@@ -45,13 +45,12 @@ export const addUser = async (req, res) => {
         );
 
         // 6. Cookie Options Set karna
-        const cookieOptions = {
-            httpOnly: true, // Frontend JavaScript ise read nahi kar payegi
-            secure: process.env.NODE_ENV === "production", 
-            sameSite: "lax", 
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 din ke liye valid
-        };
-
+       const cookieOptions = {
+    httpOnly: true,
+    secure: true,        // hardcode true kar do, NODE_ENV pe depend mat karo
+    sameSite: "None",
+    maxAge: 7 * 24 * 60 * 60 * 1000
+};
         // 7. Cookie set karna aur response bhejna
         res.status(201)
            .cookie("token", token, cookieOptions) 

@@ -1,4 +1,3 @@
-// controllers/loginUser.js
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
@@ -27,7 +26,6 @@ export const loginUser = async (req, res) => {
         }
 
         // 3. Password match karna (Bcrypt ka use karke)
-        // bcrypt.compare(plain_password, hashed_password_from_db)
         const isPasswordCorrect = await bcrypt.compare(password, user.password);
 
         if (!isPasswordCorrect) {
@@ -41,15 +39,15 @@ export const loginUser = async (req, res) => {
         const token = jwt.sign(
             { userId: user._id }, 
             process.env.JWT_SECRET || "mera_super_secret_key", 
-            { expiresIn: "7d" } // 7 din ke liye valid
+            { expiresIn: "7d" }
         );
 
-        // 5. Cookie Options Set karna
+        // 5. Cookie Options Set karna (Production Fix)
         const cookieOptions = {
-            httpOnly: true, // Frontend JS se bachaane ke liye
-            secure: process.env.NODE_ENV === "production", 
-            sameSite: "lax", 
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 din (millisecond me)
+            httpOnly: true, 
+            secure: true,           // Production (Render/HTTPS) ke liye 'true' zaroori hai
+            sameSite: "None",       // Cross-domain (Render frontend-backend) ke liye 'None' zaroori hai
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 din
         };
 
         // 6. Cookie set karna aur success response bhejna
@@ -64,7 +62,6 @@ export const loginUser = async (req, res) => {
                    email: user.email,
                    phone: user.phone,
                    exam: user.exam
-                   // Password yahan bhi wapas nahi bhejna hai
                } 
            });
 

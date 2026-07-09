@@ -1,5 +1,5 @@
 // App.jsx
-import { BrowserRouter, Routes, Route } from 'react-router-dom'; 
+import { HashRouter, Routes, Route } from 'react-router-dom'; 
 import MockTest from './pages/MockTest';
 import UserAllAnalysis from './pages/UserAllAnalysis';
 import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
@@ -15,8 +15,8 @@ import ProfilePage from './pages/ProfilePage';
 
 const App = () => { 
   return (
-    // BrowserRouter sabse bahar hona chahiye
-    <BrowserRouter>
+    // HashRouter sabse bahar hona chahiye taaki Render par reload karne pe 404 error na aaye
+    <HashRouter>
       <div>
         <Routes>
           <Route path="/" element={<HomePage/>} />
@@ -32,7 +32,7 @@ const App = () => {
           
         </Routes>
       </div>
-    </BrowserRouter>
+    </HashRouter>
   )
 }
 
