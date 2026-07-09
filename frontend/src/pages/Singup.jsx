@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/api'; // 👈 Sahi path yahan update karein
 
 const Singup = () => {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ const Singup = () => {
   });
 
   const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({}); // 👈 Field-specific errors ke liye naya state
+  const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(''); 
 
@@ -26,10 +27,10 @@ const Singup = () => {
   useEffect(() => {
     const fetchExams = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/allExamName');
-        const data = await response.json();
-        if (data.success) {
-          setExamList(data.data);
+        // 🚀 API call 1: Exam list
+        const response = await api.get('/allExamName');
+        if (response.data.success) {
+          setExamList(response.data.data);
         }
       } catch (err) {
         console.error("Exams fetch error:", err);
@@ -40,17 +41,12 @@ const Singup = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    // Type karte hi us field ka red error hat jayega
     if (fieldErrors[name]) {
       setFieldErrors({ ...fieldErrors, [name]: false });
     }
-
     if (name === 'phone') {
       const onlyNums = value.replace(/[^0-9]/g, '');
-      if (onlyNums.length <= 10) {
-        setFormData({ ...formData, [name]: onlyNums });
-      }
+      if (onlyNums.length <= 10) setFormData({ ...formData, [name]: onlyNums });
       return;
     }
     setFormData({ ...formData, [name]: value });
@@ -59,21 +55,16 @@ const Singup = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    setFieldErrors({}); // Purane errors reset karein
+    setFieldErrors({});
 
-    // 1. Phone Number Validation
     if (formData.phone.length !== 10) {
       setFieldErrors({ phone: true });
-      return setError("Phone number bilkul 10 anko (digits) ka hona chahiye!");
+      return setError("Phone number bilkul 10 anko ka hona chahiye!");
     }
-
-    // 2. Password Match Validation
     if (formData.password !== formData.confirmPassword) {
       setFieldErrors({ password: true, confirmPassword: true });
       return setError("Passwords match nahi kar rahe hain!");
     }
-    
-    // 3. Exam Category Validation
     if (!formData.exam) {
       setFieldErrors({ exam: true });
       return setError("Kripya ek Exam Category select karein!");
@@ -81,44 +72,36 @@ const Singup = () => {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/add-user', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', 
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          password: formData.password,
-          address: formData.address,
-          exam: formData.exam
-        })
+      // 🚀 API call 2: Signup (add-user)
+      const response = await api.post('/add-user', {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        password: formData.password,
+        address: formData.address,
+        exam: formData.exam
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      if (response.data.success) {
         navigate('/MockTest');
-      } else {
-        const errorMsg = data.message.toLowerCase();
-        
-        // Agar account pehle se hai toh Email aur Phone dono red honge
-        if (errorMsg.includes("pehle hi bana hua") || errorMsg.includes("already")) {
-          setFieldErrors({ email: true, phone: true });
-          setToastMsg("Account pehle se majood hai. Login page par le ja rahe hain...");
-          setTimeout(() => {
-            navigate('/Login');
-          }, 3000); 
-        } else {
-          setError(data.message || "Signup me gadbadi hui.");
-        }
       }
     } catch (err) {
-      setError("Server se connect nahi ho pa raha hai.");
+      const errorMessage = err.response?.data?.message || "Signup mein gadbadi hui.";
+      const errorMsgLower = errorMessage.toLowerCase();
+      
+      if (errorMsgLower.includes("pehle hi bana hua") || errorMsgLower.includes("already")) {
+        setFieldErrors({ email: true, phone: true });
+        setToastMsg("Account pehle se majood hai. Login page par le ja rahe hain...");
+        setTimeout(() => navigate('/Login'), 3000); 
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // ... (getInputClass function waisa hi rahega)
 
   // Border class nikalne ke liye chota helper function
   const getInputClass = (fieldName) => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-
-const BASE_URL = "http://localhost:5000/api";
+import api from "../api/api"; // 👈 Sahi import
 
 const UserSubjectAnallysis = () => {
   const navigate = useNavigate();
@@ -28,11 +27,10 @@ const UserSubjectAnallysis = () => {
 
         let currentExam = examNameFromState;
 
+        // Agar exam name state mein nahi hai, toh fetch karo
         if (!currentExam) {
-          const meRes = await fetch(`${BASE_URL}/me`, { credentials: "include" });
-          const meJson = await meRes.json();
-          if (!meRes.ok || !meJson.success) throw new Error("Please login first.");
-          currentExam = meJson.data.exam;
+          const meRes = await api.get("/me");
+          currentExam = meRes.data.data.exam;
         }
         
         setActiveExamName(currentExam);
@@ -40,18 +38,13 @@ const UserSubjectAnallysis = () => {
         const examEncoded = encodeURIComponent(currentExam);
         const subjectEncoded = encodeURIComponent(subjectNameFromState);
         
-        const url = `${BASE_URL}/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`;
+        // 🚀 Axios ka use (API instance automatically baseURL handle karega)
+        const res = await api.get(`/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`);
 
-        const res = await fetch(url, { credentials: "include" });
-        const json = await res.json();
-
-        if (!res.ok || !json.success) {
-          throw new Error(json.message || "Backend se error aaya");
-        }
-
-        setData(json.data);
+        setData(res.data.data); // 👈 res.data ka use
       } catch (err) {
-        setError(err.message);
+        // 🚀 Axios error handling
+        setError(err.response?.data?.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
       }
@@ -60,6 +53,7 @@ const UserSubjectAnallysis = () => {
     fetchSubjectAnalysis();
   }, [subjectNameFromState, examNameFromState, navigate]);
 
+  // ... (Baaki UI code waisa hi rahega)
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">

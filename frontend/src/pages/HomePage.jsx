@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const BASE_URL = "http://localhost:5000/api";
+import api from "../api/api"; // Yeh aapka axios instance hai
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -16,20 +15,16 @@ const HomePage = () => {
         setError(null);
 
         const encodedExamName = encodeURIComponent("UP Police Constable");
-        const url = `${BASE_URL}/analysis/overview/active_user/${encodedExamName}`;
-
-        const res = await fetch(url, {
-          credentials: 'include',
-        });
-        const json = await res.json();
-
-        if (!res.ok || !json.success) {
-          throw new Error(json.message || "Backend se error aaya data lene mein.");
-        }
-
-        setAverageScore(json.data.averageScore);
+        
+        // 🚀 SAHI TAREEKA: Axios ka use karein
+        // baseURL apne aap api.js se aa jayega
+        const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
+        
+        // Axios response data ko 'res.data' mein rakhta hai
+        setAverageScore(res.data.data.averageScore); 
       } catch (err) {
-        setError(err.message);
+        // Axios error ko handle karne ka tareeka
+        setError(err.response?.data?.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
       }
@@ -37,6 +32,7 @@ const HomePage = () => {
 
     fetchDashboardData();
   }, []);
+
 
   const displayedScore = loading || error || averageScore === null ? "--" : `${averageScore}%`;
 

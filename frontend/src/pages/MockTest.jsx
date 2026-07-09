@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-
-const BASE_URL = "http://localhost:5000/api";
+import api from "../api/api"; // 👈 api instance import kiya
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -31,29 +30,21 @@ const formatTime = (totalSeconds) => {
 const MockTest = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const preferredMockType =
-    location.state && location.state.mockType ? location.state.mockType : null;
+  const preferredMockType = location.state?.mockType || null;
 
-  // loading | select | instructions | test | submitting | results | error
   const [phase, setPhase] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
-
   const [userId, setUserId] = useState("");
   const [examName, setExamName] = useState("");
-
   const [blueprints, setBlueprints] = useState([]);
   const [selectedBlueprint, setSelectedBlueprint] = useState(null);
-
   const [mockData, setMockData] = useState(null);
-
   const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
   const [activeQIdx, setActiveQIdx] = useState(0);
-
   const [answers, setAnswers] = useState({});
   const [marked, setMarked] = useState(() => new Set());
   const [visited, setVisited] = useState(() => new Set());
   const [timeSpent, setTimeSpent] = useState({});
-
   const [remainingSeconds, setRemainingSeconds] = useState(0);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [resultData, setResultData] = useState(null);
@@ -62,39 +53,26 @@ const MockTest = () => {
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
 
-  // ── Step 1: who is logged in + which mocks exist for their exam ──
+  // ── Step 1: Init Data ──
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
       try {
-        const meRes = await fetch(`${BASE_URL}/me`, { credentials: "include" });
-        const meJson = await meRes.json();
-        if (!meRes.ok || !meJson.success) {
-          throw new Error(meJson.message || "Pehle login karein.");
-        }
+        const meRes = await api.get("/me");
         if (cancelled) return;
-        setUserId(meJson.data._id);
-        setExamName(meJson.data.exam);
+        setUserId(meRes.data.data._id);
+        setExamName(meRes.data.data.exam);
 
-        const bpRes = await fetch(
-          `${BASE_URL}/blueprints/${encodeURIComponent(meJson.data.exam)}`,
-          { credentials: "include" }
-        );
-        const bpJson = await bpRes.json();
-        if (!bpRes.ok || !bpJson.success) {
-          throw new Error(bpJson.message || "Mock test list fetch nahi hui.");
-        }
+        const bpRes = await api.get(`/blueprints/${encodeURIComponent(meRes.data.data.exam)}`);
         if (cancelled) return;
 
-        let list = bpJson.data || [];
+        let list = bpRes.data.data || [];
         if (preferredMockType) {
           const filtered = list.filter((b) => b.mockType === preferredMockType);
           if (filtered.length > 0) list = filtered;
         }
 
-        if (list.length === 0) {
-          throw new Error(`${meJson.data.exam} ke liye abhi koi mock test available nahi hai.`);
-        }
+        if (list.length === 0) throw new Error("No mocks available.");
 
         setBlueprints(list);
         if (list.length === 1) {
@@ -105,53 +83,34 @@ const MockTest = () => {
         }
       } catch (err) {
         if (!cancelled) {
-          setErrorMsg(err.message);
+          setErrorMsg(err.response?.data?.message || err.message);
           setPhase("error");
         }
       }
     };
     init();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    return () => { cancelled = true; };
+  }, [preferredMockType]);
 
   const chooseBlueprint = (bp) => {
     setSelectedBlueprint(bp);
     setPhase("instructions");
   };
 
-  // ── Step 2: generate the actual mock (called from instructions screen) ──
+  // ── Step 2: Generate Mock ──
   const startTest = async () => {
     setPhase("loading");
-    setErrorMsg("");
     try {
-      const res = await fetch(`${BASE_URL}/generate-mock`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          userId,
-          examName,
-          blueprintName: selectedBlueprint.blueprintName,
-        }),
+      const res = await api.post("/generate-mock", {
+        userId,
+        examName,
+        blueprintName: selectedBlueprint.blueprintName,
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Mock test generate nahi ho paaya.");
-      }
 
-      const mt = json.mockTest;
-      const nonEmptySubjects = (mt.subjects || []).filter(
-        (s) => s.questions && s.questions.length > 0
-      );
-      if (nonEmptySubjects.length === 0) {
-        throw new Error("Is blueprint ke liye abhi questions database mein maujood nahi hain.");
-      }
-
-      const cleanMock = { ...mt, subjects: nonEmptySubjects };
-      setMockData(cleanMock);
+      const mt = res.data.mockTest;
+      const nonEmptySubjects = mt.subjects.filter(s => s.questions?.length > 0);
+      
+      setMockData({ ...mt, subjects: nonEmptySubjects });
       setAnswers({});
       setMarked(new Set());
       setVisited(new Set());
@@ -165,15 +124,11 @@ const MockTest = () => {
       questionStartRef.current = Date.now();
       setVisited(new Set([firstQ._id]));
 
-      const durMin =
-        selectedBlueprint.durationMinutes && selectedBlueprint.durationMinutes > 0
-          ? selectedBlueprint.durationMinutes
-          : Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
+      const durMin = selectedBlueprint.durationMinutes || Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
       setRemainingSeconds(durMin * 60);
-
       setPhase("test");
     } catch (err) {
-      setErrorMsg(err.message);
+      setErrorMsg(err.response?.data?.message || "Mock generate fail.");
       setPhase("error");
     }
   };
@@ -288,65 +243,51 @@ const MockTest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, marked, visited, mockData]);
 
-  // ── Countdown timer — auto-submits at zero ──
-  useEffect(() => {
-    if (phase !== "test") return undefined;
-    if (remainingSeconds <= 0) {
-      handleSubmit();
-      return undefined;
-    }
-    const timer = setTimeout(() => {
-      setRemainingSeconds((s) => s - 1);
-    }, 1000);
-    return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds]);
 
-  const handleSubmit = async () => {
+const handleSubmit = async () => {
     if (!mockData || submittingRef.current) return;
     submittingRef.current = true;
     flushTime();
-    setShowSubmitConfirm(false);
     setPhase("submitting");
     try {
-      const attemptedQuestions = [];
-      mockData.subjects.forEach((subj) => {
-        subj.questions.forEach((q) => {
-          const userAns = answers[q._id] !== undefined ? answers[q._id] : null;
-          const wasVisited = visited.has(q._id);
-          const isCorrect = userAns === null ? null : userAns === String(q.correctOption);
-          attemptedQuestions.push({
-            questionId: q._id,
-            userAnswer: userAns,
-            isCorrect,
-            timeTakenInSeconds: wasVisited ? timeSpent[q._id] || 0 : null,
-          });
-        });
-      });
+      const attemptedQuestions = mockData.subjects.flatMap(subj => 
+        subj.questions.map(q => ({
+          questionId: q._id,
+          userAnswer: answers[q._id] || null,
+          isCorrect: answers[q._id] ? (answers[q._id] === String(q.correctOption)) : null,
+          timeTakenInSeconds: visited.has(q._id) ? timeSpent[q._id] || 0 : null
+        }))
+      );
 
-      const res = await fetch(`${BASE_URL}/add-performence`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          userId,
-          examName,
-          blueprintName: selectedBlueprint.blueprintName,
-          attemptedQuestions,
-        }),
+      const res = await api.post("/add-performence", {
+        userId, examName, blueprintName: selectedBlueprint.blueprintName, attemptedQuestions
       });
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Performance save nahi ho payi.");
-      }
-      setResultData(json.data);
+      setResultData(res.data.data);
       setPhase("results");
     } catch (err) {
       submittingRef.current = false;
-      setErrorMsg(err.message);
+      setErrorMsg(err.response?.data?.message || "Submit fail.");
       setPhase("error");
     }
   };
+// ── Countdown timer — auto-submits at zero ──
+  useEffect(() => {
+    if (phase !== "test") return;
+    if (remainingSeconds <= 0) {
+      // Direct call karne ki jagah setTimeout ka use karein
+      const timer = setTimeout(() => {
+        handleSubmit();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+    
+    const timer = setTimeout(() => {
+      setRemainingSeconds((s) => s - 1);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, remainingSeconds]);
 
   // ────────────────────────────── RENDER ──────────────────────────────
 

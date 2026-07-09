@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-
-const BASE_URL = "http://localhost:5000/api";
+import api from "../api/api"; // 👈 Sahi path import karein
 
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
@@ -16,29 +15,19 @@ const UserAllAnalysis = () => {
         setLoading(true);
         setError(null);
 
-        const meRes = await fetch(`${BASE_URL}/me`, { credentials: "include" });
-        const meJson = await meRes.json();
-
-        if (!meRes.ok || !meJson.success) {
-          throw new Error("Aap logged in nahi hain. Kripya pehle login karein.");
-        }
-
-        const userExam = meJson.data.exam;
+        // 🚀 API call 1: Me
+        const meRes = await api.get("/me");
+        const userExam = meRes.data.data.exam;
         setExamName(userExam);
 
+        // 🚀 API call 2: Overview analysis
         const encodedExam = encodeURIComponent(userExam);
-        const overviewRes = await fetch(`${BASE_URL}/analysis/overview/active_user/${encodedExam}`, {
-          credentials: "include",
-        });
-        const overviewJson = await overviewRes.json();
-
-        if (!overviewRes.ok || !overviewJson.success) {
-          throw new Error(overviewJson.message || "Backend se analysis error aaya.");
-        }
-
-        setOverview(overviewJson.data);
+        const overviewRes = await api.get(`/analysis/overview/active_user/${encodedExam}`);
+        
+        setOverview(overviewRes.data.data);
       } catch (err) {
-        setError(err.message);
+        // Axios error handling
+        setError(err.response?.data?.message || err.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
       }
@@ -47,6 +36,8 @@ const UserAllAnalysis = () => {
     fetchData();
   }, []);
 
+  // ... (Baaki UI code waisa hi rahega jaisa pehle tha)
+  // Bas dhyan dein ki map aur data access wahi rahen (overviewRes.data.data)
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">

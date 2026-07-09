@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-
-const BASE_URL = "http://localhost:5000/api";
+import api from "../api/api"; // 👈 Sahi import
 
 const UserTopicAnalysis = () => {
   const navigate = useNavigate();
@@ -11,12 +10,11 @@ const UserTopicAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const examNameFromState = location.state?.examName;
   const subjectNameFromState = location.state?.subjectName;
+  const examNameFromState = location.state?.examName;
   const topicNameFromState = location.state?.topicName;
 
   useEffect(() => {
-    // Agar kisi ne directly ye URL khol liya, usko wapas overview pe bhej do
     if (!topicNameFromState || !subjectNameFromState) {
       navigate('/UserAllAnalysis');
       return;
@@ -29,30 +27,23 @@ const UserTopicAnalysis = () => {
 
         let activeExamName = examNameFromState;
 
+        // Agar exam name state mein nahi hai, toh fetch karo
         if (!activeExamName) {
-          const meRes = await fetch(`${BASE_URL}/me`, { credentials: "include" });
-          const meJson = await meRes.json();
-          if (!meRes.ok || !meJson.success) throw new Error("Please login first.");
-          activeExamName = meJson.data.exam;
+          const meRes = await api.get("/me");
+          activeExamName = meRes.data.data.exam;
         }
 
         const examEncoded = encodeURIComponent(activeExamName);
         const subjectEncoded = encodeURIComponent(subjectNameFromState);
         const topicEncoded = encodeURIComponent(topicNameFromState);
         
-        // 🎯 NAYA URL: "active_user" backend ko batayega token se ID uthane ko
-        const url = `${BASE_URL}/analysis/topic/active_user/${examEncoded}/${subjectEncoded}/${topicEncoded}`;
+        // 🚀 Axios ka use (API instance automatically baseURL handle karega)
+        const res = await api.get(`/analysis/topic/active_user/${examEncoded}/${subjectEncoded}/${topicEncoded}`);
 
-        const res = await fetch(url, { credentials: "include" });
-        const json = await res.json();
-
-        if (!res.ok || !json.success) {
-          throw new Error(json.message || "Backend se error aaya");
-        }
-
-        setData(json.data);
+        setData(res.data.data); // 👈 res.data ka use
       } catch (err) {
-        setError(err.message);
+        // 🚀 Axios error handling
+        setError(err.response?.data?.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
       }
@@ -61,6 +52,7 @@ const UserTopicAnalysis = () => {
     fetchTopicAnalysis();
   }, [examNameFromState, subjectNameFromState, topicNameFromState, navigate]);
 
+  // ... (Baaki UI aur QuestionCard component waisa hi rahega)
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">

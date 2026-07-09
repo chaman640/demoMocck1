@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 // ─────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",  // React dev server (Vite)
-  "http://localhost:3000",  // React dev server (CRA)
+  "https://demomocck1-1.onrender.com",  
   process.env.FRONTEND_URL, // Production frontend URL (.env mein daalo)
 ].filter(Boolean); // undefined values hata do
 

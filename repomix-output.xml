@@ -75,6 +75,8 @@ frontend/
     favicon.svg
     icons.svg
   src/
+    api/
+      api.js
     assets/
       hero.png
       react.svg
@@ -106,6 +108,17 @@ analysise.txt
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="frontend/src/api/api.js">
+import axios from 'axios';
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  withCredentials: true, // Cookies ke liye zaroori hai
+});
+
+export default api;
+</file>
 
 <file path="backend/config/rowQuestion.js">
 // config/rowQuestion.js

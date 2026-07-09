@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/api'; // 👈 Yahan apna api instance import karein
 
 const Login = () => {
   const navigate = useNavigate();
@@ -13,19 +14,15 @@ const Login = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [toastMsg, setToastMsg] = useState(''); 
-
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-
-    // Type karte hi red error outline hat jayegi
     if (fieldErrors[name]) {
       setFieldErrors({ ...fieldErrors, [name]: false });
     }
     setError('');
 
-    // Phone me sirf numbers aur max 10 digits
     if (name === 'phone') {
       const onlyNums = value.replace(/[^0-9]/g, '');
       if (onlyNums.length <= 10) {
@@ -41,7 +38,6 @@ const Login = () => {
     setError('');
     setFieldErrors({});
 
-    // Phone Validation
     if (formData.phone.length !== 10) {
       setFieldErrors({ phone: true });
       return setError("Phone number bilkul 10 anko (digits) ka hona chahiye!");
@@ -53,40 +49,35 @@ const Login = () => {
 
     setLoading(true);
     try {
-      // Backend par login request (route: /api/user-Login)
-      const response = await fetch('http://localhost:5000/api/user-Login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include', // JWT Cookie set karne ke liye zaroori
-        body: JSON.stringify({
-          phone: formData.phone,
-          password: formData.password
-        })
+      // 🚀 Yahan humne 'fetch' ki jagah 'api.post' use kiya hai
+      const response = await api.post('/user-Login', {
+        phone: formData.phone,
+        password: formData.password
       });
 
-      const data = await response.json();
-      
-      if (data.success) {
+      // Axios response mein data 'res.data' mein hota hai
+      if (response.data.success) {
         setToastMsg("Login Successful! Redirecting...");
         setTimeout(() => {
           navigate('/MockTest');
-        }, 1500); // 1.5s delay to show success toast
-      } else {
-        // Backend se aane wale messages ke hisaab se specific field red karein
-        const errorMsg = data.message.toLowerCase();
-        if (errorMsg.includes("account nahi mila")) {
-          setFieldErrors({ phone: true });
-        } else if (errorMsg.includes("galat password")) {
-          setFieldErrors({ password: true });
-        }
-        setError(data.message || "Login fail ho gaya.");
+        }, 1500);
       }
     } catch (err) {
-      setError("Server se connect nahi ho pa raha hai.");
+      // Axios error handling
+      const errorMessage = err.response?.data?.message || "Login fail ho gaya.";
+      setError(errorMessage);
+      
+      const errorMsgLower = errorMessage.toLowerCase();
+      if (errorMsgLower.includes("account nahi mila")) {
+        setFieldErrors({ phone: true });
+      } else if (errorMsgLower.includes("galat password")) {
+        setFieldErrors({ password: true });
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   // Border class function (Same as Signup)
   const getInputClass = (fieldName) => {
