@@ -1,0 +1,177 @@
+FOR ADD   QUESTIONN
+1) questionn
+2) char option with wronge and right option 
+3) answer explane
+4) subject name and question exam name with multipal exam option 
+
+
+GEMINI ADDMOCK.JS CODE 
+// controllers/addMocktest.js
+import Blueprint from "../models/bluePrint.js";
+import Performance from "../models/Performance.js";
+import { Question } from "../models/rowQuestionSchema.js";
+
+export const addMocktest = async (req, res) => {
+  try {
+    // ⬇️ STEP 1: Request aayi
+    const { userId, examName } = req.body;
+
+    if (!userId || !examName) {
+      return res.status(400).json({ success: false, message: "userId aur examName zaroori hai!" });
+    }
+
+    // Blueprint dhundo (examName se)
+    // Note: Agar multiple mocks hain, toh yeh pehla matching uthayega. Future me tum ise blueprintName bhi bhej kar specific kar sakte ho.
+    const blueprint = await Blueprint.findOne({ examName });
+    if (!blueprint) {
+      return res.status(404).json({ success: false, message: `❌ ${examName} ka koi Blueprint nahi mila!` });
+    }
+
+    // ⬇️ STEP 2: Performance (Past attempts nikalo)
+    const pastAttempts = await Performance.find({ userId, examName });
+    const isNewUser = pastAttempts.length === 0;
+
+    // Weak topics map banao: { "Hindi": { "Sandhi": 2, "Samas": 1 } }
+    const weakTopicsMap = {}; 
+
+    if (!isNewUser) {
+      const wrongQuestionIds = [];
+      pastAttempts.forEach(attempt => {
+        attempt.attemptedQuestions.forEach(q => {
+          if (q.isCorrect === false) wrongQuestionIds.push(q.questionId);
+        });
+      });
+
+      if (wrongQuestionIds.length > 0) {
+        // Question DB se topicName aur subjectName nikalo
+        const wrongQs = await Question.find({ _id: { $in: wrongQuestionIds } }).select("topicName subjectName");
+        wrongQs.forEach(q => {
+          if (!weakTopicsMap[q.subjectName]) weakTopicsMap[q.subjectName] = {};
+          weakTopicsMap[q.subjectName][q.topicName] = (weakTopicsMap[q.subjectName][q.topicName] || 0) + 1;
+        });
+      }
+    }
+
+    const finalSubjectsArray = [];
+    let totalActualQuestions = 0;
+
+    // ⬇️ STEP 3: Har subject ke liye loop
+    for (const sub of blueprint.subjects) {
+      const subjectName = sub.subjectName;
+      const targetCount = sub.questionCount;
+      const importantTopics = sub.importantTopics || [];
+
+      let subjectQuestions = [];
+      const topicSelectionCount = {}; // Track karega ki kis topic se kitne sawal liye gaye
+
+      // ⚡ OPTIMIZATION: DB pe load kam karne ke liye ek hi baar me saare sawal memory me laye
+      const allSubjectQs = await Question.find({ examName: examName, subjectName });
+      const topicsGroup = {};
+      
+      allSubjectQs.forEach(q => {
+        if (!topicsGroup[q.topicName]) topicsGroup[q.topicName] = [];
+        topicsGroup[q.topicName].push(q);
+      });
+
+      // Har topic ke array ko shuffle kar do taaki 'base allocation' me random aaye
+      for (const t in topicsGroup) {
+        topicsGroup[t].sort(() => Math.random() - 0.5);
+      }
+
+      // 3a. Us subject ke sare UNIQUE topics
+      const allUniqueTopics = Object.keys(topicsGroup);
+      if (allUniqueTopics.length === 0) continue; // Agar DB me subject ke sawal hi nahi hain
+
+      // 3b. BASE ALLOCATION: har topic se 1 question lo
+      allUniqueTopics.forEach(topic => {
+        if (subjectQuestions.length < targetCount && topicsGroup[topic].length > 0) {
+          subjectQuestions.push(topicsGroup[topic].shift()); // shift() array se nikal leta hai, toh exclude apne aap ho gaya
+          topicSelectionCount[topic] = 1;
+        } else {
+          topicSelectionCount[topic] = 0;
+        }
+      });
+
+      // 3c. EXTRA COUNT
+      let remainingExtras = targetCount - subjectQuestions.length;
+
+      // 3d. EXTRA POOL BANAO (Priority Order)
+      if (remainingExtras > 0) {
+        let priorityQueue = [];
+
+        if (isNewUser) {
+          const impTopicsAvailable = importantTopics.filter(t => allUniqueTopics.includes(t));
+          const otherTopics = allUniqueTopics.filter(t => !importantTopics.includes(t));
+          // New User: Imp Topics -> Other Topics
+          priorityQueue = [...impTopicsAvailable, ...otherTopics];
+        } else {
+          const subjectWeakMap = weakTopicsMap[subjectName] || {};
+          const weakTopics = Object.keys(subjectWeakMap);
+
+          const impAndWeak = importantTopics.filter(t => weakTopics.includes(t) && allUniqueTopics.includes(t));
+          const impNotWeak = importantTopics.filter(t => !weakTopics.includes(t) && allUniqueTopics.includes(t));
+          const weakNotImp = weakTopics.filter(t => !importantTopics.includes(t) && allUniqueTopics.includes(t));
+          const others = allUniqueTopics.filter(t => !importantTopics.includes(t) && !weakTopics.includes(t));
+
+          // Weakness ki severity ke hisab se sort (zyada galat kiye gaye pehle)
+          impAndWeak.sort((a, b) => subjectWeakMap[b] - subjectWeakMap[a]);
+          weakNotImp.sort((a, b) => subjectWeakMap[b] - subjectWeakMap[a]);
+
+          // Old User Priority Logic 🔥
+          priorityQueue = [...impAndWeak, ...impNotWeak, ...weakNotImp, ...others];
+        }
+
+        // 3e. Round-robin extra allocation (Cap: Max 3 questions per topic)
+        let madeChanges = true;
+        while (remainingExtras > 0 && madeChanges) {
+          madeChanges = false;
+          for (const topic of priorityQueue) {
+            if (remainingExtras === 0) break;
+
+            // Cap check: Pehle se allocate hue hain toh +2 (total 3), aur DB me available ho
+            if (topicSelectionCount[topic] < 3 && topicsGroup[topic] && topicsGroup[topic].length > 0) {
+              subjectQuestions.push(topicsGroup[topic].shift());
+              topicSelectionCount[topic]++;
+              remainingExtras--;
+              madeChanges = true;
+            }
+          }
+        }
+      }
+
+      // Final shuffle taaki pattern catch na ho
+      subjectQuestions.sort(() => Math.random() - 0.5);
+
+      // Final subject object ready
+      finalSubjectsArray.push({
+        subjectName: subjectName,
+        questions: subjectQuestions
+      });
+
+      totalActualQuestions += subjectQuestions.length;
+    }
+
+    // ⬇️ STEP 4 & 5: Sab combine karo aur Response bhejo
+    res.status(200).json({
+      success: true,
+      message: isNewUser ? "🎯 Fresh Mock Test Generated" : "🧠 Adaptive Weakness-Focused Mock Generated",
+      mockTest: {
+        examName: blueprint.examName,
+        blueprintName: blueprint.blueprintName,
+        marksPerQuestion: blueprint.marksPerQuestion,
+        negativeMarking: blueprint.negativeMarking,
+        totalQuestions: totalActualQuestions,
+        subjects: finalSubjectsArray
+      }
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "❌ Algorithm crash ho gaya!",
+      error: error.message
+    });
+  }
+};
+////
+npx repomix
