@@ -4,8 +4,12 @@ dotenv.config(); // sabse upar — baaki sab iske baad
 import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser"; // 👈 1. Ye naya import add kiya hai
+import path from "path";
+import { fileURLToPath } from "url";
 import { rowQuestionConnection } from "./config/rowQuestion.js";
 import questionRouter from "./routes/Routes.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -44,8 +48,14 @@ app.use(cookieParser()); // 👈 2. Ye middleware add kiya taaki req.cookies rea
 // ─────────────────────────────────────────────
 app.use("/api", questionRouter);
 
-app.get("/", (req, res) => {
-  res.send("Server is Running!");
+// ─────────────────────────────────────────────
+// Frontend (React build) serve karna — single-origin setup
+// Ye API routes ke BAAD hai, taaki /api/* pehle match ho jaye
+// ─────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
 });
 
 // ─────────────────────────────────────────────

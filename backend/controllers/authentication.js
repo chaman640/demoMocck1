@@ -44,12 +44,11 @@ export const loginUser = async (req, res) => {
 
         // 5. Cookie Options Set karna (Production Fix)
         const cookieOptions = {
-            httpOnly: true, 
-            secure: true,           // Production (Render/HTTPS) ke liye 'true' zaroori hai
-            sameSite: "None",       // Cross-domain (Render frontend-backend) ke liye 'None' zaroori hai
-            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 din
-        };
-
+    httpOnly: true,
+    secure: true,
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000
+};
         // 6. Cookie set karna aur success response bhejna
         res.status(200)
            .cookie("token", token, cookieOptions) 
