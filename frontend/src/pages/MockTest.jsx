@@ -28,6 +28,9 @@ const formatTime = (totalSeconds) => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
+// 👇 NAYA: localStorage key banane ka helper — har user ka apna alag saved test
+const getStorageKey = (userId) => `activeMockTest_${userId}`;
+
 const MockTest = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,6 +50,9 @@ const MockTest = () => {
   const [visited, setVisited] = useState(() => new Set());
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  // 👇 NAYA: Test kab khatam hoga uska absolute (wall-clock) timestamp
+  // Isse reload ke baad bhi timer sahi se calculate ho payega
+  const [endTimestamp, setEndTimestamp] = useState(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [resultData, setResultData] = useState(null);
 
@@ -65,10 +71,56 @@ const MockTest = () => {
       try {
         const meRes = await api.get("/me");
         if (cancelled) return;
-        setUserId(meRes.data.data._id);
-        setExamName(meRes.data.data.exam);
 
-        const bpRes = await api.get(`/blueprints/${encodeURIComponent(meRes.data.data.exam)}`);
+        const uid = meRes.data.data._id;
+        const exam = meRes.data.data.exam;
+        setUserId(uid);
+        setExamName(exam);
+
+        // ─────────────────────────────────────────────
+        // 👇 NAYA: Sabse pehle check karo ki koi in-progress
+        // test localStorage mein saved to nahi hai. Agar hai
+        // aur time bacha hua hai, to usko RESUME karo —
+        // naya mock generate mat karo.
+        // ─────────────────────────────────────────────
+        const savedRaw = localStorage.getItem(getStorageKey(uid));
+        if (savedRaw) {
+          try {
+            const saved = JSON.parse(savedRaw);
+            const remaining = Math.round((saved.endTimestamp - Date.now()) / 1000);
+
+            if (saved.mockData && saved.selectedBlueprint) {
+              // State restore karo
+              setSelectedBlueprint(saved.selectedBlueprint);
+              setMockData(saved.mockData);
+              setAnswers(saved.answers || {});
+              setMarked(new Set(saved.marked || []));
+              setVisited(new Set(saved.visited || []));
+              setTimeSpent(saved.timeSpent || {});
+              setActiveSubjectIdx(saved.activeSubjectIdx || 0);
+              setActiveQIdx(saved.activeQIdx || 0);
+              setEndTimestamp(saved.endTimestamp);
+              setRemainingSeconds(Math.max(0, remaining));
+
+              const subj = saved.mockData.subjects[saved.activeSubjectIdx || 0];
+              const q = subj ? subj.questions[saved.activeQIdx || 0] : null;
+              currentQIdRef.current = q ? q._id : null;
+              questionStartRef.current = Date.now();
+              submittingRef.current = false;
+
+              setPhase("test");
+              return; // 👈 normal blueprint-fetch flow skip karo
+            }
+          } catch (parseErr) {
+            // Corrupt data mila to usse hata do aur normal flow chalao
+            localStorage.removeItem(getStorageKey(uid));
+          }
+        }
+
+        // ─────────────────────────────────────────────
+        // Koi saved test nahi mila — normal flow: blueprints fetch karo
+        // ─────────────────────────────────────────────
+        const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
         if (cancelled) return;
 
         let list = bpRes.data.data || [];
@@ -95,6 +147,7 @@ const MockTest = () => {
     };
     init();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredMockType]);
 
   const chooseBlueprint = (bp) => {
@@ -130,7 +183,11 @@ const MockTest = () => {
       setVisited(new Set([firstQ._id]));
 
       const durMin = selectedBlueprint.durationMinutes || Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
-      setRemainingSeconds(durMin * 60);
+      const totalSeconds = durMin * 60;
+      const newEndTimestamp = Date.now() + totalSeconds * 1000;
+
+      setEndTimestamp(newEndTimestamp);
+      setRemainingSeconds(totalSeconds);
       setPhase("test");
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Mock generate fail.");
@@ -248,8 +305,49 @@ const MockTest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, marked, visited, mockData]);
 
+  // ─────────────────────────────────────────────
+  // 👇 NAYA: Jab bhi test ka koi bhi zaroori part change ho
+  // (answer, mark, navigation, time), poora state localStorage
+  // mein save kar do — taaki reload pe wahi se resume ho sake.
+  // Note: remainingSeconds ko dependency mein NAHI rakha — 
+  // warna har second localStorage write hota rahega (perf hit).
+  // Uski jagah fixed endTimestamp store hota hai.
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "test" || !mockData || !userId || !endTimestamp) return;
 
-const handleSubmit = async () => {
+    const toSave = {
+      selectedBlueprint,
+      mockData,
+      answers,
+      marked: [...marked],
+      visited: [...visited],
+      timeSpent,
+      activeSubjectIdx,
+      activeQIdx,
+      endTimestamp,
+    };
+
+    try {
+      localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave));
+    } catch (err) {
+      console.error("Mock test state save nahi ho paayi:", err);
+    }
+  }, [
+    phase,
+    mockData,
+    answers,
+    marked,
+    visited,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    endTimestamp,
+    userId,
+    selectedBlueprint,
+  ]);
+
+  const handleSubmit = async () => {
     if (!mockData || submittingRef.current) return;
     submittingRef.current = true;
     flushTime();
@@ -267,6 +365,11 @@ const handleSubmit = async () => {
       const res = await api.post("/add-performence", {
         userId, examName, blueprintName: selectedBlueprint.blueprintName, attemptedQuestions
       });
+
+      // 👇 NAYA: Submit successful hone ke baad saved in-progress test hata do
+      // warna agli baar dobara yahi purana test resume ho jayega
+      localStorage.removeItem(getStorageKey(userId));
+
       setResultData(res.data.data);
       setPhase("results");
     } catch (err) {
@@ -275,9 +378,11 @@ const handleSubmit = async () => {
       setPhase("error");
     }
   };
-// ── Countdown timer — auto-submits at zero ──
+
+  // ── Countdown timer — endTimestamp ke basis pe accurate rehta hai ──
   useEffect(() => {
     if (phase !== "test") return;
+
     if (remainingSeconds <= 0) {
       // Direct call karne ki jagah setTimeout ka use karein
       const timer = setTimeout(() => {
@@ -285,14 +390,21 @@ const handleSubmit = async () => {
       }, 0);
       return () => clearTimeout(timer);
     }
-    
+
     const timer = setTimeout(() => {
-      setRemainingSeconds((s) => s - 1);
+      // 👇 NAYA: endTimestamp se hi recalculate karo, sirf -1 mat karo
+      // Isse background tab throttling ya thoda drift bhi self-correct ho jata hai
+      if (endTimestamp) {
+        const newRemaining = Math.max(0, Math.round((endTimestamp - Date.now()) / 1000));
+        setRemainingSeconds(newRemaining);
+      } else {
+        setRemainingSeconds((s) => Math.max(0, s - 1));
+      }
     }, 1000);
-    
+
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds]);
+  }, [phase, remainingSeconds, endTimestamp]);
 
   // 👇 NAYA: Review screen kholne/band karne ke functions
   const openReview = (subjectName = null, filter = "all") => {
@@ -491,7 +603,7 @@ const InstructionsScreen = ({ examName, blueprint, durMin, onStart }) => {
           {blueprint.negativeMarking > 0 && (
             <li>Har galat jawab ke {blueprint.negativeMarking} marks katenge.</li>
           )}
-          <li>Test ke beech mein page reload ya close na karein.</li>
+          <li>Agar galti se page reload ho jaaye to chinta na karein — aapka test wahi se resume ho jayega.</li>
           <li>Kisi bhi sawaal ko "Mark for Review" karke baad mein wapas aa sakte hain.</li>
         </ul>
 
@@ -734,7 +846,7 @@ const TestScreen = ({
   );
 };
 
-// 👇 UPDATED: Results screen — ab categories aur "Deep Analysis" clickable hain
+// 👇 Results screen — categories aur "Deep Analysis" clickable hain
 const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   const { scoreDetails, subjectAnalysis } = resultData;
   return (
@@ -748,7 +860,6 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
           <p className="text-sm text-gray-500 mt-1">Total Score</p>
         </div>
 
-        {/* 👇 NAYA: Ye 3 cards ab clickable hain — click karke us category ke sawaal dekh sakte hain */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           <button
             onClick={() => onOpenReview(null, "correct")}
@@ -786,7 +897,6 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
                   {s.accuracy}% accuracy &middot; {s.correctCount}/{s.totalQuestions}
                 </p>
               </div>
-              {/* 👇 NAYA: Deep Analysis button — is subject ke sawaal ek-ek karke dikhayega */}
               <button
                 onClick={() => onOpenReview(s.subjectName, "all")}
                 className="px-3 py-1.5 rounded-lg bg-[#111827] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] text-xs font-medium transition-colors flex-shrink-0"
@@ -816,9 +926,7 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   );
 };
 
-// 👇 NAYA COMPONENT: Question Review Screen
-// Ye is mock ke saare questions fetch karta hai (/analysis/mock-detail/:performanceId se),
-// phir subject/status ke hisaab se filter karke ek-ek question dikhata hai
+// Question Review Screen
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
   { key: "correct", label: "Correct" },
@@ -858,14 +966,12 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
     });
   }, [allQuestions, subjectFilter, statusFilter]);
 
-  // Filter badalte hi pehle question pe wapas le jao
   useEffect(() => {
     setIndex(0);
   }, [subjectFilter, statusFilter]);
 
   const currentQ = filteredQuestions[index];
 
-  // Selected subject ke hisaab se har status ka count (tabs pe dikhane ke liye)
   const counts = useMemo(() => {
     const base = allQuestions.filter(
       (q) => subjectFilter === "all" || q.subjectName === subjectFilter
@@ -890,7 +996,6 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
 
         <h1 className="text-xl sm:text-2xl font-bold mb-4">Question Review</h1>
 
-        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject hai */}
         {subjects.length > 1 && (
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             <button
@@ -919,7 +1024,6 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
           </div>
         )}
 
-        {/* Status filter — Correct / Wrong / Unattempted */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -987,7 +1091,7 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
   );
 };
 
-// 👇 NAYA COMPONENT: Ek single question ka poora detail card
+// Ek single question ka poora detail card
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =
     q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
