@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import api from "../api/api"; // 👈 Sahi path import karein
 
 const UserAllAnalysis = () => {
@@ -9,24 +10,24 @@ const UserAllAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  // 👇 NAYA: List me se kaunsa mock click hua, uska performanceId yahan store hoga
+  const [viewingMockId, setViewingMockId] = useState(null);
+
+  React.useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        // 🚀 API call 1: Me
         const meRes = await api.get("/me");
         const userExam = meRes.data.data.exam;
         setExamName(userExam);
 
-        // 🚀 API call 2: Overview analysis
         const encodedExam = encodeURIComponent(userExam);
         const overviewRes = await api.get(`/analysis/overview/active_user/${encodedExam}`);
         
         setOverview(overviewRes.data.data);
       } catch (err) {
-        // Axios error handling
         setError(err.response?.data?.message || err.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
@@ -36,8 +37,13 @@ const UserAllAnalysis = () => {
     fetchData();
   }, []);
 
-  // ... (Baaki UI code waisa hi rahega jaisa pehle tha)
-  // Bas dhyan dein ki map aur data access wahi rahen (overviewRes.data.data)
+  // 👇 NAYA: graphData backend se oldest→newest order me aata hai (graph ke liye zaroori),
+  // isliye table ke liye ise reverse karke newest→oldest bana rahe hain
+  const sortedHistory = useMemo(() => {
+    if (!overview?.graphData) return [];
+    return [...overview.graphData].reverse();
+  }, [overview]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
@@ -86,6 +92,16 @@ const UserAllAnalysis = () => {
           </button>
         </div>
       </div>
+    );
+  }
+
+  // 👇 NAYA: Agar koi mock click hua hai, to poori screen uska detail view dikhaye
+  if (viewingMockId) {
+    return (
+      <MockDetailScreen
+        performanceId={viewingMockId}
+        onBack={() => setViewingMockId(null)}
+      />
     );
   }
 
@@ -160,7 +176,6 @@ const UserAllAnalysis = () => {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-400">{s.averageTimePerQuestion} sec</td>
                       <td className="px-6 py-4 text-sm text-gray-400">
-                        {/* 🎯 NAYA LOGIC: Yahan hum state mein subjectName aur examName bhej rahe hain */}
                         <button 
                           onClick={() => navigate('/UserSubjectAnallysis', { 
                             state: { subjectName: s.subjectName, examName: examName } 
@@ -178,30 +193,44 @@ const UserAllAnalysis = () => {
           )}
         </div>
 
-        {/* Mock History */}
+        {/* Mock History — ab latest-first, date+time ke sath, clickable */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Test History</h3>
-            <p className="text-xs text-gray-500 mt-1">Aapke diye gaye sabhi mocks ka record</p>
+            <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par click karke uska poora result dekhein</p>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-medium">Date</th>
+                  <th className="px-6 py-4 font-medium">Date &amp; Time</th>
                   <th className="px-6 py-4 font-medium">Score</th>
-                  <th className="px-6 py-4 font-medium">Performance ID</th>
+                  <th className="px-6 py-4 font-medium text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-800">
-                {overview.graphData?.map((g, i) => (
-                  <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
+                {sortedHistory.map((g, i) => (
+                  <tr
+                    key={i}
+                    onClick={() => setViewingMockId(g.performanceId)}
+                    className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
+                  >
                     <td className="px-6 py-4 text-sm text-gray-300">
-                      {new Date(g.date).toLocaleDateString("hi-IN", { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {new Date(g.date).toLocaleString("en-IN", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
-                    <td className="px-6 py-4 text-xs font-mono text-gray-500">{String(g.performanceId)}</td>
+                    <td className="px-6 py-4 text-sm text-right">
+                      <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
+                        View Result &rarr;
+                      </span>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -210,6 +239,314 @@ const UserAllAnalysis = () => {
         </div>
 
       </div>
+    </div>
+  );
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA COMPONENT: Ek specific mock ka poora result + question review
+// Same pattern jaisa mock submit ke turant baad dikhta hai
+// ──────────────────────────────────────────────
+
+const Stat = ({ label, value }) => (
+  <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 text-center">
+    <p className="text-xl font-bold">{value}</p>
+    <p className="text-[11px] text-gray-500 mt-1">{label}</p>
+  </div>
+);
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+const MockDetailScreen = ({ performanceId, onBack }) => {
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(null); // null = abhi review nahi khula, sirf overview dikh raha
+  const [index, setIndex] = useState(0);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["mock-detail", performanceId],
+    queryFn: async () => {
+      const res = await api.get(`/analysis/mock-detail/${performanceId}`);
+      return res.data;
+    },
+    enabled: !!performanceId,
+  });
+
+  const allQuestions = data?.questionBreakdown || [];
+
+  const subjects = useMemo(() => {
+    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
+    return Array.from(set);
+  }, [allQuestions]);
+
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter((q) => {
+      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
+      let statusMatch = true;
+      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
+      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
+      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
+      return subjMatch && statusMatch;
+    });
+  }, [allQuestions, subjectFilter, statusFilter]);
+
+  const currentQ = filteredQuestions[index];
+
+  const openReview = (filter = "all") => {
+    setStatusFilter(filter);
+    setIndex(0);
+  };
+
+  const closeReview = () => {
+    setStatusFilter(null);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Result load ho raha hai...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <button
+            onClick={onBack}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Wapas Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const { overview } = data;
+
+  // ── Sub-view: question-by-question review (jab koi category click hui ho) ──
+  if (statusFilter) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+        <div className="max-w-3xl mx-auto">
+          <button
+            onClick={closeReview}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Result par wapas jaayein
+          </button>
+
+          <h1 className="text-xl sm:text-2xl font-bold mb-4">Question Review</h1>
+
+          {subjects.length > 1 && (
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+              <button
+                onClick={() => { setSubjectFilter("all"); setIndex(0); }}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  subjectFilter === "all"
+                    ? "bg-[#7C3AED] text-white"
+                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                Sabhi Subjects
+              </button>
+              {subjects.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => { setSubjectFilter(s); setIndex(0); }}
+                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                    subjectFilter === s
+                      ? "bg-[#7C3AED] text-white"
+                      : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => { setStatusFilter(f.key); setIndex(0); }}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  statusFilter === f.key
+                    ? "bg-[#7C3AED] text-white"
+                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {filteredQuestions.length === 0 && (
+            <p className="text-gray-400 text-sm py-10 text-center">
+              Is category mein koi sawaal nahi hai.
+            </p>
+          )}
+
+          {currentQ && (
+            <>
+              <p className="text-xs text-gray-500 mb-3">
+                Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
+              </p>
+              <QuestionDetailCard q={currentQ} />
+
+              <div className="flex justify-between items-center mt-6">
+                <button
+                  onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                  disabled={index === 0}
+                  className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  &larr; Previous
+                </button>
+                <button
+                  onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
+                  disabled={index >= filteredQuestions.length - 1}
+                  className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main view: overview stats (jaisa submit ke turant baad dikhta hai) ──
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+      <div className="max-w-2xl mx-auto">
+        <button
+          onClick={onBack}
+          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+        >
+          &larr; Test History par wapas jaayein
+        </button>
+
+        <h1 className="text-2xl font-bold mb-1">{overview.blueprintName}</h1>
+        <p className="text-gray-400 text-sm mb-8">{overview.examName}</p>
+
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-6">
+          <p className="text-5xl font-bold text-[#A78BFA]">{overview.totalScore}</p>
+          <p className="text-sm text-gray-500 mt-1">Total Score &middot; {overview.accuracy}% Accuracy</p>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-8">
+          <button
+            onClick={() => openReview("correct")}
+            className="bg-[#1F2937] border border-gray-800 hover:border-green-500/50 rounded-xl p-4 text-center transition-colors"
+          >
+            <p className="text-xl font-bold text-green-400">{overview.correct}</p>
+            <p className="text-[11px] text-gray-500 mt-1">Correct</p>
+          </button>
+          <button
+            onClick={() => openReview("wrong")}
+            className="bg-[#1F2937] border border-gray-800 hover:border-red-500/50 rounded-xl p-4 text-center transition-colors"
+          >
+            <p className="text-xl font-bold text-red-400">{overview.wrong}</p>
+            <p className="text-[11px] text-gray-500 mt-1">Wrong</p>
+          </button>
+          <button
+            onClick={() => openReview("unattempted")}
+            className="bg-[#1F2937] border border-gray-800 hover:border-gray-500/50 rounded-xl p-4 text-center transition-colors"
+          >
+            <p className="text-xl font-bold text-gray-300">{overview.unattempted}</p>
+            <p className="text-[11px] text-gray-500 mt-1">Unattempted</p>
+          </button>
+        </div>
+
+        <button
+          onClick={() => openReview("all")}
+          className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+        >
+          Sabhi Sawaal Dekhein
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ──────────────────────────────────────────────
+// 👇 Single question detail card (options + explanation)
+// ──────────────────────────────────────────────
+const QuestionDetailCard = ({ q }) => {
+  const statusLabel =
+    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+  const statusColor =
+    q.isCorrect === true
+      ? "text-green-400 bg-green-500/10 border-green-500/30"
+      : q.isCorrect === false
+      ? "text-red-400 bg-red-500/10 border-red-500/30"
+      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <span className="text-xs text-gray-500">{q.topicName}</span>
+        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
+
+      <div className="space-y-2.5 mb-6">
+        {[1, 2, 3, 4].map((n) => {
+          const optText = q.options?.[`option${n}`];
+          const isCorrectOpt = q.correctOption === n;
+          const isUserPick = q.userAnswer === String(n);
+
+          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
+          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
+          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
+
+          return (
+            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
+                {n}
+              </span>
+              <span className="flex-1">{optText}</span>
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isUserPick && !isCorrectOpt && (
+                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {q.userAnswer == null && (
+        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+      )}
+
+      {q.timeTakenInSeconds != null && (
+        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
+      )}
+
+      {q.answerExplain && (
+        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
+            Explanation
+          </p>
+          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+        </div>
+      )}
     </div>
   );
 };
