@@ -115,7 +115,7 @@ export const addPerformence = async (req, res) => {
     // Question count verify
     if (
       correctCount + wrongCount + unattemptedCount !==
-      blueprint.totalQuestions
+      attemptedQuestions.length
     ) {
       return res.status(400).json({
         success: false,
