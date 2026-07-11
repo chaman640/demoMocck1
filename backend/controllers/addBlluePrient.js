@@ -5,15 +5,16 @@ export const addBluePrint = async (req, res) => {
     try {
         const { 
             blueprintName, 
-            examName, // 👈 1. Frontend se examName extract kiya
+            examName,
             totalQuestions, 
             marksPerQuestion, 
             negativeMarking, 
+            durationMinutes, // 👈 1. Frontend se durationMinutes extract kiya
             subjects, 
             mockType 
         } = req.body;
 
-        // 1. Validation: Zaroori fields check karein (isme examName bhi jod diya)
+        // 1. Validation: Zaroori fields check karein
         if (!blueprintName || !examName || !totalQuestions || !marksPerQuestion || !subjects) {
             return res.status(400).json({ 
                 success: false, 
@@ -32,12 +33,13 @@ export const addBluePrint = async (req, res) => {
         // 3. Naya Blueprint Document banayein
         const newBlueprint = new Blueprint({
             blueprintName,
-            examName, // 👈 2. Database me save karne ke liye yahan pass kiya
+            examName,
             totalQuestions,
             marksPerQuestion,
-            negativeMarking: negativeMarking ?? 0, // 👈 Falsy bug fix (?? use kiya)
+            negativeMarking: negativeMarking ?? 0,
+            durationMinutes: durationMinutes ?? 0, // 👈 2. Save karte waqt pass kiya — na bheja to 0 (auto-calculate)
             subjects, 
-            mockType: mockType ?? "Full" // 👈 Falsy bug fix (?? use kiya)
+            mockType: mockType ?? "Full"
         });
 
         // 4. Database me save karein
@@ -51,7 +53,6 @@ export const addBluePrint = async (req, res) => {
         });
 
     } catch (error) {
-        // Error handling
         res.status(500).json({
             success: false,
             message: "Server me error aa gaya blueprint save karte waqt.",

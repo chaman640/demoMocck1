@@ -33,6 +33,10 @@ const blueprintSchema = new mongoose.Schema(
       required: [true, "Negative marking batana zaroori hai. (0 likhein agar nahi hai)"],
       default: 0,
     },
+    durationMinutes: {
+     type: Number,
+     default: 0, // 0 ka matlab "auto-calculate karo"
+    },
 
     // Yeh array aapko Mini aur Full mock dono banane me madad karega
     subjects: [

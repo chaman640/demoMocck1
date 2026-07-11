@@ -1,40 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../api/api"; // Yeh aapka axios instance hai
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/api";
 
 const HomePage = () => {
   const navigate = useNavigate();
-  const [averageScore, setAverageScore] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["overview", "UP Police Constable"], // same key = cache reuse hoga
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent("UP Police Constable");
+      const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
+      return res.data.data;
+    },
+  });
 
-        const encodedExamName = encodeURIComponent("UP Police Constable");
-        
-        // 🚀 SAHI TAREEKA: Axios ka use karein
-        // baseURL apne aap api.js se aa jayega
-        const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
-        
-        // Axios response data ko 'res.data' mein rakhta hai
-        setAverageScore(res.data.data.averageScore); 
-      } catch (err) {
-        // Axios error ko handle karne ka tareeka
-        setError(err.response?.data?.message || "Data laane mein error aaya.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
-
-
-  const displayedScore = loading || error || averageScore === null ? "--" : `${averageScore}%`;
+  const averageScore = data?.averageScore ?? null;
+  const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
 
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white">
@@ -70,14 +52,12 @@ const HomePage = () => {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 pt-4">
               <button 
-                // Yahan state mein mockType: "Full" bheja gaya hai
                 onClick={() => navigate('/MockTest', { state: { mockType: "Full" } })}
                 className="px-6 py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 Start Full Mock Test <span>&rarr;</span>
               </button>
               <button 
-                // Yahan state mein mockType: "Mini" bheja gaya hai
                 onClick={() => navigate('/MockTest', { state: { mockType: "Mini" } })}
                 className="px-6 py-3 bg-transparent border border-gray-700 hover:border-gray-500 text-gray-300 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
