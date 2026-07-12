@@ -1,7 +1,102 @@
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/api"; // 👈 Sahi path import karein
+import api from "../api/api";
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// ──────────────────────────────────────────────
+const formatDuration = (totalSeconds) => {
+  if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const AnalysisPageSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="w-8 h-8 rounded" />
+        <SkeletonBlock className="w-32 h-5" />
+      </div>
+      <SkeletonBlock className="w-24 h-4" />
+    </nav>
+
+    <div className="max-w-5xl mx-auto px-6 mt-10 space-y-8">
+      <div className="space-y-2">
+        <SkeletonBlock className="w-64 h-8" />
+        <SkeletonBlock className="w-48 h-4" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+          <SkeletonBlock className="w-36 h-3 mb-3" />
+          <SkeletonBlock className="w-20 h-9" />
+        </div>
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+          <SkeletonBlock className="w-36 h-3 mb-3" />
+          <SkeletonBlock className="w-20 h-9" />
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-40 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-10" />
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-32 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const MockDetailSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto space-y-6">
+      <SkeletonBlock className="w-40 h-4" />
+      <div className="space-y-2">
+        <SkeletonBlock className="w-56 h-6" />
+        <SkeletonBlock className="w-32 h-3" />
+      </div>
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 flex flex-col items-center gap-3">
+        <SkeletonBlock className="w-24 h-10" />
+        <SkeletonBlock className="w-40 h-3" />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="h-20 rounded-xl" />
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
 
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
@@ -10,7 +105,9 @@ const UserAllAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 👇 NAYA: List me se kaunsa mock click hua, uska performanceId yahan store hoga
+  // 👇 NAYA: Subject-wise question count, blueprint se aata hai
+  const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({});
+
   const [viewingMockId, setViewingMockId] = useState(null);
 
   React.useEffect(() => {
@@ -24,9 +121,25 @@ const UserAllAnalysis = () => {
         setExamName(userExam);
 
         const encodedExam = encodeURIComponent(userExam);
-        const overviewRes = await api.get(`/analysis/overview/active_user/${encodedExam}`);
-        
+
+        // Overview aur blueprints dono ek sath fetch karte hain
+        const [overviewRes, blueprintsRes] = await Promise.all([
+          api.get(`/analysis/overview/active_user/${encodedExam}`),
+          api.get(`/blueprints/${encodedExam}`).catch(() => ({ data: { data: [] } })), // fail ho to bhi crash na ho
+        ]);
+
         setOverview(overviewRes.data.data);
+
+        // 👇 NAYA: Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
+        const countMap = {};
+        (blueprintsRes.data.data || []).forEach((bp) => {
+          (bp.subjects || []).forEach((s) => {
+            if (!(s.subjectName in countMap)) {
+              countMap[s.subjectName] = s.questionCount;
+            }
+          });
+        });
+        setSubjectQuestionCounts(countMap);
       } catch (err) {
         setError(err.response?.data?.message || err.message || "Data laane mein error aaya.");
       } finally {
@@ -37,20 +150,13 @@ const UserAllAnalysis = () => {
     fetchData();
   }, []);
 
-  // 👇 NAYA: graphData backend se oldest→newest order me aata hai (graph ke liye zaroori),
-  // isliye table ke liye ise reverse karke newest→oldest bana rahe hain
   const sortedHistory = useMemo(() => {
     if (!overview?.graphData) return [];
     return [...overview.graphData].reverse();
   }, [overview]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 font-medium tracking-wide">Analysis data load ho raha hai...</p>
-      </div>
-    );
+    return <AnalysisPageSkeleton />;
   }
 
   if (error) {
@@ -95,7 +201,6 @@ const UserAllAnalysis = () => {
     );
   }
 
-  // 👇 NAYA: Agar koi mock click hua hai, to poori screen uska detail view dikhaye
   if (viewingMockId) {
     return (
       <MockDetailScreen
@@ -161,39 +266,51 @@ const UserAllAnalysis = () => {
                   <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
                     <th className="px-6 py-4 font-medium">Subject Name</th>
                     <th className="px-6 py-4 font-medium">Avg. Accuracy</th>
-                    <th className="px-6 py-4 font-medium">Avg. Time (per Q)</th>
+                    <th className="px-6 py-4 font-medium">Total Time (Subject)</th>
                     <th className="px-6 py-4 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {overview.subjectAnalysis?.map((s, i) => (
-                    <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{s.subjectName}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${s.averageAccuracy >= 70 ? 'bg-green-500/10 text-green-400' : s.averageAccuracy >= 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
-                          {s.averageAccuracy}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-400">{s.averageTimePerQuestion} sec</td>
-                      <td className="px-6 py-4 text-sm text-gray-400">
-                        <button 
-                          onClick={() => navigate('/UserSubjectAnallysis', { 
-                            state: { subjectName: s.subjectName, examName: examName } 
-                          })}
-                          className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs flex items-center gap-1"
-                        >
-                          View Deep &rarr;
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {overview.subjectAnalysis?.map((s, i) => {
+                    // 👇 NAYA: averageTimePerQuestion × us subject ke total questions = poora subject attempt karne ka time
+                    const qCount = subjectQuestionCounts[s.subjectName];
+                    const totalTimeSeconds =
+                      qCount != null ? s.averageTimePerQuestion * qCount : null;
+
+                    return (
+                      <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-200">{s.subjectName}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${s.averageAccuracy >= 70 ? 'bg-green-500/10 text-green-400' : s.averageAccuracy >= 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {s.averageAccuracy}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          {formatDuration(totalTimeSeconds)}
+                          {qCount != null && (
+                            <span className="text-gray-600 text-xs ml-1">({qCount}Q)</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          <button 
+                            onClick={() => navigate('/UserSubjectAnallysis', { 
+                              state: { subjectName: s.subjectName, examName: examName } 
+                            })}
+                            className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs flex items-center gap-1"
+                          >
+                            View Deep &rarr;
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
-        {/* Mock History — ab latest-first, date+time ke sath, clickable */}
+        {/* Mock History — latest-first, date+time ke sath, clickable */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Test History</h3>
@@ -244,8 +361,7 @@ const UserAllAnalysis = () => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 NAYA COMPONENT: Ek specific mock ka poora result + question review
-// Same pattern jaisa mock submit ke turant baad dikhta hai
+// 👇 Ek specific mock ka poora result + question review
 // ──────────────────────────────────────────────
 
 const Stat = ({ label, value }) => (
@@ -264,7 +380,7 @@ const STATUS_FILTERS = [
 
 const MockDetailScreen = ({ performanceId, onBack }) => {
   const [subjectFilter, setSubjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState(null); // null = abhi review nahi khula, sirf overview dikh raha
+  const [statusFilter, setStatusFilter] = useState(null);
   const [index, setIndex] = useState(0);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -306,14 +422,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Result load ho raha hai...</p>
-        </div>
-      </div>
-    );
+    return <MockDetailSkeleton />;
   }
 
   if (isError || !data) {
@@ -334,7 +443,6 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   const { overview } = data;
 
-  // ── Sub-view: question-by-question review (jab koi category click hui ho) ──
   if (statusFilter) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
@@ -428,7 +536,6 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
     );
   }
 
-  // ── Main view: overview stats (jaisa submit ke turant baad dikhta hai) ──
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
       <div className="max-w-2xl mx-auto">
