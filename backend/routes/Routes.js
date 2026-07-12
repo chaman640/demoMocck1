@@ -14,6 +14,8 @@ import { loginUser } from "../controllers/authentication.js";
 import { updateUserInfo } from "../controllers/updateSutf.js";
 import { allExamName } from "../controllers/allExamName.js";
 import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
 
 // 👇 NAYA: Peer-Challenge feature ke controllers
 import { createChallenge } from "../controllers/createChallenge.js";
@@ -96,5 +98,6 @@ router.get("/allExamName", allExamName);
 // isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
 router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
 router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
 
 export default router;

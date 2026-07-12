@@ -74,11 +74,13 @@ export const createChallenge = async (req, res) => {
       const { subjectName, questionCount } = subjectConfig;
 
       // Is subject ke saare questions DB se lao
+      // 👇 NAYA: answerExplain bhi select kar rahe hain — taaki baad mein
+      // "Detailed Analysis" screen pe user ko explanation dikhaya ja sake
       const allQuestions = await Question.find({
         examName: { $in: [examName] },
         subjectName: subjectName,
       }).select(
-        "_id question option1 option2 option3 option4 correctOption topicName subjectName questionNumber"
+        "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName questionNumber"
       );
 
       if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
@@ -95,6 +97,7 @@ export const createChallenge = async (req, res) => {
         option3: q.option3,
         option4: q.option4,
         correctOption: q.correctOption,
+        answerExplain: q.answerExplain, // 👈 NAYA — frozen question ke sath explanation bhi save
         topicName: q.topicName,
         subjectName: q.subjectName,
         questionNumber: q.questionNumber,

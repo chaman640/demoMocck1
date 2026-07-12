@@ -61,6 +61,7 @@ const challengeSchema = new mongoose.Schema(
             option3: { type: String, required: true },
             option4: { type: String, required: true },
             correctOption: { type: Number, required: true },
+            answerExplain: { type: String },
             topicName: { type: String },
             subjectName: { type: String },
             questionNumber: { type: Number },

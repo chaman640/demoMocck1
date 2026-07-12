@@ -713,22 +713,24 @@ const Challenge = () => {
 
           <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
 
-          <div className="space-y-3 mt-8">
-            {isOwnChallenge && (
-              <button
-                onClick={handleCreateNewChallenge}
-                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
-              >
-                Ek Naya Challenge Banao
-              </button>
-            )}
-            <button
-              onClick={() => navigate("/HomePage")}
-              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-            >
-              Home Jaayein
-            </button>
-          </div>
+          <div className="space-y-3">
+  {/* 👇 NAYA: Detailed Analysis button */}
+  <button
+    onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
+    className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
+  >
+    Detailed Analysis Dekho
+  </button>
+
+  {isOwnChallenge && (
+    <button onClick={handleCreateNewChallenge} className="...">
+      Ek Naya Challenge Banao
+    </button>
+  )}
+  <button onClick={() => navigate("/HomePage")} className="...">
+    Home Jaayein
+  </button>
+</div>
         </div>
       </div>
     );
