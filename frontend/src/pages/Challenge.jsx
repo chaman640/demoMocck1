@@ -76,9 +76,7 @@ const SubmittingSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Reusable Leaderboard list component
-// Ab ye result screen ke andar bhi use hoga aur standalone
-// "already-attempted" case mein bhi — professional, consistent look
+// Reusable Leaderboard list component
 // ──────────────────────────────────────────────
 const LeaderboardList = ({ leaderboard, currentUserName }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
@@ -162,13 +160,8 @@ const Challenge = () => {
 
   const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
 
-  // Ye batata hai ki current attempt "khud ke banaye hue challenge" ka hai
-  // ya "kisi dost ke bheje hue link" ka
   const isOwnChallenge = !codeParam && !!createdChallenge;
 
-  // ─────────────────────────────────────────────
-  // Naya challenge generate karne ka reusable function
-  // ─────────────────────────────────────────────
   const generateNewChallenge = async (exam, uid) => {
     const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
     const list = bpRes.data.data || [];
@@ -187,7 +180,6 @@ const Challenge = () => {
     return created;
   };
 
-  // Manually "Naya Challenge Banao" button ke liye
   const handleCreateNewChallenge = async () => {
     setPhase("loading-create");
     try {
@@ -200,7 +192,6 @@ const Challenge = () => {
     }
   };
 
-  // ── Step 1: Init — decide karo create-flow ya join-flow ──
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
@@ -214,7 +205,6 @@ const Challenge = () => {
         setUserExam(user.exam);
 
         if (codeParam) {
-          // ── JOIN FLOW: kisi ne link bheja hai ──
           const chRes = await api.get(`/challenge/${codeParam}`);
           if (cancelled) return;
           const data = chRes.data.data;
@@ -229,7 +219,6 @@ const Challenge = () => {
           return;
         }
 
-        // ── CREATE FLOW: pehle localStorage check karo ──
         const storageKey = getChallengeStorageKey(user._id);
         const savedRaw = localStorage.getItem(storageKey);
         if (savedRaw) {
@@ -239,7 +228,6 @@ const Challenge = () => {
             const sameExam = saved?.examName === user.exam;
 
             if (saved?.challengeCode && notExpired && sameExam) {
-              // Check karo kya khud is user ne is challenge ko already attempt kiya hai
               const checkRes = await api.get(`/challenge/${saved.challengeCode}`);
               if (cancelled) return;
 
@@ -258,7 +246,6 @@ const Challenge = () => {
           }
         }
 
-        // Koi valid/unused saved challenge nahi mila — naya generate karo
         await generateNewChallenge(user.exam, user._id);
         setPhase("created");
       } catch (err) {
@@ -361,7 +348,7 @@ const Challenge = () => {
       const res = await api.get(`/challenge/${cc}/leaderboard`);
       setLeaderboard(res.data.data);
     } catch (err) {
-      // silently fail — leaderboard optional hai result ke saath
+      // silently fail
     }
   };
 
@@ -386,8 +373,6 @@ const Challenge = () => {
         localStorage.removeItem(getChallengeStorageKey(userId));
       }
 
-      // 👇 Leaderboard yahin fetch ho jayega — result screen pe hi dikhega,
-      // alag se "poora leaderboard dekho" button/phase ki zaroorat nahi
       await loadLeaderboard(effectiveCode);
       setPhase("result");
     } catch (err) {
@@ -620,9 +605,10 @@ const Challenge = () => {
   }
 
   // ─────────────────────────────────────────────
-  // 👇 UPDATED: RESULT SCREEN — ab score + poora leaderboard EK HI SCREEN pe.
-  // Pehle yahan sirf "Poora Leaderboard Dekho" button tha jo phase badalta tha —
-  // ab wo hata diya, leaderboard yahin professionally render ho raha hai.
+  // RESULT SCREEN — submit karne ke turant baad ye dikhta hai.
+  // 👇 FIX: "Detailed Analysis Dekho" button yahan add kiya —
+  // pehle ye sirf "leaderboard" phase mein tha, jo submit ke
+  // baad kabhi trigger hi nahi hota tha.
   // ─────────────────────────────────────────────
   if (phase === "result" && resultData) {
     return (
@@ -660,7 +646,6 @@ const Challenge = () => {
             </div>
           </div>
 
-          {/* 👇 Poora leaderboard yahin, seedha, professional card ke andar */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold flex items-center gap-2">
@@ -674,6 +659,14 @@ const Challenge = () => {
           </div>
 
           <div className="space-y-3">
+            {/* 👇 FIX: Ye button ab yahan hai — submit ke baad turant dikhega */}
+            <button
+              onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
+              className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
+            >
+              Detailed Analysis Dekho
+            </button>
+
             {isOwnChallenge && (
               <button
                 onClick={handleCreateNewChallenge}
@@ -695,10 +688,8 @@ const Challenge = () => {
   }
 
   // ─────────────────────────────────────────────
-  // 👇 STANDALONE LEADERBOARD SCREEN — ye tab use hota hai jab
-  // user direct link khol ke aaya ho aur pehle se attempt kar chuka ho
-  // (is case mein score-card dikhane ke liye resultData available nahi
-  // hota, isliye ye ek chhota alag screen hai — same LeaderboardList reuse ho raha hai)
+  // STANDALONE LEADERBOARD SCREEN — ye tab dikhta hai jab user
+  // direct link khol ke aaya ho aur pehle se attempt kar chuka ho
   // ─────────────────────────────────────────────
   if (phase === "leaderboard") {
     return (
@@ -713,24 +704,30 @@ const Challenge = () => {
 
           <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
 
-          <div className="space-y-3">
-  {/* 👇 NAYA: Detailed Analysis button */}
-  <button
-    onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
-    className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
-  >
-    Detailed Analysis Dekho
-  </button>
+          {/* 👇 FIX: "..." ki jagah asli Tailwind classes lagayi */}
+          <div className="space-y-3 mt-8">
+            <button
+              onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
+              className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
+            >
+              Detailed Analysis Dekho
+            </button>
 
-  {isOwnChallenge && (
-    <button onClick={handleCreateNewChallenge} className="...">
-      Ek Naya Challenge Banao
-    </button>
-  )}
-  <button onClick={() => navigate("/HomePage")} className="...">
-    Home Jaayein
-  </button>
-</div>
+            {isOwnChallenge && (
+              <button
+                onClick={handleCreateNewChallenge}
+                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              >
+                Ek Naya Challenge Banao
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+            >
+              Home Jaayein
+            </button>
+          </div>
         </div>
       </div>
     );
