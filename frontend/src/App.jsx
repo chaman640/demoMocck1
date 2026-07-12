@@ -9,6 +9,7 @@ import Login from './pages/Login';
 import Singup from './pages/Singup';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
+import Challenge from './pages/Challenge';
 
 // Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
 const queryClient = new QueryClient({
@@ -36,6 +37,8 @@ const App = () => {
             <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
             <Route path="/HomePage" element={<HomePage/>} />
             <Route path="/ProfilePage" element={<ProfilePage/>} />
+            <Route path="/Challenge" element={<Challenge/>} />
+            <Route path="/Challenge/:code" element={<Challenge/>} />
           </Routes>
         </div>
       </HashRouter>

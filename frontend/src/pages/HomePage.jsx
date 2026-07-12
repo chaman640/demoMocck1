@@ -16,7 +16,7 @@ const HomePage = () => {
     retry: false, // 401 pe baar baar retry na kare
   });
 
-  // 👇 NAYA: Agar user login nahi hai (401), Signup page pe bhejo
+  // 👇 Agar user login nahi hai (401), Signup page pe bhejo
   useEffect(() => {
     if (isError && error?.response?.status === 401) {
       navigate("/Singup");
@@ -27,7 +27,7 @@ const HomePage = () => {
   const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
   const scoreDashArray = averageScore !== null ? `${averageScore}, 100` : "0, 100";
 
-  // 👇 NAYA: Bottom nav ke teeno buttons ke liye ek hi consistent style
+  // 👇 Bottom nav ke teeno buttons ke liye ek hi consistent style
   const navBtnClass =
     "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
 
@@ -49,7 +49,25 @@ const HomePage = () => {
 
       {/* Main Content */}
       <main className="px-5 py-8 max-w-lg mx-auto">
-        
+
+        {/* 👇 NAYA: Challenge-a-Friend banner — sabse upar taaki turant dikhe */}
+        <section className="mb-8">
+          <button
+            onClick={() => navigate("/Challenge")}
+            className="w-full rounded-2xl p-5 flex items-center justify-between gap-4 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] active:opacity-90 transition-opacity shadow-lg shadow-purple-900/30"
+          >
+            <div className="text-left">
+              <p className="text-base font-bold flex items-center gap-2">
+                Dost Ko Challenge Karo <span>⚔️</span>
+              </p>
+              <p className="text-xs text-white/80 mt-1">
+                Link banao, dosto ko bhejo, score compare karo
+              </p>
+            </div>
+            <span className="text-2xl flex-shrink-0">&rarr;</span>
+          </button>
+        </section>
+
         {/* Hero */}
         <section className="mb-10">
           <h1 className="text-4xl leading-tight font-bold mb-5">
@@ -191,7 +209,7 @@ const HomePage = () => {
         </section>
       </main>
 
-      {/* Bottom Navigation — teeno buttons ab consistent style */}
+      {/* Bottom Navigation — teeno buttons consistent style */}
       <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
         <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

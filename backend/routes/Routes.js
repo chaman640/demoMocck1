@@ -13,6 +13,12 @@ import { addMocktest }    from "../controllers/addMockTest.js";
 import { loginUser } from "../controllers/authentication.js";
 import { updateUserInfo } from "../controllers/updateSutf.js";
 import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+
+// 👇 NAYA: Peer-Challenge feature ke controllers
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
 
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
@@ -39,6 +45,12 @@ router.post("/add-bluePrint",   addBluePrint);
 router.post("/generate-mock",  userInfo, addMocktest);
 router.post("/user-Login",   loginUser);
 router.post("/user-update",  userInfo, updateUserInfo);
+
+// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
+router.post("/create-challenge", userInfo, createChallenge);
+
+// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -77,5 +89,12 @@ router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSub
 router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
 
 router.get("/allExamName", allExamName);
+
+// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
+// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
+// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
+// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
 
 export default router;
