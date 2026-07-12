@@ -10,17 +10,16 @@ const formatTime = (totalSeconds) => {
   return `${pad(m)}:${pad(s)}`;
 };
 
-// 👇 NAYA: localStorage key — har user ka apna alag saved "created challenge"
+// localStorage key — har user ka apna alag saved "created challenge"
 const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// Skeleton loading building blocks (spinner ki jagah)
 // ──────────────────────────────────────────────
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
 );
 
-// Create-flow: apna challenge auto-generate ho raha hai (share-card jaisa skeleton)
 const CreateFlowSkeleton = () => (
   <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
     <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
@@ -35,7 +34,6 @@ const CreateFlowSkeleton = () => (
   </div>
 );
 
-// Join-flow: kisi aur ka challenge load ho raha hai (instructions-card jaisa skeleton)
 const JoinFlowSkeleton = () => (
   <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
     <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
@@ -56,7 +54,6 @@ const JoinFlowSkeleton = () => (
   </div>
 );
 
-// Submit ho raha hai (result-card jaisa skeleton)
 const SubmittingSkeleton = () => (
   <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
     <div className="max-w-xl mx-auto text-center">
@@ -80,18 +77,17 @@ const SubmittingSkeleton = () => (
 
 const Challenge = () => {
   const navigate = useNavigate();
-  const { code: codeParam } = useParams(); // URL mein code hai to "join" flow, warna "create" flow
+  const { code: codeParam } = useParams();
 
   const [phase, setPhase] = useState(codeParam ? "loading-join" : "loading-create");
   const [errorMsg, setErrorMsg] = useState("");
   const [userName, setUserName] = useState("");
   const [userId, setUserId] = useState("");
+  const [userExam, setUserExam] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // ── Create-flow state ──
   const [createdChallenge, setCreatedChallenge] = useState(null);
 
-  // ── Join/Test-flow state ──
   const [challengeMeta, setChallengeMeta] = useState(null);
   const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
   const [activeQIdx, setActiveQIdx] = useState(0);
@@ -106,8 +102,48 @@ const Challenge = () => {
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
 
-  // 👇 Effective challenge code — URL se (join) ya khud banaye challenge se (own-test)
   const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
+
+  // 👇 NAYA: Ye batata hai ki current attempt "khud ke banaye hue challenge" ka hai
+  // ya "kisi dost ke bheje hue link" ka. Isi se decide hoga ki submit ke baad
+  // localStorage cache clear karni hai ya nahi.
+  const isOwnChallenge = !codeParam && !!createdChallenge;
+
+  // ─────────────────────────────────────────────
+  // 👇 NAYA: Naya challenge generate karne ka reusable function
+  // — pehle sirf init() ke andar tha, ab isse "Naya Challenge Banao"
+  // button bhi call kar sakta hai
+  // ─────────────────────────────────────────────
+  const generateNewChallenge = async (exam, uid) => {
+    const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
+    const list = bpRes.data.data || [];
+    if (list.length === 0) {
+      throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
+    }
+    const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
+
+    const createRes = await api.post("/create-challenge", {
+      examName: exam,
+      blueprintName: chosenBlueprint.blueprintName,
+    });
+    const created = createRes.data.data;
+    setCreatedChallenge(created);
+    localStorage.setItem(getChallengeStorageKey(uid), JSON.stringify(created));
+    return created;
+  };
+
+  // 👇 NAYA: Manually "Naya Challenge Banao" button ke liye
+  const handleCreateNewChallenge = async () => {
+    setPhase("loading-create");
+    try {
+      localStorage.removeItem(getChallengeStorageKey(userId));
+      await generateNewChallenge(userExam, userId);
+      setPhase("created");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || "Naya challenge nahi ban paaya.");
+      setPhase("error");
+    }
+  };
 
   // ── Step 1: Init — decide karo create-flow ya join-flow ──
   useEffect(() => {
@@ -120,6 +156,7 @@ const Challenge = () => {
         const user = meRes.data.data;
         setUserName(user.name);
         setUserId(user._id);
+        setUserExam(user.exam);
 
         if (codeParam) {
           // ── JOIN FLOW: kisi ne link bheja hai ──
@@ -137,7 +174,7 @@ const Challenge = () => {
           return;
         }
 
-        // ── CREATE FLOW: pehle localStorage check karo — dobara generate na ho ──
+        // ── CREATE FLOW: pehle localStorage check karo ──
         const storageKey = getChallengeStorageKey(user._id);
         const savedRaw = localStorage.getItem(storageKey);
         if (savedRaw) {
@@ -145,34 +182,36 @@ const Challenge = () => {
             const saved = JSON.parse(savedRaw);
             const notExpired = saved?.expiresAt && new Date(saved.expiresAt) > new Date();
             const sameExam = saved?.examName === user.exam;
+
             if (saved?.challengeCode && notExpired && sameExam) {
-              setCreatedChallenge(saved);
-              setPhase("created");
-              return;
+              // ─────────────────────────────────────────────
+              // 👇 NAYA FIX: Sirf ye check karna kaafi nahi hai ki
+              // challenge expire nahi hua — ye bhi check karo ki
+              // KHUD is user ne is challenge ko already attempt
+              // kiya hai ya nahi. Agar attempt ho chuka hai, to
+              // purani cache useless hai — hata do aur naya banao.
+              // ─────────────────────────────────────────────
+              const checkRes = await api.get(`/challenge/${saved.challengeCode}`);
+              if (cancelled) return;
+
+              if (checkRes.data.data.alreadyAttempted) {
+                // Purana challenge already de chuka hai — cache clear karo, naya banao
+                localStorage.removeItem(storageKey);
+              } else {
+                setCreatedChallenge(saved);
+                setPhase("created");
+                return;
+              }
+            } else {
+              localStorage.removeItem(storageKey);
             }
-            localStorage.removeItem(storageKey);
           } catch {
             localStorage.removeItem(storageKey);
           }
         }
 
-        // Koi valid saved challenge nahi mila — seedha naya generate karo
-        const bpRes = await api.get(`/blueprints/${encodeURIComponent(user.exam)}`);
-        if (cancelled) return;
-        const list = bpRes.data.data || [];
-        if (list.length === 0) {
-          throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
-        }
-        const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
-
-        const createRes = await api.post("/create-challenge", {
-          examName: user.exam,
-          blueprintName: chosenBlueprint.blueprintName,
-        });
-        if (cancelled) return;
-        const created = createRes.data.data;
-        setCreatedChallenge(created);
-        localStorage.setItem(storageKey, JSON.stringify(created));
+        // Koi valid/unused saved challenge nahi mila — naya generate karo
+        await generateNewChallenge(user.exam, user._id);
         setPhase("created");
       } catch (err) {
         if (!cancelled) {
@@ -186,7 +225,6 @@ const Challenge = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [codeParam]);
 
-  // ── Apna khud ka challenge test dene ke liye ──
   const startOwnTest = async () => {
     if (!createdChallenge) return;
     setPhase("loading-join");
@@ -207,7 +245,6 @@ const Challenge = () => {
     }
   };
 
-  // ── Test start karo (join-flow ya khud ka test) ──
   const startChallengeTest = () => {
     setAnswers({});
     setTimeSpent({});
@@ -276,7 +313,7 @@ const Challenge = () => {
       const res = await api.get(`/challenge/${cc}/leaderboard`);
       setLeaderboard(res.data.data);
     } catch (err) {
-      // silently fail — leaderboard optional hai result ke saath
+      // silently fail
     }
   };
 
@@ -296,11 +333,24 @@ const Challenge = () => {
 
       const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
       setResultData(res.data.data);
+
+      // ─────────────────────────────────────────────
+      // 👇 NAYA FIX: Agar ye tumhara KHUD ka banaya challenge tha,
+      // ab tum use attempt kar chuke ho — localStorage cache clear
+      // kar do. Warna agli baar "Dost ko Challenge Karo" click karne
+      // pe wahi purana (already-attempted) challenge dobara dikhega.
+      // ─────────────────────────────────────────────
+      if (isOwnChallenge) {
+        localStorage.removeItem(getChallengeStorageKey(userId));
+      }
+
       await loadLeaderboard(effectiveCode);
       setPhase("result");
     } catch (err) {
-      // Agar already-attempted error aaye, seedha leaderboard dikha do
       if (err.response?.status === 409) {
+        if (isOwnChallenge) {
+          localStorage.removeItem(getChallengeStorageKey(userId));
+        }
         await loadLeaderboard(effectiveCode);
         setPhase("leaderboard");
       } else {
@@ -310,7 +360,6 @@ const Challenge = () => {
     }
   };
 
-  // ── Countdown timer ──
   useEffect(() => {
     if (phase !== "test") return;
     if (remainingSeconds <= 0) {
@@ -357,7 +406,6 @@ const Challenge = () => {
     );
   }
 
-  // ── Challenge ban gaya — link share karo + khud test bhi de sakte ho ──
   if (phase === "created" && createdChallenge) {
     const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
     return (
@@ -387,6 +435,15 @@ const Challenge = () => {
           >
             Khud Mock Test Do
           </button>
+
+          {/* 👇 NAYA: Naya challenge banane ka explicit option */}
+          <button
+            onClick={handleCreateNewChallenge}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 font-medium mb-3"
+          >
+            Ek Naya Challenge Banao
+          </button>
+
           <button
             onClick={() => navigate("/HomePage")}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
@@ -398,7 +455,6 @@ const Challenge = () => {
     );
   }
 
-  // ── JOIN FLOW: Instructions dikhao ──
   if (phase === "instructions" && challengeMeta) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -436,7 +492,6 @@ const Challenge = () => {
     );
   }
 
-  // ── TEST SCREEN ──
   if (phase === "test" && challengeMeta && currentQuestion) {
     const subject = challengeMeta.subjects[activeSubjectIdx];
     const selected = answers[currentQuestion._id];
@@ -523,7 +578,6 @@ const Challenge = () => {
     );
   }
 
-  // ── RESULT SCREEN — score + rank ──
   if (phase === "result" && resultData) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -564,6 +618,17 @@ const Challenge = () => {
           >
             Poora Leaderboard Dekho
           </button>
+
+          {/* 👇 NAYA: Agar ye khud ka challenge tha, ab naya banane ka option bhi do */}
+          {isOwnChallenge && (
+            <button
+              onClick={handleCreateNewChallenge}
+              className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
+            >
+              Ek Naya Challenge Banao
+            </button>
+          )}
+
           <button
             onClick={() => navigate("/HomePage")}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
@@ -575,7 +640,6 @@ const Challenge = () => {
     );
   }
 
-  // ── LEADERBOARD SCREEN ──
   if (phase === "leaderboard") {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -620,9 +684,19 @@ const Challenge = () => {
             </div>
           )}
 
+          {/* 👇 NAYA: Agar ye khud ka challenge tha (already-attempted case se yahan aaya), naya banao */}
+          {isOwnChallenge && (
+            <button
+              onClick={handleCreateNewChallenge}
+              className="w-full py-3 mt-6 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+            >
+              Ek Naya Challenge Banao
+            </button>
+          )}
+
           <button
             onClick={() => navigate("/HomePage")}
-            className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300"
+            className="w-full py-3 mt-3 rounded-lg border border-gray-700 text-gray-300"
           >
             Home Jaayein
           </button>
