@@ -51,12 +51,18 @@ backend/
     addUser.js
     allExamName.js
     authentication.js
+    createChallenge.js
+    getChallenge.js
+    getChallengeLeaderboard.js
+    submitChallenge.js
     updateSutf.js
   middlewares/
     processQuestion.js
     userInfo.js
   models/
     bluePrint.js
+    Challenge.js
+    ChallengeAttempt.js
     Performance.js
     rowQuestionSchema.js
     User.js
@@ -83,6 +89,7 @@ frontend/
       vite.svg
     pages/
       AnalysisPage.jsx
+      Challenge.jsx
       HomePage.jsx
       Login.jsx
       MockTest.jsx
@@ -683,6 +690,560 @@ export const allExamName = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/createChallenge.js">
+// controllers/createChallenge.js
+import mongoose from "mongoose";
+import Blueprint from "../models/bluePrint.js";
+import Challenge from "../models/Challenge.js";
+import { Question } from "../models/rowQuestionSchema.js";
+
+// ─────────────────────────────────────────────
+// HELPER 1: Fisher-Yates Shuffle (unbiased)
+// addMockTest.js jaisa hi — random questions select karne ke liye
+// ─────────────────────────────────────────────
+const fisherYatesShuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// ─────────────────────────────────────────────
+// HELPER 2: Unique 6-character challenge code generate karo
+// (uppercase letters + digits — link mein short aur readable rahega)
+// ─────────────────────────────────────────────
+const generateChallengeCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0,O,1,I) hataye
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+};
+
+export const createChallenge = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // req.user middleware se aayega (userInfo middleware required hai route pe)
+    // ─────────────────────────────────────────────
+    const userId = req.user._id;
+    const { examName, blueprintName } = req.body;
+
+    if (!examName || !blueprintName) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur blueprintName dono zaroori hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Blueprint dhundo
+    // ─────────────────────────────────────────────
+    const blueprint = await Blueprint.findOne({ examName, blueprintName });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Har subject ke liye RANDOM questions select karo
+    //
+    // Note: Ye jaanbujh kar addMockTest.js ke adaptive-weakness
+    // logic se SIMPLE rakha gaya hai — kyunki challenge sabke
+    // liye FAIR/SAME hona chahiye. Agar personalization laga
+    // di to har dost ko alag questions milenge aur comparison
+    // hi meaningless ho jayega.
+    // ─────────────────────────────────────────────
+    const finalSubjects = [];
+    let totalActualQuestions = 0;
+
+    for (const subjectConfig of blueprint.subjects) {
+      const { subjectName, questionCount } = subjectConfig;
+
+      // Is subject ke saare questions DB se lao
+      const allQuestions = await Question.find({
+        examName: { $in: [examName] },
+        subjectName: subjectName,
+      }).select(
+        "_id question option1 option2 option3 option4 correctOption topicName subjectName questionNumber"
+      );
+
+      if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
+
+      // Shuffle karke jitne chahiye utne le lo
+      const shuffled = fisherYatesShuffle(allQuestions);
+      const picked = shuffled.slice(0, Math.min(questionCount, shuffled.length));
+
+      const questionsForFreeze = picked.map((q) => ({
+        questionId: q._id,
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correctOption: q.correctOption,
+        topicName: q.topicName,
+        subjectName: q.subjectName,
+        questionNumber: q.questionNumber,
+      }));
+
+      finalSubjects.push({
+        subjectName,
+        questions: questionsForFreeze,
+      });
+
+      totalActualQuestions += questionsForFreeze.length;
+    }
+
+    if (totalActualQuestions === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Is blueprint ke liye koi questions available nahi hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Unique challenge code generate karo
+    // (collision chance bahut kam hai but phir bhi retry-loop laga rahe hain safety ke liye)
+    // ─────────────────────────────────────────────
+    let challengeCode;
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+      challengeCode = generateChallengeCode();
+      const existing = await Challenge.findOne({ challengeCode });
+      if (!existing) isUnique = true;
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Duration + expiry calculate karo
+    // ─────────────────────────────────────────────
+    const durationMinutes =
+      blueprint.durationMinutes && blueprint.durationMinutes > 0
+        ? blueprint.durationMinutes
+        : Math.max(10, Math.round(totalActualQuestions * 0.8));
+
+    // Challenge 7 din baad expire ho jayega — TTL index isse apne aap delete kar dega
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Challenge document save karo
+    // ─────────────────────────────────────────────
+    const newChallenge = new Challenge({
+      createdBy: userId,
+      examName,
+      blueprintName,
+      challengeCode,
+      subjects: finalSubjects,
+      marksPerQuestion: blueprint.marksPerQuestion,
+      negativeMarking: blueprint.negativeMarking,
+      durationMinutes,
+      totalQuestions: totalActualQuestions,
+      expiresAt,
+    });
+
+    await newChallenge.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 6: Response — shareable code/link ke sath
+    // ─────────────────────────────────────────────
+    return res.status(201).json({
+      success: true,
+      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
+      data: {
+        challengeCode: newChallenge.challengeCode,
+        examName: newChallenge.examName,
+        blueprintName: newChallenge.blueprintName,
+        totalQuestions: newChallenge.totalQuestions,
+        durationMinutes: newChallenge.durationMinutes,
+        expiresAt: newChallenge.expiresAt,
+      },
+    });
+  } catch (error) {
+    console.error("createChallenge error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya challenge banate waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getChallenge.js">
+// controllers/getChallenge.js
+import Challenge from "../models/Challenge.js";
+import ChallengeAttempt from "../models/ChallengeAttempt.js";
+
+// Challenge ke questions fetch karta hai test dene ke liye —
+// IMPORTANT: correctOption yahan se hata diya jata hai, warna
+// user DevTools se seedha answers dekh sakta tha!
+export const getChallenge = async (req, res) => {
+  try {
+    const { challengeCode } = req.params;
+    const userId = req.user._id;
+
+    const challenge = await Challenge.findOne({ challengeCode });
+
+    if (!challenge) {
+      return res.status(404).json({ success: false, message: "Challenge nahi mila ya expire ho gaya." });
+    }
+    if (challenge.expiresAt < new Date()) {
+      return res.status(410).json({ success: false, message: "Ye challenge expire ho chuka hai." });
+    }
+
+    // Check karo user ne already attempt to nahi kiya
+    const existingAttempt = await ChallengeAttempt.findOne({ challengeId: challenge._id, userId });
+
+    // correctOption strip karke bhejo — security ke liye
+    const safeSubjects = challenge.subjects.map((s) => ({
+      subjectName: s.subjectName,
+      questions: s.questions.map((q) => ({
+        _id: q.questionId,
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        topicName: q.topicName,
+        subjectName: q.subjectName,
+      })),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        challengeCode: challenge.challengeCode,
+        examName: challenge.examName,
+        blueprintName: challenge.blueprintName,
+        marksPerQuestion: challenge.marksPerQuestion,
+        negativeMarking: challenge.negativeMarking,
+        durationMinutes: challenge.durationMinutes,
+        totalQuestions: challenge.totalQuestions,
+        subjects: safeSubjects,
+        alreadyAttempted: !!existingAttempt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+</file>
+
+<file path="backend/controllers/getChallengeLeaderboard.js">
+// controllers/getChallengeLeaderboard.js
+import Challenge from "../models/Challenge.js";
+import ChallengeAttempt from "../models/ChallengeAttempt.js";
+
+export const getChallengeLeaderboard = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // ─────────────────────────────────────────────
+    const { challengeCode } = req.params;
+
+    if (!challengeCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Challenge code zaroori hai!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Challenge dhundo (basic details ke liye)
+    // ─────────────────────────────────────────────
+    const challenge = await Challenge.findOne({ challengeCode }).select(
+      "examName blueprintName totalQuestions durationMinutes createdBy expiresAt createdAt"
+    );
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Sare attempts fetch karo — score ke hisaab se sort
+    //
+    // Sorting priority:
+    // 1. totalScore (zyada score upar)
+    // 2. totalTimeTakenInSeconds (same score ho to kam time wala upar — tie-breaker)
+    // ─────────────────────────────────────────────
+    const attempts = await ChallengeAttempt.find({ challengeId: challenge._id })
+      .select(
+        "userId userName totalScore correctCount wrongCount unattemptedCount totalTimeTakenInSeconds createdAt"
+      )
+      .sort({ totalScore: -1, totalTimeTakenInSeconds: 1 });
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Rank assign karo aur response format banao
+    //
+    // Note: Agar do logo ka EXACT same score + time ho (rare case),
+    // unhe alag rank milega insertion order ke hisaab se — ye
+    // acceptable hai kyunki practically identical score+time
+    // hona bahut rare hai.
+    // ─────────────────────────────────────────────
+    const leaderboard = attempts.map((attempt, index) => ({
+      rank: index + 1,
+      userId: attempt.userId,
+      userName: attempt.userName,
+      totalScore: attempt.totalScore,
+      correctCount: attempt.correctCount,
+      wrongCount: attempt.wrongCount,
+      unattemptedCount: attempt.unattemptedCount,
+      totalTimeTakenInSeconds: attempt.totalTimeTakenInSeconds,
+      submittedAt: attempt.createdAt,
+    }));
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Response
+    // ─────────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      data: {
+        challenge: {
+          examName: challenge.examName,
+          blueprintName: challenge.blueprintName,
+          totalQuestions: challenge.totalQuestions,
+          durationMinutes: challenge.durationMinutes,
+          createdBy: challenge.createdBy,
+          expiresAt: challenge.expiresAt,
+        },
+        totalParticipants: leaderboard.length,
+        leaderboard,
+      },
+    });
+  } catch (error) {
+    console.error("getChallengeLeaderboard error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya leaderboard fetch karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/submitChallenge.js">
+// controllers/submitChallenge.js
+import Challenge from "../models/Challenge.js";
+import ChallengeAttempt from "../models/ChallengeAttempt.js";
+
+export const submitChallenge = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // req.user middleware se aayega (userInfo middleware required hai route pe)
+    // ─────────────────────────────────────────────
+    const userId = req.user._id;
+    const userName = req.user.name;
+    const { challengeCode } = req.params;
+    const { attemptedQuestions } = req.body;
+
+    if (!challengeCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Challenge code zaroori hai!",
+      });
+    }
+
+    if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Challenge dhundo
+    // ─────────────────────────────────────────────
+    const challenge = await Challenge.findOne({ challengeCode });
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
+      });
+    }
+
+    // Expiry check (TTL index MongoDB mein thoda delay se chalta hai,
+    // isliye application-level pe bhi check karna safe hai)
+    if (challenge.expiresAt && challenge.expiresAt < new Date()) {
+      return res.status(410).json({
+        success: false,
+        message: "Ye challenge expire ho chuka hai.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Duplicate attempt check
+    // Ek user ek challenge sirf ek baar de sakta hai
+    // ─────────────────────────────────────────────
+    const existingAttempt = await ChallengeAttempt.findOne({
+      challengeId: challenge._id,
+      userId,
+    });
+
+    if (existingAttempt) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Frozen challenge questions ka lookup map banao
+    // (validation ke liye — taaki koi galat isCorrect frontend se
+    // bhej ke score manipulate na kar sake, hum khud recalculate karenge)
+    // ─────────────────────────────────────────────
+    const questionMap = {};
+    for (const subj of challenge.subjects) {
+      for (const q of subj.questions) {
+        questionMap[q.questionId.toString()] = q;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Har attempted question ko validate + score calculate karo
+    // BUG-PRONE AREA: Kabhi bhi frontend ke bheje "isCorrect" pe bharosa
+    // mat karo — hamesha server-side khud correctOption se compare karo.
+    // ─────────────────────────────────────────────
+    let correctCount = 0;
+    let wrongCount = 0;
+    let unattemptedCount = 0;
+    let totalTimeTakenInSeconds = 0;
+
+    const finalAttemptedQuestions = [];
+
+    for (const aq of attemptedQuestions) {
+      const qId = aq.questionId ? aq.questionId.toString() : null;
+      const frozenQ = qId ? questionMap[qId] : null;
+
+      // Agar ye question is challenge ka hai hi nahi, skip karo (galat/tampered data)
+      if (!frozenQ) continue;
+
+      const userAnswer =
+        aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
+          ? String(aq.userAnswer)
+          : null;
+
+      const isCorrect =
+        userAnswer === null ? null : userAnswer === String(frozenQ.correctOption);
+
+      const timeTaken =
+        typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0
+          ? aq.timeTakenInSeconds
+          : 0;
+
+      if (isCorrect === true) correctCount++;
+      else if (isCorrect === false) wrongCount++;
+      else unattemptedCount++;
+
+      totalTimeTakenInSeconds += timeTaken;
+
+      finalAttemptedQuestions.push({
+        questionId: frozenQ.questionId,
+        userAnswer,
+        isCorrect,
+        timeTakenInSeconds: timeTaken,
+      });
+    }
+
+    // Agar koi bhi valid question match nahi hua
+    if (finalAttemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Koi valid question match nahi hua is challenge ke sath.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Score calculate karo (frozen marksPerQuestion/negativeMarking se)
+    // ─────────────────────────────────────────────
+    const totalScore =
+      correctCount * challenge.marksPerQuestion -
+      wrongCount * challenge.negativeMarking;
+
+    // ─────────────────────────────────────────────
+    // STEP 6: ChallengeAttempt save karo
+    // ─────────────────────────────────────────────
+    const newAttempt = new ChallengeAttempt({
+      challengeId: challenge._id,
+      userId,
+      userName,
+      attemptedQuestions: finalAttemptedQuestions,
+      totalScore,
+      correctCount,
+      wrongCount,
+      unattemptedCount,
+      totalTimeTakenInSeconds,
+    });
+
+    await newAttempt.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 7: Response — score ke sath-sath current rank bhi bhej do
+    // taaki frontend turant "Aap 2nd number pe ho" dikha sake
+    // ─────────────────────────────────────────────
+    const betterAttemptsCount = await ChallengeAttempt.countDocuments({
+      challengeId: challenge._id,
+      totalScore: { $gt: totalScore },
+    });
+
+    const totalParticipants = await ChallengeAttempt.countDocuments({
+      challengeId: challenge._id,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Challenge submit ho gaya!",
+      data: {
+        attemptId: newAttempt._id,
+        totalScore,
+        correctCount,
+        wrongCount,
+        unattemptedCount,
+        totalTimeTakenInSeconds,
+        currentRank: betterAttemptsCount + 1,
+        totalParticipants,
+      },
+    });
+  } catch (error) {
+    // Agar duplicate-key error aaya (compound unique index se),
+    // to matlab race-condition mein dobara submit ho gaya
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+      });
+    }
+
+    console.error("submitChallenge error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya challenge submit karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/updateSutf.js">
 // controllers/updateUserInfo.js
 import User from "../models/User.js";
@@ -911,6 +1472,212 @@ export const userInfo = async (req, res, next) => {
         });
     }
 };
+</file>
+
+<file path="backend/models/Challenge.js">
+// models/Challenge.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const challengeSchema = new mongoose.Schema(
+  {
+    // Challenge kisne banaya — dost ko challenge bhejne wala user
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Challenge banane wale user ki ID zaroori hai"],
+    },
+
+    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+    },
+    blueprintName: {
+      type: String,
+      required: [true, "Blueprint ka naam zaroori hai"],
+      trim: true,
+    },
+
+    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
+    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
+    challengeCode: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
+    },
+
+    // ─────────────────────────────────────────────
+    // FROZEN QUESTIONS — Ye sabse important part hai.
+    // Jab challenge banta hai, tab ek baar mock-jaisa
+    // question set generate karke yahan PERMANENTLY save
+    // kar diya jata hai. Isse fark nahi padta ki 5 log
+    // alag-alag din pe attempt karein — sabko EXACT same
+    // questions milenge, isliye comparison fair rahega.
+    //
+    // Note: Yahan hum poora question object store kar rahe
+    // hain (sirf ID nahi) — taaki agar original Question
+    // document baad mein edit/delete ho jaye, challenge
+    // fir bhi kaam kare aur data consistent rahe.
+    // ─────────────────────────────────────────────
+    subjects: [
+      {
+        subjectName: { type: String, required: true },
+        questions: [
+          {
+            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
+            questionId: {
+              type: mongoose.Schema.Types.ObjectId,
+              required: true,
+            },
+            question: { type: String, required: true },
+            option1: { type: String, required: true },
+            option2: { type: String, required: true },
+            option3: { type: String, required: true },
+            option4: { type: String, required: true },
+            correctOption: { type: Number, required: true },
+            topicName: { type: String },
+            subjectName: { type: String },
+            questionNumber: { type: Number },
+          },
+        ],
+      },
+    ],
+
+    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
+    // (agar baad mein blueprint ke marks/negative marking badal jaye,
+    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
+    marksPerQuestion: {
+      type: Number,
+      required: true,
+    },
+    negativeMarking: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    durationMinutes: {
+      type: Number,
+      required: true,
+    },
+    totalQuestions: {
+      type: Number,
+      required: true,
+    },
+
+    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
+    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+  },
+  {
+    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
+  }
+);
+
+// ─────────────────────────────────────────────
+// TTL INDEX — MongoDB khud is document ko expiresAt ke
+// 0 seconds baad automatically delete kar dega.
+// Isse humein manual cron job nahi likhni padegi purane
+// challenges saaf karne ke liye.
+// ─────────────────────────────────────────────
+challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
+
+export default Challenge;
+</file>
+
+<file path="backend/models/ChallengeAttempt.js">
+// models/ChallengeAttempt.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const challengeAttemptSchema = new mongoose.Schema(
+  {
+    // Kis challenge ka attempt hai — Challenge document ki reference
+    challengeId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Challenge",
+      required: [true, "Challenge ID zaroori hai"],
+      index: true, // leaderboard fetch karte waqt is field pe query hogi baar-baar
+    },
+
+    // Kisne attempt diya
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID zaroori hai"],
+    },
+
+    // Leaderboard mein naam dikhane ke liye — har baar User collection
+    // populate karne ki jagah yahin bhi save kar rahe hain (denormalized).
+    // Isse leaderboard query fast rahegi aur agar user apna naam badal
+    // le baad mein, purana attempt ka naam consistent rahega.
+    userName: {
+      type: String,
+      required: [true, "User ka naam zaroori hai"],
+    },
+
+    attemptedQuestions: [
+      {
+        questionId: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true,
+        },
+        userAnswer: {
+          type: String,
+          default: null, // unattempted questions ke liye null
+        },
+        isCorrect: {
+          type: Boolean,
+          default: null, // true/false/null (null = unattempted)
+        },
+        timeTakenInSeconds: {
+          type: Number,
+          default: null,
+          min: [0, "Time negative nahi ho sakta"],
+        },
+      },
+    ],
+
+    // Score summary — Performance.js jaisa hi pattern
+    totalScore: { type: Number, default: 0 },
+    correctCount: { type: Number, default: 0 },
+    wrongCount: { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
+
+    // Total time liya poore challenge mein (leaderboard pe "fastest" 
+    // dikhane ke liye future mein kaam aa sakta hai — same score par
+    // kam time lene wala upar aa sakta hai)
+    totalTimeTakenInSeconds: {
+      type: Number,
+      default: 0,
+    },
+  },
+  {
+    timestamps: true, // submittedAt ke liye createdAt hi use karenge
+  }
+);
+
+// ─────────────────────────────────────────────
+// COMPOUND UNIQUE INDEX — Ek user ek challenge ko
+// sirf EK BAAR attempt kar sake. Agar dobara submit
+// karne ki koshish kare, DB level pe hi block ho jayega
+// (application-level check ke sath-sath ye extra safety hai).
+// ─────────────────────────────────────────────
+challengeAttemptSchema.index({ challengeId: 1, userId: 1 }, { unique: true });
+
+const ChallengeAttempt = rowQuestionConnection.model(
+  "ChallengeAttempt",
+  challengeAttemptSchema
+);
+
+export default ChallengeAttempt;
 </file>
 
 <file path="backend/models/Performance.js">
@@ -1711,90 +2478,6 @@ export const getUserMockTests = async (req, res) => {
 };
 </file>
 
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
-
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-// 3. User ke saare mocks ki list
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-
-// 4. Page 1 — Overview (average score, lifetime graph, subject list)
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-
-// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-
-// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-
-// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-export default router;
-</file>
-
 <file path="backend/.gitignore">
 
 </file>
@@ -1885,6 +2568,609 @@ const AnalysisPage = () => {
 }
 
 export default AnalysisPage
+</file>
+
+<file path="frontend/src/pages/Challenge.jsx">
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "../api/api";
+
+const formatTime = (totalSeconds) => {
+  const safe = Math.max(0, Math.floor(totalSeconds || 0));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(m)}:${pad(s)}`;
+};
+
+const Challenge = () => {
+  const navigate = useNavigate();
+  const { code } = useParams(); // agar URL mein code hai to "join" flow, warna "create" flow
+
+  const [phase, setPhase] = useState("loading");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [userName, setUserName] = useState("");
+
+  // ── Create-flow state ──
+  const [examList, setExamList] = useState([]);
+  const [selectedExam, setSelectedExam] = useState("");
+  const [blueprints, setBlueprints] = useState([]);
+  const [selectedBlueprint, setSelectedBlueprint] = useState(null);
+  const [createdChallenge, setCreatedChallenge] = useState(null);
+
+  // ── Join/Test-flow state ──
+  const [challengeMeta, setChallengeMeta] = useState(null);
+  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
+  const [activeQIdx, setActiveQIdx] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeSpent, setTimeSpent] = useState({});
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [endTimestamp, setEndTimestamp] = useState(null);
+  const [resultData, setResultData] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+
+  const questionStartRef = useRef(Date.now());
+  const currentQIdRef = useRef(null);
+  const submittingRef = useRef(false);
+
+  // ── Step 1: Init — decide karo create-flow ya join-flow ──
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      try {
+        const meRes = await api.get("/me");
+        if (cancelled) return;
+        setUserName(meRes.data.data.name);
+
+        if (code) {
+          // ── JOIN FLOW: kisi ne link bheja hai ──
+          const chRes = await api.get(`/challenge/${code}`);
+          if (cancelled) return;
+          const data = chRes.data.data;
+          setChallengeMeta(data);
+
+          if (data.alreadyAttempted) {
+            // Already de chuka hai — seedha leaderboard dikhao
+            await loadLeaderboard();
+            setPhase("leaderboard");
+          } else {
+            setPhase("instructions");
+          }
+        } else {
+          // ── CREATE FLOW: user naya challenge banana chahta hai ──
+          const examRes = await api.get("/allExamName");
+          if (cancelled) return;
+          setExamList(examRes.data.data || []);
+          setPhase("create-select");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err.response?.data?.message || err.message);
+          setPhase("error");
+        }
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
+
+  // ── Exam select hone par uske blueprints laao ──
+  const handleExamSelect = async (exam) => {
+    setSelectedExam(exam);
+    setSelectedBlueprint(null);
+    try {
+      const res = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
+      setBlueprints(res.data.data || []);
+    } catch (err) {
+      setErrorMsg("Blueprints fetch nahi ho paaye.");
+    }
+  };
+
+  // ── Challenge create karo ──
+  const handleCreateChallenge = async () => {
+    if (!selectedBlueprint) return;
+    setPhase("loading");
+    try {
+      const res = await api.post("/create-challenge", {
+        examName: selectedExam,
+        blueprintName: selectedBlueprint.blueprintName,
+      });
+      setCreatedChallenge(res.data.data);
+      setPhase("created");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Challenge banane mein error aaya.");
+      setPhase("error");
+    }
+  };
+
+  // ── Test start karo (join-flow) ──
+  const startChallengeTest = () => {
+    setAnswers({});
+    setTimeSpent({});
+    setActiveSubjectIdx(0);
+    setActiveQIdx(0);
+    submittingRef.current = false;
+
+    const firstQ = challengeMeta.subjects[0].questions[0];
+    currentQIdRef.current = firstQ._id;
+    questionStartRef.current = Date.now();
+
+    const totalSeconds = challengeMeta.durationMinutes * 60;
+    setEndTimestamp(Date.now() + totalSeconds * 1000);
+    setRemainingSeconds(totalSeconds);
+    setPhase("test");
+  };
+
+  const flushTime = () => {
+    const qId = currentQIdRef.current;
+    if (!qId) return;
+    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+    if (elapsed > 0) {
+      setTimeSpent((prev) => ({ ...prev, [qId]: (prev[qId] || 0) + elapsed }));
+    }
+    questionStartRef.current = Date.now();
+  };
+
+  const goToQuestion = (subjIdx, qIdx) => {
+    flushTime();
+    const q = challengeMeta.subjects[subjIdx].questions[qIdx];
+    currentQIdRef.current = q ? q._id : null;
+    setActiveSubjectIdx(subjIdx);
+    setActiveQIdx(qIdx);
+  };
+
+  const currentSubject = challengeMeta ? challengeMeta.subjects[activeSubjectIdx] : null;
+  const currentQuestion = currentSubject ? currentSubject.questions[activeQIdx] : null;
+
+  const selectAnswer = (n) => {
+    if (!currentQuestion) return;
+    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
+  };
+
+  const goNext = () => {
+    const subj = challengeMeta.subjects[activeSubjectIdx];
+    if (activeQIdx < subj.questions.length - 1) {
+      goToQuestion(activeSubjectIdx, activeQIdx + 1);
+    } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
+      goToQuestion(activeSubjectIdx + 1, 0);
+    }
+  };
+
+  const goPrev = () => {
+    if (activeQIdx > 0) {
+      goToQuestion(activeSubjectIdx, activeQIdx - 1);
+    } else if (activeSubjectIdx > 0) {
+      const prevSubj = challengeMeta.subjects[activeSubjectIdx - 1];
+      goToQuestion(activeSubjectIdx - 1, prevSubj.questions.length - 1);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const res = await api.get(`/challenge/${code}/leaderboard`);
+      setLeaderboard(res.data.data);
+    } catch (err) {
+      // silently fail — leaderboard optional hai result ke saath
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!challengeMeta || submittingRef.current) return;
+    submittingRef.current = true;
+    flushTime();
+    setPhase("submitting");
+    try {
+      const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
+        subj.questions.map((q) => ({
+          questionId: q._id,
+          userAnswer: answers[q._id] || null,
+          timeTakenInSeconds: timeSpent[q._id] || 0,
+        }))
+      );
+
+      const res = await api.post(`/challenge/${code}/submit`, { attemptedQuestions });
+      setResultData(res.data.data);
+      await loadLeaderboard();
+      setPhase("result");
+    } catch (err) {
+      // Agar already-attempted error aaye, seedha leaderboard dikha do
+      if (err.response?.status === 409) {
+        await loadLeaderboard();
+        setPhase("leaderboard");
+      } else {
+        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setPhase("error");
+      }
+    }
+  };
+
+  // ── Countdown timer ──
+  useEffect(() => {
+    if (phase !== "test") return;
+    if (remainingSeconds <= 0) {
+      const t = setTimeout(() => handleSubmit(), 0);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      if (endTimestamp) {
+        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
+      } else {
+        setRemainingSeconds((s) => Math.max(0, s - 1));
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, remainingSeconds, endTimestamp]);
+
+  const copyLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    navigator.clipboard.writeText(link);
+  };
+
+  // ────────────────────────────── RENDER ──────────────────────────────
+
+  if (phase === "loading" || phase === "submitting") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">
+            {phase === "submitting" ? "Result submit ho raha hai..." : "Load ho raha hai..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── CREATE FLOW: Exam + Blueprint choose karo ──
+  if (phase === "create-select") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <h1 className="text-2xl font-bold mb-1">Dost Ko Challenge Karo 🔥</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            Ek test chuno, link banao, apne dosto ko bhejo — dekho kaun sabse aage hai!
+          </p>
+
+          <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Exam Chuno</label>
+          <select
+            value={selectedExam}
+            onChange={(e) => handleExamSelect(e.target.value)}
+            className="w-full mb-6 px-4 py-3 rounded-lg bg-[#111827] border border-gray-800 text-white"
+          >
+            <option value="">-- Exam Select Karein --</option>
+            {examList.map((exam) => (
+              <option key={exam} value={exam}>{exam}</option>
+            ))}
+          </select>
+
+          {blueprints.length > 0 && (
+            <>
+              <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Mock Test Chuno</label>
+              <div className="space-y-3 mb-8">
+                {blueprints.map((bp) => (
+                  <button
+                    key={bp._id}
+                    onClick={() => setSelectedBlueprint(bp)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
+                      selectedBlueprint?._id === bp._id
+                        ? "border-[#7C3AED] bg-[#7C3AED]/15"
+                        : "border-gray-800 bg-[#111827] hover:border-gray-600"
+                    }`}
+                  >
+                    <p className="font-semibold">{bp.blueprintName}</p>
+                    <p className="text-xs text-gray-400 mt-1">{bp.totalQuestions} sawaal</p>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          <button
+            onClick={handleCreateChallenge}
+            disabled={!selectedBlueprint}
+            className={`w-full py-3 rounded-lg font-semibold ${
+              selectedBlueprint
+                ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
+                : "bg-gray-700 cursor-not-allowed text-gray-400"
+            }`}
+          >
+            Challenge Link Banao
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Challenge ban gaya — link share karo ──
+  if (phase === "created" && createdChallenge) {
+    const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
+            🎉
+          </div>
+          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
+          </p>
+
+          <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
+            {shareLink}
+          </div>
+
+          <button
+            onClick={copyLink}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+          >
+            Link Copy Karein
+          </button>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── JOIN FLOW: Instructions dikhao ──
+  if (phase === "instructions" && challengeMeta) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
+          <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.totalQuestions}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Questions</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.durationMinutes} min</p>
+              <p className="text-[11px] text-gray-500 mt-1">Duration</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">+{challengeMeta.marksPerQuestion}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Marks/Q</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-400 mb-8">
+            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
+          </p>
+
+          <button
+            onClick={startChallengeTest}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+          >
+            Challenge Accept Karo — Test Shuru Karo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TEST SCREEN ──
+  if (phase === "test" && challengeMeta && currentQuestion) {
+    const subject = challengeMeta.subjects[activeSubjectIdx];
+    const selected = answers[currentQuestion._id];
+    const timeLow = remainingSeconds <= 60;
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-800 sticky top-0 bg-[#0A0D14] z-10">
+          <span className="font-semibold text-sm sm:text-base">{challengeMeta.blueprintName}</span>
+          <span
+            className={`text-sm font-mono px-3 py-1 rounded-lg border ${
+              timeLow ? "border-red-500 text-red-400 bg-red-500/10" : "border-gray-700 text-gray-200 bg-[#111827]"
+            }`}
+          >
+            {formatTime(remainingSeconds)}
+          </span>
+        </div>
+
+        <div className="flex gap-2 px-4 sm:px-6 py-3 overflow-x-auto border-b border-gray-800">
+          {challengeMeta.subjects.map((s, i) => (
+            <button
+              key={s.subjectName}
+              onClick={() => goToQuestion(i, 0)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
+                i === activeSubjectIdx ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
+              }`}
+            >
+              {s.subjectName}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 px-4 sm:px-6 py-6">
+          <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-6">
+            <p className="text-xs text-gray-500 mb-3">
+              Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
+            </p>
+            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+
+            <div className="space-y-3 mb-8">
+              {[1, 2, 3, 4].map((n) => {
+                const optText = currentQuestion[`option${n}`];
+                const isSelected = selected === String(n);
+                return (
+                  <button
+                    key={n}
+                    onClick={() => selectAnswer(n)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 ${
+                      isSelected
+                        ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white"
+                        : "border-gray-800 bg-[#1F2937] text-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
+                        isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
+                      }`}
+                    >
+                      {n}
+                    </span>
+                    <span>{optText}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button onClick={goPrev} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Previous
+              </button>
+              <button onClick={goNext} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Next
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+              >
+                Submit Karo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RESULT SCREEN — score + rank ──
+  if (phase === "result" && resultData) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
+          <p className="text-gray-400 text-sm mb-8">Dekho tum kahan khade ho</p>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
+            <p className="text-sm text-gray-500 mt-1">Total Score</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-8">
+            <p className="text-3xl font-bold">#{resultData.currentRank}</p>
+            <p className="text-sm text-white/80 mt-1">
+              {resultData.totalParticipants} logo mein se aapki rank
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
+              <p className="text-[11px] text-gray-500">Correct</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
+              <p className="text-[11px] text-gray-500">Wrong</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
+              <p className="text-[11px] text-gray-500">Unattempted</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setPhase("leaderboard")}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+          >
+            Poora Leaderboard Dekho
+          </button>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LEADERBOARD SCREEN ──
+  if (phase === "leaderboard") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
+          </p>
+
+          {!leaderboard || leaderboard.leaderboard.length === 0 ? (
+            <p className="text-gray-400 text-sm">Abhi tak koi attempt nahi hua.</p>
+          ) : (
+            <div className="space-y-3">
+              {leaderboard.leaderboard.map((entry) => (
+                <div
+                  key={entry.userId}
+                  className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
+                    entry.userName === userName
+                      ? "border-[#7C3AED] bg-[#7C3AED]/10"
+                      : "border-gray-800 bg-[#111827]"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        entry.rank === 1
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : entry.rank === 2
+                          ? "bg-gray-400/20 text-gray-300"
+                          : entry.rank === 3
+                          ? "bg-orange-500/20 text-orange-400"
+                          : "bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      {entry.rank}
+                    </span>
+                    <span className="font-medium">{entry.userName}</span>
+                  </div>
+                  <span className="font-bold text-[#A78BFA]">{entry.totalScore}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default Challenge;
 </file>
 
 <file path="frontend/src/pages/ProfilePage.jsx">
@@ -2812,6 +4098,109 @@ const Blueprint = rowQuestionConnection.model("Blueprint", blueprintSchema);
 export default Blueprint;
 </file>
 
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+
+// 👇 NAYA: Peer-Challenge feature ke controllers
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
+router.post("/create-challenge", userInfo, createChallenge);
+
+// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+// 3. User ke saare mocks ki list
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+
+// 4. Page 1 — Overview (average score, lifetime graph, subject list)
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+
+// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+
+// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+
+// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
+// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
+// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
+// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+
+export default router;
+</file>
+
 <file path="frontend/src/api/api.js">
 import axios from "axios";
 
@@ -2821,260 +4210,6 @@ const api = axios.create({
 });
 
 export default api;
-</file>
-
-<file path="frontend/src/pages/Login.jsx">
-import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/api'; // 👈 Yahan apna api instance import karein
-
-const Login = () => {
-  const navigate = useNavigate();
-  
-  const [formData, setFormData] = useState({
-    phone: '',
-    password: '',
-  });
-
-  const [error, setError] = useState('');
-  const [fieldErrors, setFieldErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-  const [toastMsg, setToastMsg] = useState(''); 
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (fieldErrors[name]) {
-      setFieldErrors({ ...fieldErrors, [name]: false });
-    }
-    setError('');
-
-    if (name === 'phone') {
-      const onlyNums = value.replace(/[^0-9]/g, '');
-      if (onlyNums.length <= 10) {
-        setFormData({ ...formData, [name]: onlyNums });
-      }
-      return;
-    }
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setFieldErrors({});
-
-    if (formData.phone.length !== 10) {
-      setFieldErrors({ phone: true });
-      return setError("Phone number bilkul 10 anko (digits) ka hona chahiye!");
-    }
-    if (!formData.password) {
-      setFieldErrors({ password: true });
-      return setError("Kripya apna password darj karein!");
-    }
-
-    setLoading(true);
-    try {
-      // 🚀 Yahan humne 'fetch' ki jagah 'api.post' use kiya hai
-      const response = await api.post('/user-Login', {
-        phone: formData.phone,
-        password: formData.password
-      });
-
-      // Axios response mein data 'res.data' mein hota hai
-      if (response.data.success) {
-        setToastMsg("Login Successful! Redirecting...");
-        setTimeout(() => {
-          navigate('/MockTest');
-        }, 1500);
-      }
-    } catch (err) {
-      // Axios error handling
-      const errorMessage = err.response?.data?.message || "Login fail ho gaya.";
-      setError(errorMessage);
-      
-      const errorMsgLower = errorMessage.toLowerCase();
-      if (errorMsgLower.includes("account nahi mila")) {
-        setFieldErrors({ phone: true });
-      } else if (errorMsgLower.includes("galat password")) {
-        setFieldErrors({ password: true });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // Border class function (Same as Signup)
-  const getInputClass = (fieldName) => {
-    const baseClass = "w-full pl-10 py-2 text-sm bg-white border rounded-lg outline-none transition-all placeholder-[#94A3B8]";
-    const paddingRight = fieldName === 'password' ? 'pr-10' : 'pr-4';
-    const errorClass = fieldErrors[fieldName] 
-      ? "border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-red-50/10" 
-      : "border-[#CBD5E1] focus:ring-2 focus:ring-[#2563EB]";
-    
-    return `${baseClass} ${paddingRight} ${errorClass}`;
-  };
-
-  return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-[#334155] relative">
-      
-      {/* ───────────────────────────────────────────── */}
-      {/* CUSTOM TOAST NOTIFICATION                     */}
-      {/* ───────────────────────────────────────────── */}
-      {toastMsg && (
-        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 bg-white border-l-4 border-[#10B981] shadow-xl px-6 py-4 rounded-lg flex items-center gap-3 transition-all duration-300">
-          <div className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center text-[#10B981]">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
-          </div>
-          <p className="text-sm font-semibold text-[#1E293B]">{toastMsg}</p>
-        </div>
-      )}
-
-      {/* ───────────────────────────────────────────── */}
-      {/* LEFT COLUMN (PC View Only - Image & Features) */}
-      {/* ───────────────────────────────────────────── */}
-      <div className="hidden lg:flex w-full lg:w-1/2 flex-col justify-between p-12 bg-transparent">
-        
-        {/* Top Header Logo */}
-        <div className="flex items-center gap-2 mb-8 self-start fixed top-8 left-12">
-          <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-7 h-7 object-contain"/>
-          <span className="text-xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
-        </div>
-
-        <div className="flex flex-col items-center text-center max-w-xl mx-auto mt-24">
-          <h1 className="text-4xl font-extrabold text-[#0F172A] tracking-tight mb-3">Welcome Back!</h1>
-          <p className="text-lg text-[#64748B] mb-8 font-normal px-4">Continue your preparation and track your success journey with mockTest.in.</p>
-          <div className="w-full max-w-[420px] px-4 aspect-[4/3] flex items-center justify-center">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
-          </div>
-        </div>
-
-        {/* Features (Same as Signup) */}
-        <div className="w-full max-w-2xl mx-auto mt-12 mb-4">
-          <div className="relative flex py-2 items-center justify-center mb-8">
-            <div className="flex-grow border-t border-[#E2E8F0]"></div>
-            <span className="flex-shrink mx-4 text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">Key Features to Power Your Success</span>
-            <div className="flex-grow border-t border-[#E2E8F0]"></div>
-          </div>
-          <div className="grid grid-cols-3 gap-6 text-left px-2">
-            <div className="flex flex-col items-start">
-              <div className="w-10 h-10 rounded-full bg-[#ECFDF5] flex items-center justify-center text-[#10B981] mb-3 border border-[#D1FAE5]">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-              </div>
-              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Comprehensive Coverage</h4>
-              <p className="text-xs text-[#64748B] leading-relaxed">Access extensive practice resources for diverse exam types.</p>
-            </div>
-            <div className="flex flex-col items-start">
-              <div className="w-10 h-10 rounded-full bg-[#EFF6FF] flex items-center justify-center text-[#3B82F6] mb-3 border border-[#DBEAFE]">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
-              </div>
-              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Deep Analytics & Insights</h4>
-              <p className="text-xs text-[#64748B] leading-relaxed">Track your progress and identify key improvement areas.</p>
-            </div>
-            <div className="flex flex-col items-start">
-              <div className="w-10 h-10 rounded-full bg-[#FFF7ED] flex items-center justify-center text-[#F97316] mb-3 border border-[#FFEDD5]">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-              </div>
-              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Realistic Mock Test Series</h4>
-              <p className="text-xs text-[#64748B] leading-relaxed">Simulate actual exam conditions with full-length tests.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ───────────────────────────────────────────── */}
-      {/* RIGHT COLUMN (Login Form & Mobile Header)     */}
-      {/* ───────────────────────────────────────────── */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-4 sm:p-8 lg:p-12 min-h-screen lg:min-h-0">
-        
-        {/* Mobile Logo & Main Image */}
-        <div className="flex lg:hidden flex-col items-center mb-6 mt-4">
-          <div className="flex items-center gap-2 mb-2">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-8 h-8 object-contain"/>
-            <span className="text-2xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
-          </div>
-          <p className="text-sm text-[#64748B] mb-6 font-normal px-4 text-center">Welcome Back!</p>
-          <div className="w-full max-w-[280px] aspect-[4/3] flex items-center justify-center mb-4">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
-          </div>
-        </div>
-
-        {/* Form Container */}
-        <div className="w-full max-w-[460px] bg-white border border-[#E2E8F0] rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] p-6 sm:p-8">
-          
-          <div className="text-center mb-8">
-            <h2 className="text-xl sm:text-2xl font-bold text-[#0F172A]">Log In to Your Account</h2>
-            <p className="text-[#64748B] text-xs sm:text-sm mt-1">Enter your registered phone and password</p>
-          </div>
-
-          {error && (
-            <div className="mb-5 p-3 bg-[#FEF2F2] text-[#DC2626] border border-[#FEE2E2] rounded-xl text-xs font-medium text-center">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            
-            {/* Phone Input */}
-            <div>
-              <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.phone ? 'text-red-500' : 'text-[#475569]'}`}>Phone Number</label>
-              <div className="relative">
-                <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.phone ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                </span>
-                <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="9876543210" required className={getInputClass('phone')}/>
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide flex justify-between ${fieldErrors.password ? 'text-red-500' : 'text-[#475569]'}`}>
-                <span>Password</span>
-                {/* Aap baad me yaha "Forgot Password?" ka link laga sakte hain */}
-              </label>
-              <div className="relative">
-                <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.password ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                </span>
-                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" required className={getInputClass('password')}/>
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#94A3B8] hover:text-[#475569]">
-                  {showPassword ? (
-                    <svg fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" /></svg>
-                  ) : (
-                    <svg fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full py-2.5 mt-4 rounded-lg text-white font-semibold text-sm transition-all tracking-wide ${
-                loading ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
-              }`}
-            >
-              {loading ? 'Logging in...' : 'Log In'}
-            </button>
-          </form>
-
-          {/* Bottom Navigation Links */}
-          <div className="mt-6 text-center text-xs text-[#64748B]">
-            Don't have an account?{' '}
-            <Link to="/Singup" className="text-[#2563EB] font-bold hover:underline ml-1">
-              Sign Up
-            </Link>
-          </div>
-          
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default Login;
 </file>
 
 <file path="frontend/src/pages/Singup.jsx">
@@ -3421,489 +4556,6 @@ const Singup = () => {
 export default Singup;
 </file>
 
-<file path="frontend/src/pages/UserSubjectAnallysis.jsx">
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import api from "../api/api"; // 👈 Sahi import
-
-const UserSubjectAnallysis = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [activeExamName, setActiveExamName] = useState("");
-
-  const subjectNameFromState = location.state?.subjectName;
-  const examNameFromState = location.state?.examName;
-
-  useEffect(() => {
-    if (!subjectNameFromState) {
-      navigate('/UserAllAnalysis');
-      return;
-    }
-
-    const fetchSubjectAnalysis = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let currentExam = examNameFromState;
-
-        // Agar exam name state mein nahi hai, toh fetch karo
-        if (!currentExam) {
-          const meRes = await api.get("/me");
-          currentExam = meRes.data.data.exam;
-        }
-        
-        setActiveExamName(currentExam);
-
-        const examEncoded = encodeURIComponent(currentExam);
-        const subjectEncoded = encodeURIComponent(subjectNameFromState);
-        
-        // 🚀 Axios ka use (API instance automatically baseURL handle karega)
-        const res = await api.get(`/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`);
-
-        setData(res.data.data); // 👈 res.data ka use
-      } catch (err) {
-        // 🚀 Axios error handling
-        setError(err.response?.data?.message || "Data laane mein error aaya.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSubjectAnalysis();
-  }, [subjectNameFromState, examNameFromState, navigate]);
-
-  // ... (Baaki UI code waisa hi rahega)
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 font-medium tracking-wide">Fetching {subjectNameFromState} Data...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
-        <div className="bg-[#111827] border border-red-500/30 p-8 rounded-2xl max-w-md text-center shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
-            !
-          </div>
-          <h2 className="text-xl font-bold mb-2">Oops! Error</h2>
-          <p className="text-gray-400 mb-6 text-sm">{error}</p>
-          <button 
-            onClick={() => navigate('/UserAllAnalysis')}
-            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  return (
-    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
-      
-      <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
-        <div onClick={() => navigate('/HomePage')} className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
-            mt
-          </div>
-          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
-        </div>
-        <button 
-          onClick={() => navigate('/UserAllAnalysis')}
-          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
-        >
-          &larr; Back to Overview
-        </button>
-      </nav>
-
-      <div className="max-w-6xl mx-auto px-6 mt-10 space-y-8">
-        
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Subject Analysis — <span className="text-[#A78BFA]">{data.subjectName}</span></h1>
-          <p className="text-gray-400 mt-2 text-sm">Deep dive into your performance for this subject based on the last 3 mocks.</p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Average Accuracy</p>
-            <p className="text-3xl font-bold text-[#10B981]">{data.averageAccuracy}%</p>
-          </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Avg Time / Question</p>
-            <p className="text-3xl font-bold text-[#3B82F6]">{data.averageTimePerQuestion}s</p>
-          </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Mocks Considered</p>
-            <p className="text-3xl font-bold text-white">{data.totalTestsConsidered}</p>
-          </div>
-        </div>
-
-        {/* Topic-wise Efficiency (Updated) */}
-        <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
-          <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
-            <h3 className="font-semibold text-lg">Topic-wise Efficiency</h3>
-            <p className="text-xs text-gray-500 mt-1">{data.topicList?.length || 0} topics covered in this subject</p>
-          </div>
-
-          {data.topicList?.length === 0 ? (
-            <p className="p-6 text-sm text-yellow-500">No topic data available for this subject.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-6 py-4 font-medium">Topic</th>
-                    <th className="px-6 py-4 font-medium">Efficiency</th>
-                    <th className="px-6 py-4 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {data.topicList?.map((t, i) => (
-                    <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{t.topicName}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${t.efficiency >= 70 ? 'text-green-400 bg-green-500/10' : t.efficiency >= 40 ? 'text-yellow-400 bg-yellow-500/10' : 'text-red-400 bg-red-500/10'}`}>
-                          {t.efficiency}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-right">
-                        {/* 🎯 NAYA BUTTON Jisse Topic Analysis par jayenge */}
-                        <button 
-                          onClick={() => navigate('/UserTopicAnalysis', {
-                            state: {
-                              examName: activeExamName,
-                              subjectName: data.subjectName,
-                              topicName: t.topicName
-                            }
-                          })}
-                          className="px-4 py-1.5 bg-[#1F2937] hover:bg-[#374151] border border-gray-700 rounded-lg text-[#A78BFA] text-xs font-medium transition-colors"
-                        >
-                          Deep Research &rarr;
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Top 5 Weak Topics */}
-        <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
-          <div className="px-6 py-5 border-b border-gray-800 bg-red-900/10">
-            <h3 className="font-semibold text-lg text-red-400">Top Weak Topics (Needs Attention)</h3>
-            <p className="text-xs text-gray-500 mt-1">Focus on these areas to improve your score</p>
-          </div>
-
-          {data.weakTopics?.length === 0 ? (
-            <p className="p-6 text-sm text-green-400">Great job! No specific weak topics detected.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-6 py-4 font-medium">Topic</th>
-                    <th className="px-6 py-4 font-medium">Efficiency</th>
-                    <th className="px-6 py-4 font-medium">Wrong Answers</th>
-                    <th className="px-6 py-4 font-medium">Reason</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {data.weakTopics?.map((t, i) => (
-                    <tr key={i} className={`${i === 0 ? 'bg-red-500/5' : 'hover:bg-[#1F2937]/50'} transition-colors`}>
-                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{t.topicName}</td>
-                      <td className="px-6 py-4 text-sm text-red-400">{t.efficiency}%</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-red-500">{t.wrongCount}</td>
-                      <td className="px-6 py-4 text-xs text-red-300/80">{t.reason}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-      </div>
-    </div>
-  );
-};
-
-export default UserSubjectAnallysis;
-</file>
-
-<file path="frontend/src/pages/UserTopicAnalysis.jsx">
-import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
-import api from "../api/api"; // 👈 Sahi import
-
-const UserTopicAnalysis = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const subjectNameFromState = location.state?.subjectName;
-  const examNameFromState = location.state?.examName;
-  const topicNameFromState = location.state?.topicName;
-
-  useEffect(() => {
-    if (!topicNameFromState || !subjectNameFromState) {
-      navigate('/UserAllAnalysis');
-      return;
-    }
-
-    const fetchTopicAnalysis = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        let activeExamName = examNameFromState;
-
-        // Agar exam name state mein nahi hai, toh fetch karo
-        if (!activeExamName) {
-          const meRes = await api.get("/me");
-          activeExamName = meRes.data.data.exam;
-        }
-
-        const examEncoded = encodeURIComponent(activeExamName);
-        const subjectEncoded = encodeURIComponent(subjectNameFromState);
-        const topicEncoded = encodeURIComponent(topicNameFromState);
-        
-        // 🚀 Axios ka use (API instance automatically baseURL handle karega)
-        const res = await api.get(`/analysis/topic/active_user/${examEncoded}/${subjectEncoded}/${topicEncoded}`);
-
-        setData(res.data.data); // 👈 res.data ka use
-      } catch (err) {
-        // 🚀 Axios error handling
-        setError(err.response?.data?.message || "Data laane mein error aaya.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTopicAnalysis();
-  }, [examNameFromState, subjectNameFromState, topicNameFromState, navigate]);
-
-  // ... (Baaki UI aur QuestionCard component waisa hi rahega)
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 font-medium tracking-wide">Fetching deep research data...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
-        <div className="bg-[#111827] border border-red-500/30 p-8 rounded-2xl max-w-md text-center shadow-2xl">
-          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
-            !
-          </div>
-          <h2 className="text-xl font-bold mb-2">Oops! Error</h2>
-          <p className="text-gray-400 mb-6 text-sm">{error}</p>
-          <button 
-            onClick={() => navigate('/UserAllAnalysis')}
-            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
-          >
-            Go Back
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) return null;
-
-  return (
-    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
-      
-      {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
-        <div onClick={() => navigate('/HomePage')} className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
-            mt
-          </div>
-          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
-        </div>
-        <button 
-          // Wapas Subject Analysis page par bhejna state ke sath
-          onClick={() => navigate('/UserSubjectAnallysis', { 
-            state: { examName: examNameFromState, subjectName: data.subjectName } 
-          })}
-          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
-        >
-          &larr; Back to {data.subjectName}
-        </button>
-      </nav>
-
-      {/* Main Container */}
-      <div className="max-w-4xl mx-auto px-6 mt-10 space-y-8">
-        
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Topic Deep Research — <span className="text-[#A78BFA]">{data.topicName}</span></h1>
-          <p className="text-gray-400 mt-2 text-sm">Subject: {data.subjectName} | Combined data from all lifetime mocks</p>
-        </div>
-
-        {/* Stats Row */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Efficiency</p>
-            <p className="text-2xl sm:text-3xl font-bold text-[#A78BFA]">{data.summary?.efficiency}%</p>
-          </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Total Attempted</p>
-            <p className="text-2xl sm:text-3xl font-bold text-white">{data.summary?.totalAttempted}</p>
-          </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Correct</p>
-            <p className="text-2xl sm:text-3xl font-bold text-green-400">{data.summary?.totalCorrect}</p>
-          </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Wrong</p>
-            <p className="text-2xl sm:text-3xl font-bold text-red-400">{data.summary?.totalWrong}</p>
-          </div>
-        </div>
-
-        {/* ── Good At ── */}
-        <section className="pt-6">
-          <h3 className="text-xl font-bold text-green-400 mb-4 flex items-center gap-2">
-            ✅ Correctly Answered ({data.goodAt?.length || 0})
-          </h3>
-          {data.goodAt?.length === 0 ? (
-            <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 text-gray-500 text-sm">
-              Aapne is topic mein koi sawaal sahi nahi kiya hai.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {data.goodAt?.map((q, i) => (
-                <QuestionCard key={i} q={q} type="good" index={i} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── Wrong ── */}
-        <section className="pt-6">
-          <h3 className="text-xl font-bold text-red-400 mb-4 flex items-center gap-2">
-            ❌ Incorrect Answers ({data.wrong?.length || 0})
-          </h3>
-          {data.wrong?.length === 0 ? (
-            <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 text-green-400/80 text-sm">
-              Great! Aapne koi sawaal galat nahi kiya.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {data.wrong?.map((q, i) => (
-                <QuestionCard key={i} q={q} type="wrong" index={i} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* ── Unattempted ── */}
-        <section className="pt-6">
-          <h3 className="text-xl font-bold text-yellow-500 mb-4 flex items-center gap-2">
-            ⏭️ Unattempted ({data.unattempted?.length || 0})
-          </h3>
-          {data.unattempted?.length === 0 ? (
-            <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 text-green-400/80 text-sm">
-              Awesome! Aapne sabhi sawaal attempt kiye hain.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {data.unattempted?.map((q, i) => (
-                <QuestionCard key={i} q={q} type="unattempted" index={i} />
-              ))}
-            </div>
-          )}
-        </section>
-
-      </div>
-    </div>
-  );
-};
-
-// ── Question Card Component (Dark Theme UI) ──
-const QuestionCard = ({ q, type, index }) => {
-  const borderColorClass =
-    type === "good" ? "border-l-green-500" : type === "wrong" ? "border-l-red-500" : "border-l-yellow-500";
-
-  return (
-    <div className={`bg-[#111827] border border-gray-800 rounded-xl p-5 sm:p-6 shadow-md border-l-4 ${borderColorClass}`}>
-      
-      {/* Meta info */}
-      <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 mb-4 font-mono">
-        <span>Mock ID: {String(q.performanceId).slice(-6)}</span>
-        <span>•</span>
-        <span>{new Date(q.mockDate).toLocaleDateString("hi-IN", { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-        <span>•</span>
-        <span>Time: {q.timeTakenInSeconds ?? "—"}s</span>
-      </div>
-
-      {/* Question */}
-      <p className="text-base sm:text-lg font-medium text-gray-200 mb-5 leading-relaxed">
-        <span className="text-gray-500 mr-2">Q{index + 1}.</span> 
-        {q.question}
-      </p>
-
-      {/* Options */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-        {[1, 2, 3, 4].map((n) => {
-          const isCorrect = q.correctOption === n;
-          const isUser = q.userAnswer === String(n);
-          
-          let optionStyle = "bg-[#1F2937] border-gray-700 text-gray-400"; // Default
-          
-          if (isCorrect) {
-            optionStyle = "bg-green-500/10 border-green-500/30 text-green-400 font-semibold";
-          } else if (isUser && !isCorrect) {
-            optionStyle = "bg-red-500/10 border-red-500/30 text-red-400 font-semibold";
-          }
-
-          return (
-            <div
-              key={n}
-              className={`p-3 rounded-lg border text-sm flex items-start gap-3 ${optionStyle}`}
-            >
-              <span className="shrink-0">{n}.</span>
-              <span className="flex-1">{q.options?.[`option${n}`]}</span>
-              {isCorrect && <span className="shrink-0">✅</span>}
-              {isUser && !isCorrect && <span className="shrink-0 text-xs mt-0.5">(Your Answer) ❌</span>}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Explanation */}
-      {q.answerExplain && (
-        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4 mt-2">
-          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">Explanation</p>
-          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default UserTopicAnalysis;
-</file>
-
 <file path="frontend/package.json">
 {
   "name": "frontend",
@@ -4093,239 +4745,1006 @@ export const loginUser = async (req, res) => {
 };
 </file>
 
-<file path="frontend/src/pages/HomePage.jsx">
-import React from "react";
-import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import api from "../api/api";
+<file path="frontend/src/pages/Login.jsx">
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import api from '../api/api'; // 👈 Yahan apna api instance import karein
 
-const HomePage = () => {
+const Login = () => {
   const navigate = useNavigate();
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["overview", "UP Police Constable"], // same key = cache reuse hoga
-    queryFn: async () => {
-      const encodedExamName = encodeURIComponent("UP Police Constable");
-      const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
-      return res.data.data;
-    },
+  
+  const [formData, setFormData] = useState({
+    phone: '',
+    password: '',
   });
 
-  const averageScore = data?.averageScore ?? null;
-  const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [toastMsg, setToastMsg] = useState(''); 
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    if (fieldErrors[name]) {
+      setFieldErrors({ ...fieldErrors, [name]: false });
+    }
+    setError('');
+
+    if (name === 'phone') {
+      const onlyNums = value.replace(/[^0-9]/g, '');
+      if (onlyNums.length <= 10) {
+        setFormData({ ...formData, [name]: onlyNums });
+      }
+      return;
+    }
+    setFormData({ ...formData, [name]: value });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setFieldErrors({});
+
+    if (formData.phone.length !== 10) {
+      setFieldErrors({ phone: true });
+      return setError("Phone number bilkul 10 anko (digits) ka hona chahiye!");
+    }
+    if (!formData.password) {
+      setFieldErrors({ password: true });
+      return setError("Kripya apna password darj karein!");
+    }
+
+    setLoading(true);
+    try {
+      // 🚀 Yahan humne 'fetch' ki jagah 'api.post' use kiya hai
+      const response = await api.post('/user-Login', {
+        phone: formData.phone,
+        password: formData.password
+      });
+
+      // Axios response mein data 'res.data' mein hota hai
+      if (response.data.success) {
+        setToastMsg("Login Successful! Redirecting...");
+        setTimeout(() => {
+          navigate('/MockTest');
+        }, 1500);
+      }
+    } catch (err) {
+      // Axios error handling
+      const errorMessage = err.response?.data?.message || "Login fail ho gaya.";
+      setError(errorMessage);
+      
+      const errorMsgLower = errorMessage.toLowerCase();
+      if (errorMsgLower.includes("account nahi mila")) {
+        setFieldErrors({ phone: true });
+      } else if (errorMsgLower.includes("galat password")) {
+        setFieldErrors({ password: true });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  // Border class function (Same as Signup)
+  const getInputClass = (fieldName) => {
+    const baseClass = "w-full pl-10 py-2 text-sm bg-white border rounded-lg outline-none transition-all placeholder-[#94A3B8]";
+    const paddingRight = fieldName === 'password' ? 'pr-10' : 'pr-4';
+    const errorClass = fieldErrors[fieldName] 
+      ? "border-red-500 focus:ring-2 focus:ring-red-500 focus:border-red-500 bg-red-50/10" 
+      : "border-[#CBD5E1] focus:ring-2 focus:ring-[#2563EB]";
+    
+    return `${baseClass} ${paddingRight} ${errorClass}`;
+  };
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white">
-      {/* Navbar */}
+    <div className="min-h-screen bg-[#F8FAFC] flex flex-col lg:flex-row font-sans text-[#334155] relative">
+      
+      {/* ───────────────────────────────────────────── */}
+      {/* CUSTOM TOAST NOTIFICATION                     */}
+      {/* ───────────────────────────────────────────── */}
+      {toastMsg && (
+        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 z-50 bg-white border-l-4 border-[#10B981] shadow-xl px-6 py-4 rounded-lg flex items-center gap-3 transition-all duration-300">
+          <div className="w-8 h-8 rounded-full bg-[#ECFDF5] flex items-center justify-center text-[#10B981]">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <p className="text-sm font-semibold text-[#1E293B]">{toastMsg}</p>
+        </div>
+      )}
+
+      {/* ───────────────────────────────────────────── */}
+      {/* LEFT COLUMN (PC View Only - Image & Features) */}
+      {/* ───────────────────────────────────────────── */}
+      <div className="hidden lg:flex w-full lg:w-1/2 flex-col justify-between p-12 bg-transparent">
+        
+        {/* Top Header Logo */}
+        <div className="flex items-center gap-2 mb-8 self-start fixed top-8 left-12">
+          <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-7 h-7 object-contain"/>
+          <span className="text-xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
+        </div>
+
+        <div className="flex flex-col items-center text-center max-w-xl mx-auto mt-24">
+          <h1 className="text-4xl font-extrabold text-[#0F172A] tracking-tight mb-3">Welcome Back!</h1>
+          <p className="text-lg text-[#64748B] mb-8 font-normal px-4">Continue your preparation and track your success journey with mockTest.in.</p>
+          <div className="w-full max-w-[420px] px-4 aspect-[4/3] flex items-center justify-center">
+            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
+          </div>
+        </div>
+
+        {/* Features (Same as Signup) */}
+        <div className="w-full max-w-2xl mx-auto mt-12 mb-4">
+          <div className="relative flex py-2 items-center justify-center mb-8">
+            <div className="flex-grow border-t border-[#E2E8F0]"></div>
+            <span className="flex-shrink mx-4 text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">Key Features to Power Your Success</span>
+            <div className="flex-grow border-t border-[#E2E8F0]"></div>
+          </div>
+          <div className="grid grid-cols-3 gap-6 text-left px-2">
+            <div className="flex flex-col items-start">
+              <div className="w-10 h-10 rounded-full bg-[#ECFDF5] flex items-center justify-center text-[#10B981] mb-3 border border-[#D1FAE5]">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+              </div>
+              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Comprehensive Coverage</h4>
+              <p className="text-xs text-[#64748B] leading-relaxed">Access extensive practice resources for diverse exam types.</p>
+            </div>
+            <div className="flex flex-col items-start">
+              <div className="w-10 h-10 rounded-full bg-[#EFF6FF] flex items-center justify-center text-[#3B82F6] mb-3 border border-[#DBEAFE]">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M11 3.055A9.003 9.003 0 1020.945 13H11V3.055z"/><path strokeLinecap="round" strokeLinejoin="round" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+              </div>
+              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Deep Analytics & Insights</h4>
+              <p className="text-xs text-[#64748B] leading-relaxed">Track your progress and identify key improvement areas.</p>
+            </div>
+            <div className="flex flex-col items-start">
+              <div className="w-10 h-10 rounded-full bg-[#FFF7ED] flex items-center justify-center text-[#F97316] mb-3 border border-[#FFEDD5]">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+              </div>
+              <h4 className="font-bold text-sm text-[#1E293B] mb-1">Realistic Mock Test Series</h4>
+              <p className="text-xs text-[#64748B] leading-relaxed">Simulate actual exam conditions with full-length tests.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ───────────────────────────────────────────── */}
+      {/* RIGHT COLUMN (Login Form & Mobile Header)     */}
+      {/* ───────────────────────────────────────────── */}
+      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center p-4 sm:p-8 lg:p-12 min-h-screen lg:min-h-0">
+        
+        {/* Mobile Logo & Main Image */}
+        <div className="flex lg:hidden flex-col items-center mb-6 mt-4">
+          <div className="flex items-center gap-2 mb-2">
+            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-8 h-8 object-contain"/>
+            <span className="text-2xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
+          </div>
+          <p className="text-sm text-[#64748B] mb-6 font-normal px-4 text-center">Welcome Back!</p>
+          <div className="w-full max-w-[280px] aspect-[4/3] flex items-center justify-center mb-4">
+            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
+          </div>
+        </div>
+
+        {/* Form Container */}
+        <div className="w-full max-w-[460px] bg-white border border-[#E2E8F0] rounded-2xl shadow-[0_10px_25px_-5px_rgba(0,0,0,0.05)] p-6 sm:p-8">
+          
+          <div className="text-center mb-8">
+            <h2 className="text-xl sm:text-2xl font-bold text-[#0F172A]">Log In to Your Account</h2>
+            <p className="text-[#64748B] text-xs sm:text-sm mt-1">Enter your registered phone and password</p>
+          </div>
+
+          {error && (
+            <div className="mb-5 p-3 bg-[#FEF2F2] text-[#DC2626] border border-[#FEE2E2] rounded-xl text-xs font-medium text-center">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            
+            {/* Phone Input */}
+            <div>
+              <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.phone ? 'text-red-500' : 'text-[#475569]'}`}>Phone Number</label>
+              <div className="relative">
+                <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.phone ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.94.725l.548 2.2a1 1 0 01-.321.988l-1.305.98a10.582 10.582 0 004.872 4.872l.98-1.305a1 1 0 01.988-.321l2.2.548a1 1 0 01.725.94V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                </span>
+                <input type="text" name="phone" value={formData.phone} onChange={handleChange} placeholder="0000000000" required className={getInputClass('phone')}/>
+              </div>
+            </div>
+
+            {/* Password Input */}
+            <div>
+              <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide flex justify-between ${fieldErrors.password ? 'text-red-500' : 'text-[#475569]'}`}>
+                <span>Password</span>
+                {/* Aap baad me yaha "Forgot Password?" ka link laga sakte hain */}
+              </label>
+              <div className="relative">
+                <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.password ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                </span>
+                <input type={showPassword ? "text" : "password"} name="password" value={formData.password} onChange={handleChange} placeholder="••••••••" required className={getInputClass('password')}/>
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center text-[#94A3B8] hover:text-[#475569]">
+                  {showPassword ? (
+                    <svg fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7Z" /></svg>
+                  ) : (
+                    <svg fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className={`w-full py-2.5 mt-4 rounded-lg text-white font-semibold text-sm transition-all tracking-wide ${
+                loading ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
+              }`}
+            >
+              {loading ? 'Logging in...' : 'Log In'}
+            </button>
+          </form>
+
+          {/* Bottom Navigation Links */}
+          <div className="mt-6 text-center text-xs text-[#64748B]">
+            Don't have an account?{' '}
+            <Link to="/Singup" className="text-[#2563EB] font-bold hover:underline ml-1">
+              Sign Up
+            </Link>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
+</file>
+
+<file path="frontend/src/pages/UserSubjectAnallysis.jsx">
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import api from "../api/api"; // 👈 Sahi import
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// ──────────────────────────────────────────────
+const formatDuration = (totalSeconds) => {
+  if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const SubjectAnalysisSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="w-8 h-8 rounded" />
+        <SkeletonBlock className="w-32 h-5" />
+      </div>
+      <SkeletonBlock className="w-28 h-4" />
+    </nav>
+
+    <div className="max-w-6xl mx-auto px-6 mt-10 space-y-8">
+      <div className="space-y-2">
+        <SkeletonBlock className="w-64 h-7" />
+        <SkeletonBlock className="w-80 h-4" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
+            <SkeletonBlock className="w-20 h-3 mb-3" />
+            <SkeletonBlock className="w-14 h-7" />
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-44 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-44 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const UserSubjectAnallysis = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeExamName, setActiveExamName] = useState("");
+
+  const subjectNameFromState = location.state?.subjectName;
+  const examNameFromState = location.state?.examName;
+
+  useEffect(() => {
+    if (!subjectNameFromState) {
+      navigate('/UserAllAnalysis');
+      return;
+    }
+
+    const fetchSubjectAnalysis = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        let currentExam = examNameFromState;
+
+        if (!currentExam) {
+          const meRes = await api.get("/me");
+          currentExam = meRes.data.data.exam;
+        }
+        
+        setActiveExamName(currentExam);
+
+        const examEncoded = encodeURIComponent(currentExam);
+        const subjectEncoded = encodeURIComponent(subjectNameFromState);
+        
+        const res = await api.get(`/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`);
+
+        setData(res.data.data);
+      } catch (err) {
+        setError(err.response?.data?.message || "Data laane mein error aaya.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubjectAnalysis();
+  }, [subjectNameFromState, examNameFromState, navigate]);
+
+  // 👇 NAYA: Total time calculate karna — topicList se average question-count per mock nikal ke,
+  // averageTimePerQuestion se multiply karte hain
+  const totalTimeSeconds = useMemo(() => {
+    if (!data?.topicList || !data.totalTestsConsidered) return null;
+    const totalAttempts = data.topicList.reduce((sum, t) => sum + (t.totalAttempted || 0), 0);
+    const questionsPerMock = totalAttempts / data.totalTestsConsidered;
+    return data.averageTimePerQuestion * questionsPerMock;
+  }, [data]);
+
+  if (loading) {
+    return <SubjectAnalysisSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
+        <div className="bg-[#111827] border border-red-500/30 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
+            !
+          </div>
+          <h2 className="text-xl font-bold mb-2">Oops! Error</h2>
+          <p className="text-gray-400 mb-6 text-sm">{error}</p>
+          <button 
+            onClick={() => navigate('/UserAllAnalysis')}
+            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
+      
       <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
-        <div className="flex items-center gap-2 cursor-pointer">
+        <div onClick={() => navigate('/HomePage')} className="flex items-center gap-2 cursor-pointer">
           <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
             mt
           </div>
           <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
         </div>
-        <div className="md:hidden">
-          <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </div>
+        <button 
+          onClick={() => navigate('/UserAllAnalysis')}
+          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
+        >
+          &larr; Back to Overview
+        </button>
       </nav>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-8 items-center mb-16">
-          
-          {/* Left Column */}
-          <div className="space-y-6">
-            <h1 className="text-5xl md:text-6xl font-bold leading-tight">
-              Full Practice.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A78BFA] to-[#7C3AED]">
-                Real Results.
-              </span>
-            </h1>
-            <p className="text-gray-400 text-lg md:text-xl max-w-md leading-relaxed">
-              Take mock tests, analyze your performance and improve with detailed insights.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 pt-4">
-              <button 
-                onClick={() => navigate('/MockTest', { state: { mockType: "Full" } })}
-                className="px-6 py-3 bg-[#7C3AED] hover:bg-[#6D28D9] text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                Start Full Mock Test <span>&rarr;</span>
-              </button>
-              <button 
-                onClick={() => navigate('/MockTest', { state: { mockType: "Mini" } })}
-                className="px-6 py-3 bg-transparent border border-gray-700 hover:border-gray-500 text-gray-300 font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-              >
-                Start Mini Mock <span>&rarr;</span>
-              </button>
-            </div>
+      <div className="max-w-6xl mx-auto px-6 mt-10 space-y-8">
+        
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Subject Analysis — <span className="text-[#A78BFA]">{data.subjectName}</span></h1>
+          <p className="text-gray-400 mt-2 text-sm">Deep dive into your performance for this subject based on the last 3 mocks.</p>
+        </div>
+
+        {/* 👇 UPDATED: "Mocks Considered" hataya, "Total Time" add kiya, 2-column square-ish grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Avg. Accuracy</p>
+            <p className="text-2xl font-bold text-[#10B981]">{data.averageAccuracy}%</p>
           </div>
-
-          {/* Right Column */}
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden flex flex-col justify-center">
-            <h3 className="text-sm text-gray-400 mb-6 font-medium">Overall Performance</h3>
-            <div className="flex flex-col sm:flex-row gap-8 items-center justify-center mb-8 w-full">
-              
-              <div className="relative w-48 h-48 flex-shrink-0">
-                <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                  <path className="text-gray-800" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                  <path className="text-[#8B5CF6]" strokeDasharray="72, 100" strokeWidth="3" strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                </svg>
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-4xl font-bold text-white">{displayedScore}</span>
-                  <span className="text-sm text-gray-500 mt-1">Score</span>
-                </div>
-              </div>
-
-            </div>
-
-            <div className="w-full mt-4">
-              <h3 className="text-xs text-gray-500 mb-3">Performance Overview</h3>
-              <div className="w-full h-24 relative flex items-end">
-                <svg className="w-full h-full preserve-aspect-ratio-none" viewBox="0 0 100 30" preserveAspectRatio="none">
-                  <path d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12" fill="none" stroke="#8B5CF6" strokeWidth="1" />
-                  <path d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12 L100,30 L0,30 Z" fill="url(#gradient)" opacity="0.2" />
-                  <defs>
-                    <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
-                      <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <circle cx="20" cy="20" r="1.5" fill="#A78BFA" />
-                  <circle cx="40" cy="10" r="1.5" fill="#A78BFA" />
-                  <circle cx="60" cy="18" r="1.5" fill="#A78BFA" />
-                  <circle cx="80" cy="5" r="1.5" fill="#A78BFA" />
-                </svg>
-              </div>
-            </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Avg Time / Q</p>
+            <p className="text-2xl font-bold text-[#3B82F6]">{data.averageTimePerQuestion}s</p>
+          </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg col-span-2 sm:col-span-1">
+            <p className="text-xs text-gray-500 font-medium mb-1">Total Time (Subject)</p>
+            <p className="text-2xl font-bold text-[#A78BFA]">{formatDuration(totalTimeSeconds)}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 py-8 border-y border-gray-800/50">
-          <div className="flex gap-4 items-center justify-center">
-            <div className="w-12 h-12 rounded-xl bg-purple-900/30 flex items-center justify-center text-purple-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-            </div>
-            <div>
-              <h3 className="text-md font-semibold text-gray-100">Exam Focused</h3>
-              <p className="text-xs text-gray-500">Topic-wise tests</p>
-            </div>
+        {/* Topic-wise Efficiency */}
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+          <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
+            <h3 className="font-semibold text-lg">Topic-wise Efficiency</h3>
+            <p className="text-xs text-gray-500 mt-1">{data.topicList?.length || 0} topics covered in this subject</p>
           </div>
-          <div className="flex gap-4 items-center justify-center">
-            <div className="w-12 h-12 rounded-xl bg-green-900/30 flex items-center justify-center text-green-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+
+          {data.topicList?.length === 0 ? (
+            <p className="p-6 text-sm text-yellow-500">No topic data available for this subject.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-medium">Topic</th>
+                    <th className="px-6 py-4 font-medium">Efficiency</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {data.topicList?.map((t, i) => (
+                    <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{t.topicName}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${t.efficiency >= 70 ? 'text-green-400 bg-green-500/10' : t.efficiency >= 40 ? 'text-yellow-400 bg-yellow-500/10' : 'text-red-400 bg-red-500/10'}`}>
+                          {t.efficiency}%
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        <button 
+                          onClick={() => navigate('/UserTopicAnalysis', {
+                            state: {
+                              examName: activeExamName,
+                              subjectName: data.subjectName,
+                              topicName: t.topicName
+                            }
+                          })}
+                          className="px-4 py-1.5 bg-[#1F2937] hover:bg-[#374151] border border-gray-700 rounded-lg text-[#A78BFA] text-xs font-medium transition-colors"
+                        >
+                          Deep Research &rarr;
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <h3 className="text-md font-semibold text-gray-100">Smart Analysis</h3>
-              <p className="text-xs text-gray-500">Detailed insights</p>
-            </div>
-          </div>
-          <div className="flex gap-4 items-center justify-center">
-            <div className="w-12 h-12 rounded-xl bg-blue-900/30 flex items-center justify-center text-blue-400">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-            </div>
-            <div>
-              <h3 className="text-md font-semibold text-gray-100">Track Progress</h3>
-              <p className="text-xs text-gray-500">Measure growth</p>
-            </div>
-          </div>
+          )}
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-8 mb-16 rounded-2xl bg-[#111827] border border-gray-800 shadow-lg">
-          <div className="text-center">
-            <p className="text-4xl font-bold text-white">10,000+</p>
-            <p className="text-sm text-gray-500">Tests Attempted</p>
+        {/* 👇 UPDATED: Top Weak Topics — Wrong Answers & Reason hataye, Deep Analysis button diya */}
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+          <div className="px-6 py-5 border-b border-gray-800 bg-red-900/10">
+            <h3 className="font-semibold text-lg text-red-400">Top Weak Topics (Needs Attention)</h3>
+            <p className="text-xs text-gray-500 mt-1">Focus on these areas to improve your score</p>
           </div>
-          <div className="text-center">
-            <p className="text-4xl font-bold text-white">95%</p>
-            <p className="text-sm text-gray-500">Success Rate</p>
-          </div>
-          <div className="text-center">
-            <p className="text-4xl font-bold text-white">50,000+</p>
-            <p className="text-sm text-gray-500">Happy Students</p>
-          </div>
-          <div className="text-center">
-            <p className="text-4xl font-bold text-white">4.9/5</p>
-            <p className="text-sm text-gray-500">User Rating</p>
-          </div>
+
+          {data.weakTopics?.length === 0 ? (
+            <p className="p-6 text-sm text-green-400">Great job! No specific weak topics detected.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-medium">Topic</th>
+                    <th className="px-6 py-4 font-medium">Efficiency</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {data.weakTopics?.map((t, i) => (
+                    <tr key={i} className={`${i === 0 ? 'bg-red-500/5' : 'hover:bg-[#1F2937]/50'} transition-colors`}>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{t.topicName}</td>
+                      <td className="px-6 py-4 text-sm text-red-400">{t.efficiency}%</td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        <button
+                          onClick={() => navigate('/UserTopicAnalysis', {
+                            state: {
+                              examName: activeExamName,
+                              subjectName: data.subjectName,
+                              topicName: t.topicName
+                            }
+                          })}
+                          className="px-4 py-1.5 bg-[#1F2937] hover:bg-[#374151] border border-gray-700 rounded-lg text-red-300 text-xs font-medium transition-colors"
+                        >
+                          Deep Analysis &rarr;
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        <div className="py-12">
-          <div className="flex justify-between items-end mb-8">
-            <h2 className="text-2xl font-bold">Explore Features</h2>
-            <button className="text-sm text-gray-400 hover:text-white flex items-center gap-1 transition-colors">
-              View All <span>&rarr;</span>
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            
-            <div 
-              onClick={() => navigate('/MockTest')}
-              className="bg-[#111827] border border-gray-800 rounded-3xl p-6 cursor-pointer transition-all hover:-translate-y-1 hover:border-purple-500/50 group"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#1F2937] flex items-center justify-center text-[#A78BFA] mb-4 group-hover:bg-purple-900/30">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-              </div>
-              <h3 className="text-lg font-bold mb-2">Mock Tests</h3>
-              <p className="text-sm text-gray-400 mb-6 line-clamp-2">
-                Take tests and challenge yourself with real exam pattern.
-              </p>
-              <div className="w-8 h-8 rounded-full bg-[#1F2937] flex items-center justify-center text-gray-400 group-hover:text-white group-hover:bg-purple-600 transition-colors">
-                &rarr;
-              </div>
-            </div>
-
-            <div 
-              onClick={() => navigate('/AnalysisPage')}
-              className="bg-[#111827] border border-gray-800 rounded-3xl p-6 cursor-pointer transition-all hover:-translate-y-1 hover:border-green-500/50 group"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#1F2937] flex items-center justify-center text-[#10B981] mb-4 group-hover:bg-green-900/30">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-              </div>
-              <h3 className="text-lg font-bold mb-2">Analysis</h3>
-              <p className="text-sm text-gray-400 mb-6 line-clamp-2">
-                View your performance and get detailed analysis.
-              </p>
-              <div className="w-8 h-8 rounded-full bg-[#1F2937] flex items-center justify-center text-gray-400 group-hover:text-white group-hover:bg-green-600 transition-colors">
-                &rarr;
-              </div>
-            </div>
-
-            <div 
-              onClick={() => navigate('/ProfilePage')}
-              className="bg-[#111827] border border-gray-800 rounded-3xl p-6 cursor-pointer transition-all hover:-translate-y-1 hover:border-blue-500/50 group"
-            >
-              <div className="w-12 h-12 rounded-xl bg-[#1F2937] flex items-center justify-center text-[#3B82F6] mb-4 group-hover:bg-blue-900/30">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-              </div>
-              <h3 className="text-lg font-bold mb-2">Profile</h3>
-              <p className="text-sm text-gray-400 mb-6 line-clamp-2">
-                Manage your account and track your progress.
-              </p>
-              <div className="w-8 h-8 rounded-full bg-[#1F2937] flex items-center justify-center text-gray-400 group-hover:text-white group-hover:bg-blue-600 transition-colors">
-                &rarr;
-              </div>
-            </div>
-            
-          </div>
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-800/50 py-12 text-center flex flex-col items-center justify-center gap-2">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-[10px]">
-            mt
-          </div>
-          <span className="text-md font-semibold text-gray-300">mockTest.in</span>
-        </div>
-      </footer>
+      </div>
     </div>
   );
 };
 
-export default HomePage;
+export default UserSubjectAnallysis;
+</file>
+
+<file path="frontend/src/pages/UserTopicAnalysis.jsx">
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import api from "../api/api"; // 👈 Sahi import
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const TopicAnalysisSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="w-8 h-8 rounded" />
+        <SkeletonBlock className="w-32 h-5" />
+      </div>
+      <SkeletonBlock className="w-28 h-4" />
+    </nav>
+
+    <div className="max-w-4xl mx-auto px-6 mt-10 space-y-8">
+      <div className="space-y-2">
+        <SkeletonBlock className="w-56 h-7" />
+        <SkeletonBlock className="w-72 h-4" />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+        {[1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
+            <SkeletonBlock className="w-16 h-3 mb-3" />
+            <SkeletonBlock className="w-10 h-6" />
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-20 h-8 rounded-full" />
+        ))}
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 space-y-5">
+        <SkeletonBlock className="w-full h-4" />
+        <SkeletonBlock className="w-full h-16" />
+        <div className="space-y-3">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-12 rounded-xl" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+// ──────────────────────────────────────────────
+// 👇 Status filter tabs — jaisa Question Review screen me hota hai
+// ──────────────────────────────────────────────
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+const UserTopicAnalysis = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // 👇 NAYA: status filter aur one-at-a-time navigation ke liye state
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [index, setIndex] = useState(0);
+
+  const subjectNameFromState = location.state?.subjectName;
+  const examNameFromState = location.state?.examName;
+  const topicNameFromState = location.state?.topicName;
+
+  useEffect(() => {
+    if (!topicNameFromState || !subjectNameFromState) {
+      navigate('/UserAllAnalysis');
+      return;
+    }
+
+    const fetchTopicAnalysis = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        let activeExamName = examNameFromState;
+
+        if (!activeExamName) {
+          const meRes = await api.get("/me");
+          activeExamName = meRes.data.data.exam;
+        }
+
+        const examEncoded = encodeURIComponent(activeExamName);
+        const subjectEncoded = encodeURIComponent(subjectNameFromState);
+        const topicEncoded = encodeURIComponent(topicNameFromState);
+        
+        const res = await api.get(`/analysis/topic/active_user/${examEncoded}/${subjectEncoded}/${topicEncoded}`);
+
+        setData(res.data.data);
+      } catch (err) {
+        setError(err.response?.data?.message || "Data laane mein error aaya.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTopicAnalysis();
+  }, [examNameFromState, subjectNameFromState, topicNameFromState, navigate]);
+
+  // 👇 NAYA: teeno arrays (goodAt/wrong/unattempted) ko ek sath combine karte hain,
+  // har question pe isCorrect status tag laga ke — taaki ek hi list pe filter chal sake
+  const combinedQuestions = useMemo(() => {
+    if (!data) return [];
+    const good = (data.goodAt || []).map((q) => ({ ...q, isCorrect: true }));
+    const wrong = (data.wrong || []).map((q) => ({ ...q, isCorrect: false }));
+    const unattempted = (data.unattempted || []).map((q) => ({ ...q, isCorrect: null }));
+    return [...good, ...wrong, ...unattempted];
+  }, [data]);
+
+  const filteredQuestions = useMemo(() => {
+    return combinedQuestions.filter((q) => {
+      if (statusFilter === "correct") return q.isCorrect === true;
+      if (statusFilter === "wrong") return q.isCorrect === false;
+      if (statusFilter === "unattempted") return q.isCorrect === null;
+      return true; // all
+    });
+  }, [combinedQuestions, statusFilter]);
+
+  // Filter badalte hi pehle question pe wapas le jao
+  useEffect(() => {
+    setIndex(0);
+  }, [statusFilter]);
+
+  const currentQ = filteredQuestions[index];
+
+  const counts = useMemo(() => {
+    return {
+      all: combinedQuestions.length,
+      correct: data?.summary?.totalCorrect ?? 0,
+      wrong: data?.summary?.totalWrong ?? 0,
+      unattempted: data?.summary?.totalUnattempted ?? 0,
+    };
+  }, [combinedQuestions, data]);
+
+  if (loading) {
+    return <TopicAnalysisSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
+        <div className="bg-[#111827] border border-red-500/30 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+          <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
+            !
+          </div>
+          <h2 className="text-xl font-bold mb-2">Oops! Error</h2>
+          <p className="text-gray-400 mb-6 text-sm">{error}</p>
+          <button 
+            onClick={() => navigate('/UserAllAnalysis')}
+            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
+      
+      {/* Navbar */}
+      <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+        <div onClick={() => navigate('/HomePage')} className="flex items-center gap-2 cursor-pointer">
+          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
+            mt
+          </div>
+          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
+        </div>
+        <button 
+          onClick={() => navigate('/UserSubjectAnallysis', { 
+            state: { examName: examNameFromState, subjectName: data.subjectName } 
+          })}
+          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
+        >
+          &larr; Back to {data.subjectName}
+        </button>
+      </nav>
+
+      {/* Main Container */}
+      <div className="max-w-4xl mx-auto px-6 mt-10 space-y-8">
+        
+        {/* 👇 UPDATED: "Topic Deep Research —" hataya, sirf topic name */}
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-[#A78BFA]">{data.topicName}</h1>
+          <p className="text-gray-400 mt-2 text-sm">Subject: {data.subjectName} &middot; Combined data from all lifetime mocks</p>
+        </div>
+
+        {/* 👇 UPDATED: Stats Row — ab Unattempted bhi shaamil hai */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Efficiency</p>
+            <p className="text-xl sm:text-2xl font-bold text-[#A78BFA]">{data.summary?.efficiency}%</p>
+          </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Attempted</p>
+            <p className="text-xl sm:text-2xl font-bold text-white">{data.summary?.totalAttempted}</p>
+          </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Correct</p>
+            <p className="text-xl sm:text-2xl font-bold text-green-400">{data.summary?.totalCorrect}</p>
+          </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Wrong</p>
+            <p className="text-xl sm:text-2xl font-bold text-red-400">{data.summary?.totalWrong}</p>
+          </div>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg col-span-2 sm:col-span-1">
+            <p className="text-xs text-gray-500 font-medium mb-1">Unattempted</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-300">{data.summary?.totalUnattempted}</p>
+          </div>
+        </div>
+
+        {/* 👇 NAYA: Status filter tabs — jaisa reference screenshot me hai */}
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                statusFilter === f.key
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {f.label} ({counts[f.key]})
+            </button>
+          ))}
+        </div>
+
+        {/* 👇 NAYA: Ek-ek question dikhna, Prev/Next se navigate */}
+        {filteredQuestions.length === 0 && (
+          <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 text-gray-500 text-sm text-center">
+            Is category mein koi sawaal nahi hai.
+          </div>
+        )}
+
+        {currentQ && (
+          <>
+            <p className="text-xs text-gray-500">
+              Question {index + 1} of {filteredQuestions.length} &middot; {data.topicName}
+            </p>
+            <QuestionCard q={currentQ} index={index} />
+
+            <div className="flex justify-between items-center pt-2">
+              <button
+                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                disabled={index === 0}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &larr; Previous
+              </button>
+              <button
+                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
+                disabled={index >= filteredQuestions.length - 1}
+                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </>
+        )}
+
+      </div>
+    </div>
+  );
+};
+
+// ── Question Card Component (Dark Theme UI) ──
+const QuestionCard = ({ q, index }) => {
+  const statusLabel =
+    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+  const statusColor =
+    q.isCorrect === true
+      ? "text-green-400 bg-green-500/10 border-green-500/30"
+      : q.isCorrect === false
+      ? "text-red-400 bg-red-500/10 border-red-500/30"
+      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
+  const borderColorClass =
+    q.isCorrect === true ? "border-l-green-500" : q.isCorrect === false ? "border-l-red-500" : "border-l-yellow-500";
+
+  return (
+    <div className={`bg-[#111827] border border-gray-800 rounded-xl p-5 sm:p-6 shadow-md border-l-4 ${borderColorClass}`}>
+      
+      {/* Meta info */}
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 font-mono">
+          <span>Mock ID: {String(q.performanceId).slice(-6)}</span>
+          <span>•</span>
+          <span>{new Date(q.mockDate).toLocaleDateString("hi-IN", { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+          <span>•</span>
+          <span>Time: {q.timeTakenInSeconds ?? "—"}s</span>
+        </div>
+        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${statusColor}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      {/* Question */}
+      <p className="text-base sm:text-lg font-medium text-gray-200 mb-5 leading-relaxed">
+        <span className="text-gray-500 mr-2">Q{index + 1}.</span> 
+        {q.question}
+      </p>
+
+      {/* Options */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+        {[1, 2, 3, 4].map((n) => {
+          const isCorrect = q.correctOption === n;
+          const isUser = q.userAnswer === String(n);
+          
+          let optionStyle = "bg-[#1F2937] border-gray-700 text-gray-400";
+          
+          if (isCorrect) {
+            optionStyle = "bg-green-500/10 border-green-500/30 text-green-400 font-semibold";
+          } else if (isUser && !isCorrect) {
+            optionStyle = "bg-red-500/10 border-red-500/30 text-red-400 font-semibold";
+          }
+
+          return (
+            <div
+              key={n}
+              className={`p-3 rounded-lg border text-sm flex items-start gap-3 ${optionStyle}`}
+            >
+              <span className="shrink-0">{n}.</span>
+              <span className="flex-1">{q.options?.[`option${n}`]}</span>
+              {isCorrect && <span className="shrink-0">✅</span>}
+              {isUser && !isCorrect && <span className="shrink-0 text-xs mt-0.5">(Your Answer) ❌</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Explanation */}
+      {q.answerExplain && (
+        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4 mt-2">
+          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">Explanation</p>
+          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserTopicAnalysis;
+</file>
+
+<file path="backend/server.js">
+import dotenv from "dotenv";
+dotenv.config(); // sabse upar — baaki sab iske baad
+
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser"; // 👈 1. Ye naya import add kiya hai
+import path from "path";
+import { fileURLToPath } from "url";
+import { rowQuestionConnection } from "./config/rowQuestion.js";
+import questionRouter from "./routes/Routes.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// ─────────────────────────────────────────────
+// CORS — frontend se API call allow karne ke liye
+// CORS missing hone pe browser silently block karta hai —
+// koi proper error nahi aata, bas request fail hoti hai
+// ─────────────────────────────────────────────
+const allowedOrigins = [
+  "http://localhost:5173",  // React dev server (Vite)
+  "https://demomock-1.onrender.com",  
+  process.env.FRONTEND_URL, // Production frontend URL (.env mein daalo)
+].filter(Boolean); // undefined values hata do
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Postman/mobile app ke liye origin nahi hoti — allow karo
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS blocked: ${origin} allowed nahi hai`));
+    },
+    credentials: true, // cookies/auth headers ke liye
+  })
+);
+
+// ─────────────────────────────────────────────
+// Middleware
+// ─────────────────────────────────────────────
+app.use(express.json());
+app.use(cookieParser()); // 👈 2. Ye middleware add kiya taaki req.cookies read ho sake (Hamesha routes se upar hona chahiye)
+
+// ─────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────
+app.use("/api", questionRouter);
+
+// ─────────────────────────────────────────────
+// Frontend (React build) serve karna — single-origin setup
+// Ye API routes ke BAAD hai, taaki /api/* pehle match ho jaye
+// ─────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+});
+
+// ─────────────────────────────────────────────
+// Database connection check karke server start karo
+// Pehle DB connect ho, phir server sune —
+// warna server chal jaata hai but DB queries fail hoti hain
+// ─────────────────────────────────────────────
+rowQuestionConnection.once("connected", () => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Database connected`);
+  });
+});
+
+rowQuestionConnection.on("error", (err) => {
+  console.error("Database connection failed:", err.message);
+  process.exit(1); // DB nahi chala to server band karo
+});
 </file>
 
 <file path="frontend/src/pages/MockTest.jsx">
@@ -4359,6 +5778,9 @@ const formatTime = (totalSeconds) => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
+// 👇 NAYA: localStorage key banane ka helper — har user ka apna alag saved test
+const getStorageKey = (userId) => `activeMockTest_${userId}`;
+
 const MockTest = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -4378,6 +5800,9 @@ const MockTest = () => {
   const [visited, setVisited] = useState(() => new Set());
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  // 👇 NAYA: Test kab khatam hoga uska absolute (wall-clock) timestamp
+  // Isse reload ke baad bhi timer sahi se calculate ho payega
+  const [endTimestamp, setEndTimestamp] = useState(null);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [resultData, setResultData] = useState(null);
 
@@ -4396,10 +5821,56 @@ const MockTest = () => {
       try {
         const meRes = await api.get("/me");
         if (cancelled) return;
-        setUserId(meRes.data.data._id);
-        setExamName(meRes.data.data.exam);
 
-        const bpRes = await api.get(`/blueprints/${encodeURIComponent(meRes.data.data.exam)}`);
+        const uid = meRes.data.data._id;
+        const exam = meRes.data.data.exam;
+        setUserId(uid);
+        setExamName(exam);
+
+        // ─────────────────────────────────────────────
+        // 👇 NAYA: Sabse pehle check karo ki koi in-progress
+        // test localStorage mein saved to nahi hai. Agar hai
+        // aur time bacha hua hai, to usko RESUME karo —
+        // naya mock generate mat karo.
+        // ─────────────────────────────────────────────
+        const savedRaw = localStorage.getItem(getStorageKey(uid));
+        if (savedRaw) {
+          try {
+            const saved = JSON.parse(savedRaw);
+            const remaining = Math.round((saved.endTimestamp - Date.now()) / 1000);
+
+            if (saved.mockData && saved.selectedBlueprint) {
+              // State restore karo
+              setSelectedBlueprint(saved.selectedBlueprint);
+              setMockData(saved.mockData);
+              setAnswers(saved.answers || {});
+              setMarked(new Set(saved.marked || []));
+              setVisited(new Set(saved.visited || []));
+              setTimeSpent(saved.timeSpent || {});
+              setActiveSubjectIdx(saved.activeSubjectIdx || 0);
+              setActiveQIdx(saved.activeQIdx || 0);
+              setEndTimestamp(saved.endTimestamp);
+              setRemainingSeconds(Math.max(0, remaining));
+
+              const subj = saved.mockData.subjects[saved.activeSubjectIdx || 0];
+              const q = subj ? subj.questions[saved.activeQIdx || 0] : null;
+              currentQIdRef.current = q ? q._id : null;
+              questionStartRef.current = Date.now();
+              submittingRef.current = false;
+
+              setPhase("test");
+              return; // 👈 normal blueprint-fetch flow skip karo
+            }
+          } catch (parseErr) {
+            // Corrupt data mila to usse hata do aur normal flow chalao
+            localStorage.removeItem(getStorageKey(uid));
+          }
+        }
+
+        // ─────────────────────────────────────────────
+        // Koi saved test nahi mila — normal flow: blueprints fetch karo
+        // ─────────────────────────────────────────────
+        const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
         if (cancelled) return;
 
         let list = bpRes.data.data || [];
@@ -4426,6 +5897,7 @@ const MockTest = () => {
     };
     init();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preferredMockType]);
 
   const chooseBlueprint = (bp) => {
@@ -4461,7 +5933,11 @@ const MockTest = () => {
       setVisited(new Set([firstQ._id]));
 
       const durMin = selectedBlueprint.durationMinutes || Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
-      setRemainingSeconds(durMin * 60);
+      const totalSeconds = durMin * 60;
+      const newEndTimestamp = Date.now() + totalSeconds * 1000;
+
+      setEndTimestamp(newEndTimestamp);
+      setRemainingSeconds(totalSeconds);
       setPhase("test");
     } catch (err) {
       setErrorMsg(err.response?.data?.message || "Mock generate fail.");
@@ -4579,8 +6055,49 @@ const MockTest = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [answers, marked, visited, mockData]);
 
+  // ─────────────────────────────────────────────
+  // 👇 NAYA: Jab bhi test ka koi bhi zaroori part change ho
+  // (answer, mark, navigation, time), poora state localStorage
+  // mein save kar do — taaki reload pe wahi se resume ho sake.
+  // Note: remainingSeconds ko dependency mein NAHI rakha — 
+  // warna har second localStorage write hota rahega (perf hit).
+  // Uski jagah fixed endTimestamp store hota hai.
+  // ─────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== "test" || !mockData || !userId || !endTimestamp) return;
 
-const handleSubmit = async () => {
+    const toSave = {
+      selectedBlueprint,
+      mockData,
+      answers,
+      marked: [...marked],
+      visited: [...visited],
+      timeSpent,
+      activeSubjectIdx,
+      activeQIdx,
+      endTimestamp,
+    };
+
+    try {
+      localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave));
+    } catch (err) {
+      console.error("Mock test state save nahi ho paayi:", err);
+    }
+  }, [
+    phase,
+    mockData,
+    answers,
+    marked,
+    visited,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    endTimestamp,
+    userId,
+    selectedBlueprint,
+  ]);
+
+  const handleSubmit = async () => {
     if (!mockData || submittingRef.current) return;
     submittingRef.current = true;
     flushTime();
@@ -4598,6 +6115,11 @@ const handleSubmit = async () => {
       const res = await api.post("/add-performence", {
         userId, examName, blueprintName: selectedBlueprint.blueprintName, attemptedQuestions
       });
+
+      // 👇 NAYA: Submit successful hone ke baad saved in-progress test hata do
+      // warna agli baar dobara yahi purana test resume ho jayega
+      localStorage.removeItem(getStorageKey(userId));
+
       setResultData(res.data.data);
       setPhase("results");
     } catch (err) {
@@ -4606,9 +6128,11 @@ const handleSubmit = async () => {
       setPhase("error");
     }
   };
-// ── Countdown timer — auto-submits at zero ──
+
+  // ── Countdown timer — endTimestamp ke basis pe accurate rehta hai ──
   useEffect(() => {
     if (phase !== "test") return;
+
     if (remainingSeconds <= 0) {
       // Direct call karne ki jagah setTimeout ka use karein
       const timer = setTimeout(() => {
@@ -4616,14 +6140,21 @@ const handleSubmit = async () => {
       }, 0);
       return () => clearTimeout(timer);
     }
-    
+
     const timer = setTimeout(() => {
-      setRemainingSeconds((s) => s - 1);
+      // 👇 NAYA: endTimestamp se hi recalculate karo, sirf -1 mat karo
+      // Isse background tab throttling ya thoda drift bhi self-correct ho jata hai
+      if (endTimestamp) {
+        const newRemaining = Math.max(0, Math.round((endTimestamp - Date.now()) / 1000));
+        setRemainingSeconds(newRemaining);
+      } else {
+        setRemainingSeconds((s) => Math.max(0, s - 1));
+      }
     }, 1000);
-    
+
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds]);
+  }, [phase, remainingSeconds, endTimestamp]);
 
   // 👇 NAYA: Review screen kholne/band karne ke functions
   const openReview = (subjectName = null, filter = "all") => {
@@ -4822,7 +6353,7 @@ const InstructionsScreen = ({ examName, blueprint, durMin, onStart }) => {
           {blueprint.negativeMarking > 0 && (
             <li>Har galat jawab ke {blueprint.negativeMarking} marks katenge.</li>
           )}
-          <li>Test ke beech mein page reload ya close na karein.</li>
+          <li>Agar galti se page reload ho jaaye to chinta na karein — aapka test wahi se resume ho jayega.</li>
           <li>Kisi bhi sawaal ko "Mark for Review" karke baad mein wapas aa sakte hain.</li>
         </ul>
 
@@ -5065,7 +6596,7 @@ const TestScreen = ({
   );
 };
 
-// 👇 UPDATED: Results screen — ab categories aur "Deep Analysis" clickable hain
+// 👇 Results screen — categories aur "Deep Analysis" clickable hain
 const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   const { scoreDetails, subjectAnalysis } = resultData;
   return (
@@ -5079,7 +6610,6 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
           <p className="text-sm text-gray-500 mt-1">Total Score</p>
         </div>
 
-        {/* 👇 NAYA: Ye 3 cards ab clickable hain — click karke us category ke sawaal dekh sakte hain */}
         <div className="grid grid-cols-3 gap-4 mb-8">
           <button
             onClick={() => onOpenReview(null, "correct")}
@@ -5117,7 +6647,6 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
                   {s.accuracy}% accuracy &middot; {s.correctCount}/{s.totalQuestions}
                 </p>
               </div>
-              {/* 👇 NAYA: Deep Analysis button — is subject ke sawaal ek-ek karke dikhayega */}
               <button
                 onClick={() => onOpenReview(s.subjectName, "all")}
                 className="px-3 py-1.5 rounded-lg bg-[#111827] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] text-xs font-medium transition-colors flex-shrink-0"
@@ -5147,9 +6676,7 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   );
 };
 
-// 👇 NAYA COMPONENT: Question Review Screen
-// Ye is mock ke saare questions fetch karta hai (/analysis/mock-detail/:performanceId se),
-// phir subject/status ke hisaab se filter karke ek-ek question dikhata hai
+// Question Review Screen
 const STATUS_FILTERS = [
   { key: "all", label: "All" },
   { key: "correct", label: "Correct" },
@@ -5189,14 +6716,12 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
     });
   }, [allQuestions, subjectFilter, statusFilter]);
 
-  // Filter badalte hi pehle question pe wapas le jao
   useEffect(() => {
     setIndex(0);
   }, [subjectFilter, statusFilter]);
 
   const currentQ = filteredQuestions[index];
 
-  // Selected subject ke hisaab se har status ka count (tabs pe dikhane ke liye)
   const counts = useMemo(() => {
     const base = allQuestions.filter(
       (q) => subjectFilter === "all" || q.subjectName === subjectFilter
@@ -5221,7 +6746,6 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
 
         <h1 className="text-xl sm:text-2xl font-bold mb-4">Question Review</h1>
 
-        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject hai */}
         {subjects.length > 1 && (
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             <button
@@ -5250,7 +6774,6 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
           </div>
         )}
 
-        {/* Status filter — Correct / Wrong / Unattempted */}
         <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -5318,7 +6841,7 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
   );
 };
 
-// 👇 NAYA COMPONENT: Ek single question ka poora detail card
+// Ek single question ka poora detail card
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =
     q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
@@ -5399,7 +6922,102 @@ export default MockTest;
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/api"; // 👈 Sahi path import karein
+import api from "../api/api";
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// ──────────────────────────────────────────────
+const formatDuration = (totalSeconds) => {
+  if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const AnalysisPageSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="w-8 h-8 rounded" />
+        <SkeletonBlock className="w-32 h-5" />
+      </div>
+      <SkeletonBlock className="w-24 h-4" />
+    </nav>
+
+    <div className="max-w-5xl mx-auto px-6 mt-10 space-y-8">
+      <div className="space-y-2">
+        <SkeletonBlock className="w-64 h-8" />
+        <SkeletonBlock className="w-48 h-4" />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+          <SkeletonBlock className="w-36 h-3 mb-3" />
+          <SkeletonBlock className="w-20 h-9" />
+        </div>
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+          <SkeletonBlock className="w-36 h-3 mb-3" />
+          <SkeletonBlock className="w-20 h-9" />
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-40 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-10" />
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-32 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const MockDetailSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto space-y-6">
+      <SkeletonBlock className="w-40 h-4" />
+      <div className="space-y-2">
+        <SkeletonBlock className="w-56 h-6" />
+        <SkeletonBlock className="w-32 h-3" />
+      </div>
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 flex flex-col items-center gap-3">
+        <SkeletonBlock className="w-24 h-10" />
+        <SkeletonBlock className="w-40 h-3" />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="h-20 rounded-xl" />
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
 
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
@@ -5408,7 +7026,9 @@ const UserAllAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 👇 NAYA: List me se kaunsa mock click hua, uska performanceId yahan store hoga
+  // 👇 NAYA: Subject-wise question count, blueprint se aata hai
+  const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({});
+
   const [viewingMockId, setViewingMockId] = useState(null);
 
   React.useEffect(() => {
@@ -5422,9 +7042,25 @@ const UserAllAnalysis = () => {
         setExamName(userExam);
 
         const encodedExam = encodeURIComponent(userExam);
-        const overviewRes = await api.get(`/analysis/overview/active_user/${encodedExam}`);
-        
+
+        // Overview aur blueprints dono ek sath fetch karte hain
+        const [overviewRes, blueprintsRes] = await Promise.all([
+          api.get(`/analysis/overview/active_user/${encodedExam}`),
+          api.get(`/blueprints/${encodedExam}`).catch(() => ({ data: { data: [] } })), // fail ho to bhi crash na ho
+        ]);
+
         setOverview(overviewRes.data.data);
+
+        // 👇 NAYA: Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
+        const countMap = {};
+        (blueprintsRes.data.data || []).forEach((bp) => {
+          (bp.subjects || []).forEach((s) => {
+            if (!(s.subjectName in countMap)) {
+              countMap[s.subjectName] = s.questionCount;
+            }
+          });
+        });
+        setSubjectQuestionCounts(countMap);
       } catch (err) {
         setError(err.response?.data?.message || err.message || "Data laane mein error aaya.");
       } finally {
@@ -5435,20 +7071,13 @@ const UserAllAnalysis = () => {
     fetchData();
   }, []);
 
-  // 👇 NAYA: graphData backend se oldest→newest order me aata hai (graph ke liye zaroori),
-  // isliye table ke liye ise reverse karke newest→oldest bana rahe hain
   const sortedHistory = useMemo(() => {
     if (!overview?.graphData) return [];
     return [...overview.graphData].reverse();
   }, [overview]);
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 font-medium tracking-wide">Analysis data load ho raha hai...</p>
-      </div>
-    );
+    return <AnalysisPageSkeleton />;
   }
 
   if (error) {
@@ -5493,7 +7122,6 @@ const UserAllAnalysis = () => {
     );
   }
 
-  // 👇 NAYA: Agar koi mock click hua hai, to poori screen uska detail view dikhaye
   if (viewingMockId) {
     return (
       <MockDetailScreen
@@ -5559,39 +7187,51 @@ const UserAllAnalysis = () => {
                   <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
                     <th className="px-6 py-4 font-medium">Subject Name</th>
                     <th className="px-6 py-4 font-medium">Avg. Accuracy</th>
-                    <th className="px-6 py-4 font-medium">Avg. Time (per Q)</th>
+                    <th className="px-6 py-4 font-medium">Total Time (Subject)</th>
                     <th className="px-6 py-4 font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
-                  {overview.subjectAnalysis?.map((s, i) => (
-                    <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-200">{s.subjectName}</td>
-                      <td className="px-6 py-4 text-sm">
-                        <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${s.averageAccuracy >= 70 ? 'bg-green-500/10 text-green-400' : s.averageAccuracy >= 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
-                          {s.averageAccuracy}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-400">{s.averageTimePerQuestion} sec</td>
-                      <td className="px-6 py-4 text-sm text-gray-400">
-                        <button 
-                          onClick={() => navigate('/UserSubjectAnallysis', { 
-                            state: { subjectName: s.subjectName, examName: examName } 
-                          })}
-                          className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs flex items-center gap-1"
-                        >
-                          View Deep &rarr;
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {overview.subjectAnalysis?.map((s, i) => {
+                    // 👇 NAYA: averageTimePerQuestion × us subject ke total questions = poora subject attempt karne ka time
+                    const qCount = subjectQuestionCounts[s.subjectName];
+                    const totalTimeSeconds =
+                      qCount != null ? s.averageTimePerQuestion * qCount : null;
+
+                    return (
+                      <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
+                        <td className="px-6 py-4 text-sm font-medium text-gray-200">{s.subjectName}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${s.averageAccuracy >= 70 ? 'bg-green-500/10 text-green-400' : s.averageAccuracy >= 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
+                            {s.averageAccuracy}%
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          {formatDuration(totalTimeSeconds)}
+                          {qCount != null && (
+                            <span className="text-gray-600 text-xs ml-1">({qCount}Q)</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-400">
+                          <button 
+                            onClick={() => navigate('/UserSubjectAnallysis', { 
+                              state: { subjectName: s.subjectName, examName: examName } 
+                            })}
+                            className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs flex items-center gap-1"
+                          >
+                            View Deep &rarr;
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
         </div>
 
-        {/* Mock History — ab latest-first, date+time ke sath, clickable */}
+        {/* Mock History — latest-first, date+time ke sath, clickable */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Test History</h3>
@@ -5642,8 +7282,7 @@ const UserAllAnalysis = () => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 NAYA COMPONENT: Ek specific mock ka poora result + question review
-// Same pattern jaisa mock submit ke turant baad dikhta hai
+// 👇 Ek specific mock ka poora result + question review
 // ──────────────────────────────────────────────
 
 const Stat = ({ label, value }) => (
@@ -5662,7 +7301,7 @@ const STATUS_FILTERS = [
 
 const MockDetailScreen = ({ performanceId, onBack }) => {
   const [subjectFilter, setSubjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState(null); // null = abhi review nahi khula, sirf overview dikh raha
+  const [statusFilter, setStatusFilter] = useState(null);
   const [index, setIndex] = useState(0);
 
   const { data, isLoading, isError, error } = useQuery({
@@ -5704,14 +7343,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
   };
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Result load ho raha hai...</p>
-        </div>
-      </div>
-    );
+    return <MockDetailSkeleton />;
   }
 
   if (isError || !data) {
@@ -5732,7 +7364,6 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   const { overview } = data;
 
-  // ── Sub-view: question-by-question review (jab koi category click hui ho) ──
   if (statusFilter) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
@@ -5826,7 +7457,6 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
     );
   }
 
-  // ── Main view: overview stats (jaisa submit ke turant baad dikhta hai) ──
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
       <div className="max-w-2xl mx-auto">
@@ -5952,85 +7582,6 @@ const QuestionDetailCard = ({ q }) => {
 export default UserAllAnalysis;
 </file>
 
-<file path="backend/server.js">
-import dotenv from "dotenv";
-dotenv.config(); // sabse upar — baaki sab iske baad
-
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser"; // 👈 1. Ye naya import add kiya hai
-import path from "path";
-import { fileURLToPath } from "url";
-import { rowQuestionConnection } from "./config/rowQuestion.js";
-import questionRouter from "./routes/Routes.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// ─────────────────────────────────────────────
-// CORS — frontend se API call allow karne ke liye
-// CORS missing hone pe browser silently block karta hai —
-// koi proper error nahi aata, bas request fail hoti hai
-// ─────────────────────────────────────────────
-const allowedOrigins = [
-  "http://localhost:5173",  // React dev server (Vite)
-  "https://demomock-1.onrender.com",  
-  process.env.FRONTEND_URL, // Production frontend URL (.env mein daalo)
-].filter(Boolean); // undefined values hata do
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Postman/mobile app ke liye origin nahi hoti — allow karo
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS blocked: ${origin} allowed nahi hai`));
-    },
-    credentials: true, // cookies/auth headers ke liye
-  })
-);
-
-// ─────────────────────────────────────────────
-// Middleware
-// ─────────────────────────────────────────────
-app.use(express.json());
-app.use(cookieParser()); // 👈 2. Ye middleware add kiya taaki req.cookies read ho sake (Hamesha routes se upar hona chahiye)
-
-// ─────────────────────────────────────────────
-// Routes
-// ─────────────────────────────────────────────
-app.use("/api", questionRouter);
-
-// ─────────────────────────────────────────────
-// Frontend (React build) serve karna — single-origin setup
-// Ye API routes ke BAAD hai, taaki /api/* pehle match ho jaye
-// ─────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-app.get(/^(?!\/api).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
-});
-
-// ─────────────────────────────────────────────
-// Database connection check karke server start karo
-// Pehle DB connect ho, phir server sune —
-// warna server chal jaata hai but DB queries fail hoti hain
-// ─────────────────────────────────────────────
-rowQuestionConnection.once("connected", () => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Database connected`);
-  });
-});
-
-rowQuestionConnection.on("error", (err) => {
-  console.error("Database connection failed:", err.message);
-  process.exit(1); // DB nahi chala to server band karo
-});
-</file>
-
 <file path="frontend/src/App.jsx">
 // App.jsx
 import { HashRouter, Routes, Route } from 'react-router-dom'; 
@@ -6043,6 +7594,7 @@ import Login from './pages/Login';
 import Singup from './pages/Singup';
 import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
+import Challenge from './pages/Challenge';
 
 // Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
 const queryClient = new QueryClient({
@@ -6070,6 +7622,8 @@ const App = () => {
             <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
             <Route path="/HomePage" element={<HomePage/>} />
             <Route path="/ProfilePage" element={<ProfilePage/>} />
+            <Route path="/Challenge" element={<Challenge/>} />
+            <Route path="/Challenge/:code" element={<Challenge/>} />
           </Routes>
         </div>
       </HashRouter>
@@ -6078,6 +7632,248 @@ const App = () => {
 }
 
 export default App;
+</file>
+
+<file path="frontend/src/pages/HomePage.jsx">
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/api";
+
+const HomePage = () => {
+  const navigate = useNavigate();
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["overview", "UP Police Constable"],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent("UP Police Constable");
+      const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
+      return res.data.data;
+    },
+    retry: false, // 401 pe baar baar retry na kare
+  });
+
+  // 👇 Agar user login nahi hai (401), Signup page pe bhejo
+  useEffect(() => {
+    if (isError && error?.response?.status === 401) {
+      navigate("/Singup");
+    }
+  }, [isError, error, navigate]);
+
+  const averageScore = data?.averageScore ?? null;
+  const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
+  const scoreDashArray = averageScore !== null ? `${averageScore}, 100` : "0, 100";
+
+  // 👇 Bottom nav ke teeno buttons ke liye ek hi consistent style
+  const navBtnClass =
+    "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
+
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
+      
+      {/* Navbar */}
+      <nav className="flex items-center justify-between px-5 py-5 border-b border-gray-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
+            mt
+          </div>
+          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
+        </div>
+        <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </nav>
+
+      {/* Main Content */}
+      <main className="px-5 py-8 max-w-lg mx-auto">
+
+        {/* 👇 NAYA: Challenge-a-Friend banner — sabse upar taaki turant dikhe */}
+        <section className="mb-8">
+          <button
+            onClick={() => navigate("/Challenge")}
+            className="w-full rounded-2xl p-5 flex items-center justify-between gap-4 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] active:opacity-90 transition-opacity shadow-lg shadow-purple-900/30"
+          >
+            <div className="text-left">
+              <p className="text-base font-bold flex items-center gap-2">
+                Dost Ko Challenge Karo <span>⚔️</span>
+              </p>
+              <p className="text-xs text-white/80 mt-1">
+                Link banao, dosto ko bhejo, score compare karo
+              </p>
+            </div>
+            <span className="text-2xl flex-shrink-0">&rarr;</span>
+          </button>
+        </section>
+
+        {/* Hero */}
+        <section className="mb-10">
+          <h1 className="text-4xl leading-tight font-bold mb-5">
+            Full Practice.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A78BFA] to-[#7C3AED]">
+              Real Results.
+            </span>
+          </h1>
+          <p className="text-gray-400 text-lg leading-relaxed mb-6">
+            Take mock tests, analyze your performance and improve with detailed insights.
+          </p>
+          <div className="flex flex-col gap-4">
+            <button
+              onClick={() => navigate('/MockTest', { state: { mockType: "Full" } })}
+              className="py-3.5 px-6 rounded-lg text-base font-medium flex items-center justify-center gap-2 bg-[#7C3AED] text-white active:bg-[#6D28D9]"
+            >
+              Start Full Mock Test <span>&rarr;</span>
+            </button>
+            <button
+              onClick={() => navigate('/MockTest', { state: { mockType: "Mini" } })}
+              className="py-3.5 px-6 rounded-lg text-base font-medium flex items-center justify-center gap-2 bg-transparent border border-gray-700 text-gray-300 active:border-gray-500"
+            >
+              Start Mini Mock <span>&rarr;</span>
+            </button>
+          </div>
+        </section>
+
+        {/* Performance Card */}
+        <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
+          <h3 className="text-sm text-gray-400 mb-6">Overall Performance</h3>
+
+          <div className="flex justify-center mb-8">
+            <div className="relative w-[150px] h-[150px]">
+              <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                <path
+                  className="text-gray-800"
+                  strokeWidth="3"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-[#8B5CF6]"
+                  strokeDasharray={scoreDashArray}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold">{displayedScore}</span>
+                <span className="text-xs text-gray-500 mt-1">Score</span>
+              </div>
+            </div>
+          </div>
+
+          <h3 className="text-xs text-gray-500 mb-2.5">Performance Overview</h3>
+          <div className="w-full h-24 relative flex items-end">
+            <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
+              <path d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12" fill="none" stroke="#8B5CF6" strokeWidth="1" />
+              <path
+                d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12 L100,30 L0,30 Z"
+                fill="url(#gradient)"
+                opacity="0.2"
+              />
+              <defs>
+                <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
+                  <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <circle cx="20" cy="20" r="1.5" fill="#A78BFA" />
+              <circle cx="40" cy="10" r="1.5" fill="#A78BFA" />
+              <circle cx="60" cy="18" r="1.5" fill="#A78BFA" />
+              <circle cx="80" cy="5" r="1.5" fill="#A78BFA" />
+            </svg>
+          </div>
+        </section>
+
+        {/* Feature Row */}
+        <section className="flex flex-col gap-5 py-8 border-y border-gray-800 mb-10">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-purple-900/30 text-purple-400 flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold mb-0.5">Exam Focused</h3>
+              <p className="text-xs text-gray-500">Topic-wise tests</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-900/30 text-green-400 flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold mb-0.5">Smart Analysis</h3>
+              <p className="text-xs text-gray-500">Detailed insights</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-900/30 text-blue-400 flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-base font-semibold mb-0.5">Track Progress</h3>
+              <p className="text-xs text-gray-500">Measure growth</p>
+            </div>
+          </div>
+        </section>
+
+        {/* Stats Grid */}
+        <section className="grid grid-cols-2 gap-5 bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
+          <div>
+            <h4 className="text-2xl font-bold mb-1">10,000+</h4>
+            <p className="text-xs text-gray-500">Tests Attempted</p>
+          </div>
+          <div>
+            <h4 className="text-2xl font-bold mb-1">95%</h4>
+            <p className="text-xs text-gray-500">Success Rate</p>
+          </div>
+          <div>
+            <h4 className="text-2xl font-bold mb-1">50,000+</h4>
+            <p className="text-xs text-gray-500">Happy Students</p>
+          </div>
+          <div>
+            <h4 className="text-2xl font-bold mb-1">4.9/5</h4>
+            <p className="text-xs text-gray-500">User Rating</p>
+          </div>
+        </section>
+      </main>
+
+      {/* Bottom Navigation — teeno buttons consistent style */}
+      <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
+        <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          <span className="text-xs font-medium">Mock Tests</span>
+        </button>
+
+        <button onClick={() => navigate('/UserAllAnalysis')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span className="text-xs font-medium">Analysis</span>
+        </button>
+
+        <button onClick={() => navigate('/ProfilePage')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span className="text-xs font-medium">Profile</span>
+        </button>
+      </nav>
+    </div>
+  );
+};
+
+export default HomePage;
 </file>
 
 </files>

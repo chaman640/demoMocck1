@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
 
@@ -10,19 +10,85 @@ const formatTime = (totalSeconds) => {
   return `${pad(m)}:${pad(s)}`;
 };
 
+// 👇 NAYA: localStorage key — har user ka apna alag saved "created challenge"
+const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+// Create-flow: apna challenge auto-generate ho raha hai (share-card jaisa skeleton)
+const CreateFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+    <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+      <SkeletonBlock className="w-16 h-16 rounded-full mx-auto mb-4" />
+      <SkeletonBlock className="w-48 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-56 h-4 mx-auto mb-6" />
+      <SkeletonBlock className="w-full h-14 rounded-lg mb-4" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+// Join-flow: kisi aur ka challenge load ho raha hai (instructions-card jaisa skeleton)
+const JoinFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+      <SkeletonBlock className="w-64 h-6 mb-3" />
+      <SkeletonBlock className="w-48 h-4 mb-6" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4">
+            <SkeletonBlock className="w-10 h-6 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-4 mb-2" />
+      <SkeletonBlock className="w-3/4 h-4 mb-8" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+// Submit ho raha hai (result-card jaisa skeleton)
+const SubmittingSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-xl mx-auto text-center">
+      <SkeletonBlock className="w-56 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-40 h-4 mx-auto mb-8" />
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+        <SkeletonBlock className="w-24 h-10 mx-auto mb-2" />
+        <SkeletonBlock className="w-20 h-3 mx-auto" />
+      </div>
+      <SkeletonBlock className="w-full h-20 rounded-2xl mb-8" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
 const Challenge = () => {
   const navigate = useNavigate();
-  const { code } = useParams(); // agar URL mein code hai to "join" flow, warna "create" flow
+  const { code: codeParam } = useParams(); // URL mein code hai to "join" flow, warna "create" flow
 
-  const [phase, setPhase] = useState("loading");
+  const [phase, setPhase] = useState(codeParam ? "loading-join" : "loading-create");
   const [errorMsg, setErrorMsg] = useState("");
   const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
+  const [copied, setCopied] = useState(false);
 
   // ── Create-flow state ──
-  const [examList, setExamList] = useState([]);
-  const [selectedExam, setSelectedExam] = useState("");
-  const [blueprints, setBlueprints] = useState([]);
-  const [selectedBlueprint, setSelectedBlueprint] = useState(null);
   const [createdChallenge, setCreatedChallenge] = useState(null);
 
   // ── Join/Test-flow state ──
@@ -40,36 +106,74 @@ const Challenge = () => {
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
 
+  // 👇 Effective challenge code — URL se (join) ya khud banaye challenge se (own-test)
+  const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
+
   // ── Step 1: Init — decide karo create-flow ya join-flow ──
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      setPhase(codeParam ? "loading-join" : "loading-create");
       try {
         const meRes = await api.get("/me");
         if (cancelled) return;
-        setUserName(meRes.data.data.name);
+        const user = meRes.data.data;
+        setUserName(user.name);
+        setUserId(user._id);
 
-        if (code) {
+        if (codeParam) {
           // ── JOIN FLOW: kisi ne link bheja hai ──
-          const chRes = await api.get(`/challenge/${code}`);
+          const chRes = await api.get(`/challenge/${codeParam}`);
           if (cancelled) return;
           const data = chRes.data.data;
           setChallengeMeta(data);
 
           if (data.alreadyAttempted) {
-            // Already de chuka hai — seedha leaderboard dikhao
-            await loadLeaderboard();
+            await loadLeaderboard(codeParam);
             setPhase("leaderboard");
           } else {
             setPhase("instructions");
           }
-        } else {
-          // ── CREATE FLOW: user naya challenge banana chahta hai ──
-          const examRes = await api.get("/allExamName");
-          if (cancelled) return;
-          setExamList(examRes.data.data || []);
-          setPhase("create-select");
+          return;
         }
+
+        // ── CREATE FLOW: pehle localStorage check karo — dobara generate na ho ──
+        const storageKey = getChallengeStorageKey(user._id);
+        const savedRaw = localStorage.getItem(storageKey);
+        if (savedRaw) {
+          try {
+            const saved = JSON.parse(savedRaw);
+            const notExpired = saved?.expiresAt && new Date(saved.expiresAt) > new Date();
+            const sameExam = saved?.examName === user.exam;
+            if (saved?.challengeCode && notExpired && sameExam) {
+              setCreatedChallenge(saved);
+              setPhase("created");
+              return;
+            }
+            localStorage.removeItem(storageKey);
+          } catch {
+            localStorage.removeItem(storageKey);
+          }
+        }
+
+        // Koi valid saved challenge nahi mila — seedha naya generate karo
+        const bpRes = await api.get(`/blueprints/${encodeURIComponent(user.exam)}`);
+        if (cancelled) return;
+        const list = bpRes.data.data || [];
+        if (list.length === 0) {
+          throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
+        }
+        const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
+
+        const createRes = await api.post("/create-challenge", {
+          examName: user.exam,
+          blueprintName: chosenBlueprint.blueprintName,
+        });
+        if (cancelled) return;
+        const created = createRes.data.data;
+        setCreatedChallenge(created);
+        localStorage.setItem(storageKey, JSON.stringify(created));
+        setPhase("created");
       } catch (err) {
         if (!cancelled) {
           setErrorMsg(err.response?.data?.message || err.message);
@@ -80,38 +184,30 @@ const Challenge = () => {
     init();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [codeParam]);
 
-  // ── Exam select hone par uske blueprints laao ──
-  const handleExamSelect = async (exam) => {
-    setSelectedExam(exam);
-    setSelectedBlueprint(null);
+  // ── Apna khud ka challenge test dene ke liye ──
+  const startOwnTest = async () => {
+    if (!createdChallenge) return;
+    setPhase("loading-join");
     try {
-      const res = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
-      setBlueprints(res.data.data || []);
-    } catch (err) {
-      setErrorMsg("Blueprints fetch nahi ho paaye.");
-    }
-  };
+      const chRes = await api.get(`/challenge/${createdChallenge.challengeCode}`);
+      const data = chRes.data.data;
+      setChallengeMeta(data);
 
-  // ── Challenge create karo ──
-  const handleCreateChallenge = async () => {
-    if (!selectedBlueprint) return;
-    setPhase("loading");
-    try {
-      const res = await api.post("/create-challenge", {
-        examName: selectedExam,
-        blueprintName: selectedBlueprint.blueprintName,
-      });
-      setCreatedChallenge(res.data.data);
-      setPhase("created");
+      if (data.alreadyAttempted) {
+        await loadLeaderboard(createdChallenge.challengeCode);
+        setPhase("leaderboard");
+      } else {
+        setPhase("instructions");
+      }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Challenge banane mein error aaya.");
+      setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
       setPhase("error");
     }
   };
 
-  // ── Test start karo (join-flow) ──
+  // ── Test start karo (join-flow ya khud ka test) ──
   const startChallengeTest = () => {
     setAnswers({});
     setTimeSpent({});
@@ -173,9 +269,11 @@ const Challenge = () => {
     }
   };
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = async (challengeCode) => {
+    const cc = challengeCode || effectiveCode;
+    if (!cc) return;
     try {
-      const res = await api.get(`/challenge/${code}/leaderboard`);
+      const res = await api.get(`/challenge/${cc}/leaderboard`);
       setLeaderboard(res.data.data);
     } catch (err) {
       // silently fail — leaderboard optional hai result ke saath
@@ -183,7 +281,7 @@ const Challenge = () => {
   };
 
   const handleSubmit = async () => {
-    if (!challengeMeta || submittingRef.current) return;
+    if (!challengeMeta || submittingRef.current || !effectiveCode) return;
     submittingRef.current = true;
     flushTime();
     setPhase("submitting");
@@ -196,14 +294,14 @@ const Challenge = () => {
         }))
       );
 
-      const res = await api.post(`/challenge/${code}/submit`, { attemptedQuestions });
+      const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
       setResultData(res.data.data);
-      await loadLeaderboard();
+      await loadLeaderboard(effectiveCode);
       setPhase("result");
     } catch (err) {
       // Agar already-attempted error aaye, seedha leaderboard dikha do
       if (err.response?.status === 409) {
-        await loadLeaderboard();
+        await loadLeaderboard(effectiveCode);
         setPhase("leaderboard");
       } else {
         setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
@@ -233,22 +331,15 @@ const Challenge = () => {
   const copyLink = () => {
     const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
     navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // ────────────────────────────── RENDER ──────────────────────────────
 
-  if (phase === "loading" || phase === "submitting") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">
-            {phase === "submitting" ? "Result submit ho raha hai..." : "Load ho raha hai..."}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  if (phase === "loading-create") return <CreateFlowSkeleton />;
+  if (phase === "loading-join") return <JoinFlowSkeleton />;
+  if (phase === "submitting") return <SubmittingSkeleton />;
 
   if (phase === "error") {
     return (
@@ -266,67 +357,7 @@ const Challenge = () => {
     );
   }
 
-  // ── CREATE FLOW: Exam + Blueprint choose karo ──
-  if (phase === "create-select") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Dost Ko Challenge Karo 🔥</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            Ek test chuno, link banao, apne dosto ko bhejo — dekho kaun sabse aage hai!
-          </p>
-
-          <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Exam Chuno</label>
-          <select
-            value={selectedExam}
-            onChange={(e) => handleExamSelect(e.target.value)}
-            className="w-full mb-6 px-4 py-3 rounded-lg bg-[#111827] border border-gray-800 text-white"
-          >
-            <option value="">-- Exam Select Karein --</option>
-            {examList.map((exam) => (
-              <option key={exam} value={exam}>{exam}</option>
-            ))}
-          </select>
-
-          {blueprints.length > 0 && (
-            <>
-              <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Mock Test Chuno</label>
-              <div className="space-y-3 mb-8">
-                {blueprints.map((bp) => (
-                  <button
-                    key={bp._id}
-                    onClick={() => setSelectedBlueprint(bp)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                      selectedBlueprint?._id === bp._id
-                        ? "border-[#7C3AED] bg-[#7C3AED]/15"
-                        : "border-gray-800 bg-[#111827] hover:border-gray-600"
-                    }`}
-                  >
-                    <p className="font-semibold">{bp.blueprintName}</p>
-                    <p className="text-xs text-gray-400 mt-1">{bp.totalQuestions} sawaal</p>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          <button
-            onClick={handleCreateChallenge}
-            disabled={!selectedBlueprint}
-            className={`w-full py-3 rounded-lg font-semibold ${
-              selectedBlueprint
-                ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
-                : "bg-gray-700 cursor-not-allowed text-gray-400"
-            }`}
-          >
-            Challenge Link Banao
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Challenge ban gaya — link share karo ──
+  // ── Challenge ban gaya — link share karo + khud test bhi de sakte ho ──
   if (phase === "created" && createdChallenge) {
     const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
     return (
@@ -348,7 +379,13 @@ const Challenge = () => {
             onClick={copyLink}
             className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
           >
-            Link Copy Karein
+            {copied ? "Link Copy Ho Gaya ✓" : "Link Copy Karein"}
+          </button>
+          <button
+            onClick={startOwnTest}
+            className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
+          >
+            Khud Mock Test Do
           </button>
           <button
             onClick={() => navigate("/HomePage")}
