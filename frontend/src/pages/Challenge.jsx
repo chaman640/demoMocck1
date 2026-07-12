@@ -75,6 +75,64 @@ const SubmittingSkeleton = () => (
   </div>
 );
 
+// ──────────────────────────────────────────────
+// 👇 NAYA: Reusable Leaderboard list component
+// Ab ye result screen ke andar bhi use hoga aur standalone
+// "already-attempted" case mein bhi — professional, consistent look
+// ──────────────────────────────────────────────
+const LeaderboardList = ({ leaderboard, currentUserName }) => {
+  if (!leaderboard || leaderboard.leaderboard.length === 0) {
+    return (
+      <p className="text-gray-400 text-sm text-center py-6">
+        Abhi tak koi attempt nahi hua.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {leaderboard.leaderboard.map((entry) => {
+        const isMe = entry.userName === currentUserName;
+        return (
+          <div
+            key={entry.userId}
+            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+              isMe
+                ? "border-[#7C3AED] bg-[#7C3AED]/10"
+                : "border-gray-800 bg-[#1F2937]/60"
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span
+                className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                  entry.rank === 1
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : entry.rank === 2
+                    ? "bg-gray-400/20 text-gray-300"
+                    : entry.rank === 3
+                    ? "bg-orange-500/20 text-orange-400"
+                    : "bg-gray-800 text-gray-500"
+                }`}
+              >
+                {entry.rank}
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                </p>
+              </div>
+            </div>
+            <span className="font-bold text-[#A78BFA] flex-shrink-0 ml-2">{entry.totalScore}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 const Challenge = () => {
   const navigate = useNavigate();
   const { code: codeParam } = useParams();
@@ -104,15 +162,12 @@ const Challenge = () => {
 
   const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
 
-  // 👇 NAYA: Ye batata hai ki current attempt "khud ke banaye hue challenge" ka hai
-  // ya "kisi dost ke bheje hue link" ka. Isi se decide hoga ki submit ke baad
-  // localStorage cache clear karni hai ya nahi.
+  // Ye batata hai ki current attempt "khud ke banaye hue challenge" ka hai
+  // ya "kisi dost ke bheje hue link" ka
   const isOwnChallenge = !codeParam && !!createdChallenge;
 
   // ─────────────────────────────────────────────
-  // 👇 NAYA: Naya challenge generate karne ka reusable function
-  // — pehle sirf init() ke andar tha, ab isse "Naya Challenge Banao"
-  // button bhi call kar sakta hai
+  // Naya challenge generate karne ka reusable function
   // ─────────────────────────────────────────────
   const generateNewChallenge = async (exam, uid) => {
     const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
@@ -132,7 +187,7 @@ const Challenge = () => {
     return created;
   };
 
-  // 👇 NAYA: Manually "Naya Challenge Banao" button ke liye
+  // Manually "Naya Challenge Banao" button ke liye
   const handleCreateNewChallenge = async () => {
     setPhase("loading-create");
     try {
@@ -184,18 +239,11 @@ const Challenge = () => {
             const sameExam = saved?.examName === user.exam;
 
             if (saved?.challengeCode && notExpired && sameExam) {
-              // ─────────────────────────────────────────────
-              // 👇 NAYA FIX: Sirf ye check karna kaafi nahi hai ki
-              // challenge expire nahi hua — ye bhi check karo ki
-              // KHUD is user ne is challenge ko already attempt
-              // kiya hai ya nahi. Agar attempt ho chuka hai, to
-              // purani cache useless hai — hata do aur naya banao.
-              // ─────────────────────────────────────────────
+              // Check karo kya khud is user ne is challenge ko already attempt kiya hai
               const checkRes = await api.get(`/challenge/${saved.challengeCode}`);
               if (cancelled) return;
 
               if (checkRes.data.data.alreadyAttempted) {
-                // Purana challenge already de chuka hai — cache clear karo, naya banao
                 localStorage.removeItem(storageKey);
               } else {
                 setCreatedChallenge(saved);
@@ -313,7 +361,7 @@ const Challenge = () => {
       const res = await api.get(`/challenge/${cc}/leaderboard`);
       setLeaderboard(res.data.data);
     } catch (err) {
-      // silently fail
+      // silently fail — leaderboard optional hai result ke saath
     }
   };
 
@@ -334,16 +382,12 @@ const Challenge = () => {
       const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
       setResultData(res.data.data);
 
-      // ─────────────────────────────────────────────
-      // 👇 NAYA FIX: Agar ye tumhara KHUD ka banaya challenge tha,
-      // ab tum use attempt kar chuke ho — localStorage cache clear
-      // kar do. Warna agli baar "Dost ko Challenge Karo" click karne
-      // pe wahi purana (already-attempted) challenge dobara dikhega.
-      // ─────────────────────────────────────────────
       if (isOwnChallenge) {
         localStorage.removeItem(getChallengeStorageKey(userId));
       }
 
+      // 👇 Leaderboard yahin fetch ho jayega — result screen pe hi dikhega,
+      // alag se "poora leaderboard dekho" button/phase ki zaroorat nahi
       await loadLeaderboard(effectiveCode);
       setPhase("result");
     } catch (err) {
@@ -435,15 +479,12 @@ const Challenge = () => {
           >
             Khud Mock Test Do
           </button>
-
-          {/* 👇 NAYA: Naya challenge banane ka explicit option */}
           <button
             onClick={handleCreateNewChallenge}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 font-medium mb-3"
           >
             Ek Naya Challenge Banao
           </button>
-
           <button
             onClick={() => navigate("/HomePage")}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
@@ -578,128 +619,116 @@ const Challenge = () => {
     );
   }
 
+  // ─────────────────────────────────────────────
+  // 👇 UPDATED: RESULT SCREEN — ab score + poora leaderboard EK HI SCREEN pe.
+  // Pehle yahan sirf "Poora Leaderboard Dekho" button tha jo phase badalta tha —
+  // ab wo hata diya, leaderboard yahin professionally render ho raha hai.
+  // ─────────────────────────────────────────────
   if (phase === "result" && resultData) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto text-center">
-          <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
-          <p className="text-gray-400 text-sm mb-8">Dekho tum kahan khade ho</p>
+        <div className="max-w-xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
+            <p className="text-gray-400 text-sm">Dekho tum kahan khade ho</p>
+          </div>
 
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-4">
             <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
             <p className="text-sm text-gray-500 mt-1">Total Score</p>
           </div>
 
-          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-8">
+          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-6 text-center">
             <p className="text-3xl font-bold">#{resultData.currentRank}</p>
             <p className="text-sm text-white/80 mt-1">
               {resultData.totalParticipants} logo mein se aapki rank
             </p>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#1F2937] rounded-xl p-4">
+          <div className="grid grid-cols-3 gap-3 mb-10">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
               <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
               <p className="text-[11px] text-gray-500">Correct</p>
             </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
               <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
               <p className="text-[11px] text-gray-500">Wrong</p>
             </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
               <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
               <p className="text-[11px] text-gray-500">Unattempted</p>
             </div>
           </div>
 
-          <button
-            onClick={() => setPhase("leaderboard")}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
-          >
-            Poora Leaderboard Dekho
-          </button>
+          {/* 👇 Poora leaderboard yahin, seedha, professional card ke andar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                Leaderboard <span>🏆</span>
+              </h3>
+              <span className="text-xs text-gray-500">
+                {leaderboard?.totalParticipants || 0} participants
+              </span>
+            </div>
+            <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+          </div>
 
-          {/* 👇 NAYA: Agar ye khud ka challenge tha, ab naya banane ka option bhi do */}
-          {isOwnChallenge && (
+          <div className="space-y-3">
+            {isOwnChallenge && (
+              <button
+                onClick={handleCreateNewChallenge}
+                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              >
+                Ek Naya Challenge Banao
+              </button>
+            )}
             <button
-              onClick={handleCreateNewChallenge}
-              className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Ek Naya Challenge Banao
+              Home Jaayein
             </button>
-          )}
-
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // ─────────────────────────────────────────────
+  // 👇 STANDALONE LEADERBOARD SCREEN — ye tab use hota hai jab
+  // user direct link khol ke aaya ho aur pehle se attempt kar chuka ho
+  // (is case mein score-card dikhane ke liye resultData available nahi
+  // hota, isliye ye ek chhota alag screen hai — same LeaderboardList reuse ho raha hai)
+  // ─────────────────────────────────────────────
   if (phase === "leaderboard") {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
         <div className="max-w-xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
-          </p>
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+            <p className="text-gray-400 text-sm">
+              {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
+            </p>
+          </div>
 
-          {!leaderboard || leaderboard.leaderboard.length === 0 ? (
-            <p className="text-gray-400 text-sm">Abhi tak koi attempt nahi hua.</p>
-          ) : (
-            <div className="space-y-3">
-              {leaderboard.leaderboard.map((entry) => (
-                <div
-                  key={entry.userId}
-                  className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
-                    entry.userName === userName
-                      ? "border-[#7C3AED] bg-[#7C3AED]/10"
-                      : "border-gray-800 bg-[#111827]"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        entry.rank === 1
-                          ? "bg-yellow-500/20 text-yellow-400"
-                          : entry.rank === 2
-                          ? "bg-gray-400/20 text-gray-300"
-                          : entry.rank === 3
-                          ? "bg-orange-500/20 text-orange-400"
-                          : "bg-gray-800 text-gray-500"
-                      }`}
-                    >
-                      {entry.rank}
-                    </span>
-                    <span className="font-medium">{entry.userName}</span>
-                  </div>
-                  <span className="font-bold text-[#A78BFA]">{entry.totalScore}</span>
-                </div>
-              ))}
-            </div>
-          )}
+          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
 
-          {/* 👇 NAYA: Agar ye khud ka challenge tha (already-attempted case se yahan aaya), naya banao */}
-          {isOwnChallenge && (
+          <div className="space-y-3 mt-8">
+            {isOwnChallenge && (
+              <button
+                onClick={handleCreateNewChallenge}
+                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              >
+                Ek Naya Challenge Banao
+              </button>
+            )}
             <button
-              onClick={handleCreateNewChallenge}
-              className="w-full py-3 mt-6 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Ek Naya Challenge Banao
+              Home Jaayein
             </button>
-          )}
-
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 mt-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
+          </div>
         </div>
       </div>
     );
