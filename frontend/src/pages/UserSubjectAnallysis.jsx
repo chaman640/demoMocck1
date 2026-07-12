@@ -1,6 +1,77 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/api"; // 👈 Sahi import
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// ──────────────────────────────────────────────
+const formatDuration = (totalSeconds) => {
+  if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
+  const safe = Math.max(0, Math.round(totalSeconds));
+  const mins = Math.floor(safe / 60);
+  const secs = safe % 60;
+  if (mins === 0) return `${secs}s`;
+  return `${mins}m ${secs}s`;
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const SubjectAnalysisSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <div className="flex items-center gap-2">
+        <SkeletonBlock className="w-8 h-8 rounded" />
+        <SkeletonBlock className="w-32 h-5" />
+      </div>
+      <SkeletonBlock className="w-28 h-4" />
+    </nav>
+
+    <div className="max-w-6xl mx-auto px-6 mt-10 space-y-8">
+      <div className="space-y-2">
+        <SkeletonBlock className="w-64 h-7" />
+        <SkeletonBlock className="w-80 h-4" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
+            <SkeletonBlock className="w-20 h-3 mb-3" />
+            <SkeletonBlock className="w-14 h-7" />
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-44 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-800">
+          <SkeletonBlock className="w-44 h-4 mb-2" />
+          <SkeletonBlock className="w-56 h-3" />
+        </div>
+        <div className="p-6 space-y-4">
+          {[1, 2].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-9" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 const UserSubjectAnallysis = () => {
   const navigate = useNavigate();
@@ -27,7 +98,6 @@ const UserSubjectAnallysis = () => {
 
         let currentExam = examNameFromState;
 
-        // Agar exam name state mein nahi hai, toh fetch karo
         if (!currentExam) {
           const meRes = await api.get("/me");
           currentExam = meRes.data.data.exam;
@@ -38,12 +108,10 @@ const UserSubjectAnallysis = () => {
         const examEncoded = encodeURIComponent(currentExam);
         const subjectEncoded = encodeURIComponent(subjectNameFromState);
         
-        // 🚀 Axios ka use (API instance automatically baseURL handle karega)
         const res = await api.get(`/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`);
 
-        setData(res.data.data); // 👈 res.data ka use
+        setData(res.data.data);
       } catch (err) {
-        // 🚀 Axios error handling
         setError(err.response?.data?.message || "Data laane mein error aaya.");
       } finally {
         setLoading(false);
@@ -53,14 +121,17 @@ const UserSubjectAnallysis = () => {
     fetchSubjectAnalysis();
   }, [subjectNameFromState, examNameFromState, navigate]);
 
-  // ... (Baaki UI code waisa hi rahega)
+  // 👇 NAYA: Total time calculate karna — topicList se average question-count per mock nikal ke,
+  // averageTimePerQuestion se multiply karte hain
+  const totalTimeSeconds = useMemo(() => {
+    if (!data?.topicList || !data.totalTestsConsidered) return null;
+    const totalAttempts = data.topicList.reduce((sum, t) => sum + (t.totalAttempted || 0), 0);
+    const questionsPerMock = totalAttempts / data.totalTestsConsidered;
+    return data.averageTimePerQuestion * questionsPerMock;
+  }, [data]);
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center">
-        <div className="w-12 h-12 border-4 border-gray-800 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-        <p className="text-gray-400 font-medium tracking-wide">Fetching {subjectNameFromState} Data...</p>
-      </div>
-    );
+    return <SubjectAnalysisSkeleton />;
   }
 
   if (error) {
@@ -110,22 +181,23 @@ const UserSubjectAnallysis = () => {
           <p className="text-gray-400 mt-2 text-sm">Deep dive into your performance for this subject based on the last 3 mocks.</p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Average Accuracy</p>
-            <p className="text-3xl font-bold text-[#10B981]">{data.averageAccuracy}%</p>
+        {/* 👇 UPDATED: "Mocks Considered" hataya, "Total Time" add kiya, 2-column square-ish grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Avg. Accuracy</p>
+            <p className="text-2xl font-bold text-[#10B981]">{data.averageAccuracy}%</p>
           </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Avg Time / Question</p>
-            <p className="text-3xl font-bold text-[#3B82F6]">{data.averageTimePerQuestion}s</p>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+            <p className="text-xs text-gray-500 font-medium mb-1">Avg Time / Q</p>
+            <p className="text-2xl font-bold text-[#3B82F6]">{data.averageTimePerQuestion}s</p>
           </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
-            <p className="text-sm text-gray-500 font-medium mb-1">Mocks Considered</p>
-            <p className="text-3xl font-bold text-white">{data.totalTestsConsidered}</p>
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg col-span-2 sm:col-span-1">
+            <p className="text-xs text-gray-500 font-medium mb-1">Total Time (Subject)</p>
+            <p className="text-2xl font-bold text-[#A78BFA]">{formatDuration(totalTimeSeconds)}</p>
           </div>
         </div>
 
-        {/* Topic-wise Efficiency (Updated) */}
+        {/* Topic-wise Efficiency */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Topic-wise Efficiency</h3>
@@ -154,7 +226,6 @@ const UserSubjectAnallysis = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-right">
-                        {/* 🎯 NAYA BUTTON Jisse Topic Analysis par jayenge */}
                         <button 
                           onClick={() => navigate('/UserTopicAnalysis', {
                             state: {
@@ -176,7 +247,7 @@ const UserSubjectAnallysis = () => {
           )}
         </div>
 
-        {/* Top 5 Weak Topics */}
+        {/* 👇 UPDATED: Top Weak Topics — Wrong Answers & Reason hataye, Deep Analysis button diya */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-red-900/10">
             <h3 className="font-semibold text-lg text-red-400">Top Weak Topics (Needs Attention)</h3>
@@ -192,8 +263,7 @@ const UserSubjectAnallysis = () => {
                   <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
                     <th className="px-6 py-4 font-medium">Topic</th>
                     <th className="px-6 py-4 font-medium">Efficiency</th>
-                    <th className="px-6 py-4 font-medium">Wrong Answers</th>
-                    <th className="px-6 py-4 font-medium">Reason</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-800">
@@ -201,8 +271,20 @@ const UserSubjectAnallysis = () => {
                     <tr key={i} className={`${i === 0 ? 'bg-red-500/5' : 'hover:bg-[#1F2937]/50'} transition-colors`}>
                       <td className="px-6 py-4 text-sm font-medium text-gray-200">{t.topicName}</td>
                       <td className="px-6 py-4 text-sm text-red-400">{t.efficiency}%</td>
-                      <td className="px-6 py-4 text-sm font-semibold text-red-500">{t.wrongCount}</td>
-                      <td className="px-6 py-4 text-xs text-red-300/80">{t.reason}</td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        <button
+                          onClick={() => navigate('/UserTopicAnalysis', {
+                            state: {
+                              examName: activeExamName,
+                              subjectName: data.subjectName,
+                              topicName: t.topicName
+                            }
+                          })}
+                          className="px-4 py-1.5 bg-[#1F2937] hover:bg-[#374151] border border-gray-700 rounded-lg text-red-300 text-xs font-medium transition-colors"
+                        >
+                          Deep Analysis &rarr;
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
