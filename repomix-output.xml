@@ -53,6 +53,7 @@ backend/
     authentication.js
     createChallenge.js
     getChallenge.js
+    getChallengeAttemptDetail.js
     getChallengeLeaderboard.js
     submitChallenge.js
     updateSutf.js
@@ -90,6 +91,7 @@ frontend/
     pages/
       AnalysisPage.jsx
       Challenge.jsx
+      ChallengeReview.jsx
       HomePage.jsx
       Login.jsx
       MockTest.jsx
@@ -690,201 +692,6 @@ export const allExamName = async (req, res) => {
 };
 </file>
 
-<file path="backend/controllers/createChallenge.js">
-// controllers/createChallenge.js
-import mongoose from "mongoose";
-import Blueprint from "../models/bluePrint.js";
-import Challenge from "../models/Challenge.js";
-import { Question } from "../models/rowQuestionSchema.js";
-
-// ─────────────────────────────────────────────
-// HELPER 1: Fisher-Yates Shuffle (unbiased)
-// addMockTest.js jaisa hi — random questions select karne ke liye
-// ─────────────────────────────────────────────
-const fisherYatesShuffle = (arr) => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// ─────────────────────────────────────────────
-// HELPER 2: Unique 6-character challenge code generate karo
-// (uppercase letters + digits — link mein short aur readable rahega)
-// ─────────────────────────────────────────────
-const generateChallengeCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0,O,1,I) hataye
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-};
-
-export const createChallenge = async (req, res) => {
-  try {
-    // ─────────────────────────────────────────────
-    // STEP 0: Validation
-    // req.user middleware se aayega (userInfo middleware required hai route pe)
-    // ─────────────────────────────────────────────
-    const userId = req.user._id;
-    const { examName, blueprintName } = req.body;
-
-    if (!examName || !blueprintName) {
-      return res.status(400).json({
-        success: false,
-        message: "examName aur blueprintName dono zaroori hain!",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 1: Blueprint dhundo
-    // ─────────────────────────────────────────────
-    const blueprint = await Blueprint.findOne({ examName, blueprintName });
-
-    if (!blueprint) {
-      return res.status(404).json({
-        success: false,
-        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 2: Har subject ke liye RANDOM questions select karo
-    //
-    // Note: Ye jaanbujh kar addMockTest.js ke adaptive-weakness
-    // logic se SIMPLE rakha gaya hai — kyunki challenge sabke
-    // liye FAIR/SAME hona chahiye. Agar personalization laga
-    // di to har dost ko alag questions milenge aur comparison
-    // hi meaningless ho jayega.
-    // ─────────────────────────────────────────────
-    const finalSubjects = [];
-    let totalActualQuestions = 0;
-
-    for (const subjectConfig of blueprint.subjects) {
-      const { subjectName, questionCount } = subjectConfig;
-
-      // Is subject ke saare questions DB se lao
-      const allQuestions = await Question.find({
-        examName: { $in: [examName] },
-        subjectName: subjectName,
-      }).select(
-        "_id question option1 option2 option3 option4 correctOption topicName subjectName questionNumber"
-      );
-
-      if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
-
-      // Shuffle karke jitne chahiye utne le lo
-      const shuffled = fisherYatesShuffle(allQuestions);
-      const picked = shuffled.slice(0, Math.min(questionCount, shuffled.length));
-
-      const questionsForFreeze = picked.map((q) => ({
-        questionId: q._id,
-        question: q.question,
-        option1: q.option1,
-        option2: q.option2,
-        option3: q.option3,
-        option4: q.option4,
-        correctOption: q.correctOption,
-        topicName: q.topicName,
-        subjectName: q.subjectName,
-        questionNumber: q.questionNumber,
-      }));
-
-      finalSubjects.push({
-        subjectName,
-        questions: questionsForFreeze,
-      });
-
-      totalActualQuestions += questionsForFreeze.length;
-    }
-
-    if (totalActualQuestions === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Is blueprint ke liye koi questions available nahi hain!",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 3: Unique challenge code generate karo
-    // (collision chance bahut kam hai but phir bhi retry-loop laga rahe hain safety ke liye)
-    // ─────────────────────────────────────────────
-    let challengeCode;
-    let isUnique = false;
-    let attempts = 0;
-
-    while (!isUnique && attempts < 5) {
-      challengeCode = generateChallengeCode();
-      const existing = await Challenge.findOne({ challengeCode });
-      if (!existing) isUnique = true;
-      attempts++;
-    }
-
-    if (!isUnique) {
-      return res.status(500).json({
-        success: false,
-        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 4: Duration + expiry calculate karo
-    // ─────────────────────────────────────────────
-    const durationMinutes =
-      blueprint.durationMinutes && blueprint.durationMinutes > 0
-        ? blueprint.durationMinutes
-        : Math.max(10, Math.round(totalActualQuestions * 0.8));
-
-    // Challenge 7 din baad expire ho jayega — TTL index isse apne aap delete kar dega
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    // ─────────────────────────────────────────────
-    // STEP 5: Challenge document save karo
-    // ─────────────────────────────────────────────
-    const newChallenge = new Challenge({
-      createdBy: userId,
-      examName,
-      blueprintName,
-      challengeCode,
-      subjects: finalSubjects,
-      marksPerQuestion: blueprint.marksPerQuestion,
-      negativeMarking: blueprint.negativeMarking,
-      durationMinutes,
-      totalQuestions: totalActualQuestions,
-      expiresAt,
-    });
-
-    await newChallenge.save();
-
-    // ─────────────────────────────────────────────
-    // STEP 6: Response — shareable code/link ke sath
-    // ─────────────────────────────────────────────
-    return res.status(201).json({
-      success: true,
-      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
-      data: {
-        challengeCode: newChallenge.challengeCode,
-        examName: newChallenge.examName,
-        blueprintName: newChallenge.blueprintName,
-        totalQuestions: newChallenge.totalQuestions,
-        durationMinutes: newChallenge.durationMinutes,
-        expiresAt: newChallenge.expiresAt,
-      },
-    });
-  } catch (error) {
-    console.error("createChallenge error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server mein error aa gaya challenge banate waqt.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
 <file path="backend/controllers/getChallenge.js">
 // controllers/getChallenge.js
 import Challenge from "../models/Challenge.js";
@@ -941,6 +748,115 @@ export const getChallenge = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
+  }
+};
+</file>
+
+<file path="backend/controllers/getChallengeAttemptDetail.js">
+// controllers/getChallengeAttemptDetail.js
+import Challenge from "../models/Challenge.js";
+import ChallengeAttempt from "../models/ChallengeAttempt.js";
+
+// Ek user ka apna challenge-attempt ka POORA breakdown deta hai —
+// question, options, correct answer, user ka answer, explanation — sab kuch.
+// Ye endpoint sirf submit ke BAAD kaam aata hai (login required).
+export const getChallengeAttemptDetail = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { challengeCode } = req.params;
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Challenge dhundo (frozen questions ke sath)
+    // ─────────────────────────────────────────────
+    const challenge = await Challenge.findOne({ challengeCode });
+
+    if (!challenge) {
+      return res.status(404).json({
+        success: false,
+        message: "Challenge nahi mila ya expire ho gaya.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Is user ka attempt dhundo
+    // ─────────────────────────────────────────────
+    const attempt = await ChallengeAttempt.findOne({
+      challengeId: challenge._id,
+      userId,
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        success: false,
+        message: "Aapne abhi tak ye challenge attempt nahi kiya hai.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Frozen questions ka lookup map banao
+    // (question text, options, correctOption, explanation — sab yahi se milega)
+    // ─────────────────────────────────────────────
+    const questionMap = {};
+    for (const subj of challenge.subjects) {
+      for (const q of subj.questions) {
+        questionMap[q.questionId.toString()] = q;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Har attempted question ko frozen-question-data ke sath merge karo
+    // ─────────────────────────────────────────────
+    const questionBreakdown = attempt.attemptedQuestions
+      .map((aq) => {
+        const qId = aq.questionId ? aq.questionId.toString() : null;
+        const frozenQ = qId ? questionMap[qId] : null;
+        if (!frozenQ) return null; // safety — agar kabhi mismatch ho
+
+        return {
+          questionId: frozenQ.questionId,
+          question: frozenQ.question,
+          options: {
+            option1: frozenQ.option1,
+            option2: frozenQ.option2,
+            option3: frozenQ.option3,
+            option4: frozenQ.option4,
+          },
+          correctOption: frozenQ.correctOption,
+          userAnswer: aq.userAnswer,
+          isCorrect: aq.isCorrect,
+          answerExplain: frozenQ.answerExplain || null,
+          topicName: frozenQ.topicName,
+          subjectName: frozenQ.subjectName,
+          timeTakenInSeconds: aq.timeTakenInSeconds,
+        };
+      })
+      .filter(Boolean);
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Response
+    // ─────────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      data: {
+        challengeCode: challenge.challengeCode,
+        examName: challenge.examName,
+        blueprintName: challenge.blueprintName,
+        overview: {
+          totalScore: attempt.totalScore,
+          correctCount: attempt.correctCount,
+          wrongCount: attempt.wrongCount,
+          unattemptedCount: attempt.unattemptedCount,
+        },
+        questionBreakdown,
+      },
+    });
+  } catch (error) {
+    console.error("getChallengeAttemptDetail error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya detail fetch karte waqt.",
+      error: error.message,
+    });
   }
 };
 </file>
@@ -1472,124 +1388,6 @@ export const userInfo = async (req, res, next) => {
         });
     }
 };
-</file>
-
-<file path="backend/models/Challenge.js">
-// models/Challenge.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const challengeSchema = new mongoose.Schema(
-  {
-    // Challenge kisne banaya — dost ko challenge bhejne wala user
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Challenge banane wale user ki ID zaroori hai"],
-    },
-
-    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-    },
-    blueprintName: {
-      type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
-      trim: true,
-    },
-
-    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
-    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
-    challengeCode: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
-    },
-
-    // ─────────────────────────────────────────────
-    // FROZEN QUESTIONS — Ye sabse important part hai.
-    // Jab challenge banta hai, tab ek baar mock-jaisa
-    // question set generate karke yahan PERMANENTLY save
-    // kar diya jata hai. Isse fark nahi padta ki 5 log
-    // alag-alag din pe attempt karein — sabko EXACT same
-    // questions milenge, isliye comparison fair rahega.
-    //
-    // Note: Yahan hum poora question object store kar rahe
-    // hain (sirf ID nahi) — taaki agar original Question
-    // document baad mein edit/delete ho jaye, challenge
-    // fir bhi kaam kare aur data consistent rahe.
-    // ─────────────────────────────────────────────
-    subjects: [
-      {
-        subjectName: { type: String, required: true },
-        questions: [
-          {
-            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
-            questionId: {
-              type: mongoose.Schema.Types.ObjectId,
-              required: true,
-            },
-            question: { type: String, required: true },
-            option1: { type: String, required: true },
-            option2: { type: String, required: true },
-            option3: { type: String, required: true },
-            option4: { type: String, required: true },
-            correctOption: { type: Number, required: true },
-            topicName: { type: String },
-            subjectName: { type: String },
-            questionNumber: { type: Number },
-          },
-        ],
-      },
-    ],
-
-    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
-    // (agar baad mein blueprint ke marks/negative marking badal jaye,
-    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
-    marksPerQuestion: {
-      type: Number,
-      required: true,
-    },
-    negativeMarking: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-    },
-    totalQuestions: {
-      type: Number,
-      required: true,
-    },
-
-    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
-    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
-    expiresAt: {
-      type: Date,
-      required: true,
-    },
-  },
-  {
-    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
-  }
-);
-
-// ─────────────────────────────────────────────
-// TTL INDEX — MongoDB khud is document ko expiresAt ke
-// 0 seconds baad automatically delete kar dega.
-// Isse humein manual cron job nahi likhni padegi purane
-// challenges saaf karne ke liye.
-// ─────────────────────────────────────────────
-challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
-
-export default Challenge;
 </file>
 
 <file path="backend/models/ChallengeAttempt.js">
@@ -2570,264 +2368,157 @@ const AnalysisPage = () => {
 export default AnalysisPage
 </file>
 
-<file path="frontend/src/pages/Challenge.jsx">
-import React, { useState, useEffect, useMemo, useRef } from "react";
+<file path="frontend/src/pages/ChallengeReview.jsx">
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 
-const formatTime = (totalSeconds) => {
-  const safe = Math.max(0, Math.floor(totalSeconds || 0));
-  const m = Math.floor(safe / 60);
-  const s = safe % 60;
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(m)}:${pad(s)}`;
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+// ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
+const QuestionDetailCard = ({ q }) => {
+  const statusLabel =
+    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+  const statusColor =
+    q.isCorrect === true
+      ? "text-green-400 bg-green-500/10 border-green-500/30"
+      : q.isCorrect === false
+      ? "text-red-400 bg-red-500/10 border-red-500/30"
+      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <span className="text-xs text-gray-500">{q.topicName}</span>
+        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
+
+      <div className="space-y-2.5 mb-6">
+        {[1, 2, 3, 4].map((n) => {
+          const optText = q.options?.[`option${n}`];
+          const isCorrectOpt = q.correctOption === n;
+          const isUserPick = q.userAnswer === String(n);
+
+          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
+          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
+          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
+
+          return (
+            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
+                {n}
+              </span>
+              <span className="flex-1">{optText}</span>
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isUserPick && !isCorrectOpt && (
+                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {q.userAnswer == null && (
+        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+      )}
+
+      {q.timeTakenInSeconds != null && (
+        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
+      )}
+
+      {q.answerExplain && (
+        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
+            Explanation
+          </p>
+          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+        </div>
+      )}
+    </div>
+  );
 };
 
-const Challenge = () => {
+const ChallengeReview = () => {
   const navigate = useNavigate();
-  const { code } = useParams(); // agar URL mein code hai to "join" flow, warna "create" flow
+  const { code } = useParams();
 
-  const [phase, setPhase] = useState("loading");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [userName, setUserName] = useState("");
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [index, setIndex] = useState(0);
 
-  // ── Create-flow state ──
-  const [examList, setExamList] = useState([]);
-  const [selectedExam, setSelectedExam] = useState("");
-  const [blueprints, setBlueprints] = useState([]);
-  const [selectedBlueprint, setSelectedBlueprint] = useState(null);
-  const [createdChallenge, setCreatedChallenge] = useState(null);
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["challenge-attempt-detail", code],
+    queryFn: async () => {
+      const res = await api.get(`/challenge/${code}/my-attempt`);
+      return res.data.data;
+    },
+    enabled: !!code,
+  });
 
-  // ── Join/Test-flow state ──
-  const [challengeMeta, setChallengeMeta] = useState(null);
-  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
-  const [activeQIdx, setActiveQIdx] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [timeSpent, setTimeSpent] = useState({});
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const [endTimestamp, setEndTimestamp] = useState(null);
-  const [resultData, setResultData] = useState(null);
-  const [leaderboard, setLeaderboard] = useState(null);
+  const allQuestions = data?.questionBreakdown || [];
 
-  const questionStartRef = useRef(Date.now());
-  const currentQIdRef = useRef(null);
-  const submittingRef = useRef(false);
+  const subjects = useMemo(() => {
+    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
+    return Array.from(set);
+  }, [allQuestions]);
 
-  // ── Step 1: Init — decide karo create-flow ya join-flow ──
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter((q) => {
+      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
+      let statusMatch = true;
+      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
+      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
+      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
+      return subjMatch && statusMatch;
+    });
+  }, [allQuestions, subjectFilter, statusFilter]);
+
   useEffect(() => {
-    let cancelled = false;
-    const init = async () => {
-      try {
-        const meRes = await api.get("/me");
-        if (cancelled) return;
-        setUserName(meRes.data.data.name);
+    setIndex(0);
+  }, [subjectFilter, statusFilter]);
 
-        if (code) {
-          // ── JOIN FLOW: kisi ne link bheja hai ──
-          const chRes = await api.get(`/challenge/${code}`);
-          if (cancelled) return;
-          const data = chRes.data.data;
-          setChallengeMeta(data);
+  const currentQ = filteredQuestions[index];
 
-          if (data.alreadyAttempted) {
-            // Already de chuka hai — seedha leaderboard dikhao
-            await loadLeaderboard();
-            setPhase("leaderboard");
-          } else {
-            setPhase("instructions");
-          }
-        } else {
-          // ── CREATE FLOW: user naya challenge banana chahta hai ──
-          const examRes = await api.get("/allExamName");
-          if (cancelled) return;
-          setExamList(examRes.data.data || []);
-          setPhase("create-select");
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setErrorMsg(err.response?.data?.message || err.message);
-          setPhase("error");
-        }
-      }
+  const counts = useMemo(() => {
+    const base = allQuestions.filter(
+      (q) => subjectFilter === "all" || q.subjectName === subjectFilter
+    );
+    return {
+      all: base.length,
+      correct: base.filter((q) => q.isCorrect === true).length,
+      wrong: base.filter((q) => q.isCorrect === false).length,
+      unattempted: base.filter((q) => q.isCorrect === null).length,
     };
-    init();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [code]);
+  }, [allQuestions, subjectFilter]);
 
-  // ── Exam select hone par uske blueprints laao ──
-  const handleExamSelect = async (exam) => {
-    setSelectedExam(exam);
-    setSelectedBlueprint(null);
-    try {
-      const res = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
-      setBlueprints(res.data.data || []);
-    } catch (err) {
-      setErrorMsg("Blueprints fetch nahi ho paaye.");
-    }
-  };
-
-  // ── Challenge create karo ──
-  const handleCreateChallenge = async () => {
-    if (!selectedBlueprint) return;
-    setPhase("loading");
-    try {
-      const res = await api.post("/create-challenge", {
-        examName: selectedExam,
-        blueprintName: selectedBlueprint.blueprintName,
-      });
-      setCreatedChallenge(res.data.data);
-      setPhase("created");
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Challenge banane mein error aaya.");
-      setPhase("error");
-    }
-  };
-
-  // ── Test start karo (join-flow) ──
-  const startChallengeTest = () => {
-    setAnswers({});
-    setTimeSpent({});
-    setActiveSubjectIdx(0);
-    setActiveQIdx(0);
-    submittingRef.current = false;
-
-    const firstQ = challengeMeta.subjects[0].questions[0];
-    currentQIdRef.current = firstQ._id;
-    questionStartRef.current = Date.now();
-
-    const totalSeconds = challengeMeta.durationMinutes * 60;
-    setEndTimestamp(Date.now() + totalSeconds * 1000);
-    setRemainingSeconds(totalSeconds);
-    setPhase("test");
-  };
-
-  const flushTime = () => {
-    const qId = currentQIdRef.current;
-    if (!qId) return;
-    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
-    if (elapsed > 0) {
-      setTimeSpent((prev) => ({ ...prev, [qId]: (prev[qId] || 0) + elapsed }));
-    }
-    questionStartRef.current = Date.now();
-  };
-
-  const goToQuestion = (subjIdx, qIdx) => {
-    flushTime();
-    const q = challengeMeta.subjects[subjIdx].questions[qIdx];
-    currentQIdRef.current = q ? q._id : null;
-    setActiveSubjectIdx(subjIdx);
-    setActiveQIdx(qIdx);
-  };
-
-  const currentSubject = challengeMeta ? challengeMeta.subjects[activeSubjectIdx] : null;
-  const currentQuestion = currentSubject ? currentSubject.questions[activeQIdx] : null;
-
-  const selectAnswer = (n) => {
-    if (!currentQuestion) return;
-    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
-  };
-
-  const goNext = () => {
-    const subj = challengeMeta.subjects[activeSubjectIdx];
-    if (activeQIdx < subj.questions.length - 1) {
-      goToQuestion(activeSubjectIdx, activeQIdx + 1);
-    } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
-      goToQuestion(activeSubjectIdx + 1, 0);
-    }
-  };
-
-  const goPrev = () => {
-    if (activeQIdx > 0) {
-      goToQuestion(activeSubjectIdx, activeQIdx - 1);
-    } else if (activeSubjectIdx > 0) {
-      const prevSubj = challengeMeta.subjects[activeSubjectIdx - 1];
-      goToQuestion(activeSubjectIdx - 1, prevSubj.questions.length - 1);
-    }
-  };
-
-  const loadLeaderboard = async () => {
-    try {
-      const res = await api.get(`/challenge/${code}/leaderboard`);
-      setLeaderboard(res.data.data);
-    } catch (err) {
-      // silently fail — leaderboard optional hai result ke saath
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!challengeMeta || submittingRef.current) return;
-    submittingRef.current = true;
-    flushTime();
-    setPhase("submitting");
-    try {
-      const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
-        subj.questions.map((q) => ({
-          questionId: q._id,
-          userAnswer: answers[q._id] || null,
-          timeTakenInSeconds: timeSpent[q._id] || 0,
-        }))
-      );
-
-      const res = await api.post(`/challenge/${code}/submit`, { attemptedQuestions });
-      setResultData(res.data.data);
-      await loadLeaderboard();
-      setPhase("result");
-    } catch (err) {
-      // Agar already-attempted error aaye, seedha leaderboard dikha do
-      if (err.response?.status === 409) {
-        await loadLeaderboard();
-        setPhase("leaderboard");
-      } else {
-        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
-        setPhase("error");
-      }
-    }
-  };
-
-  // ── Countdown timer ──
-  useEffect(() => {
-    if (phase !== "test") return;
-    if (remainingSeconds <= 0) {
-      const t = setTimeout(() => handleSubmit(), 0);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => {
-      if (endTimestamp) {
-        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
-    }, 1000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
-
-  const copyLink = () => {
-    const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
-    navigator.clipboard.writeText(link);
-  };
-
-  // ────────────────────────────── RENDER ──────────────────────────────
-
-  if (phase === "loading" || phase === "submitting") {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">
-            {phase === "submitting" ? "Result submit ho raha hai..." : "Load ho raha hai..."}
-          </p>
+          <p className="text-gray-400 text-sm">Analysis load ho raha hai...</p>
         </div>
       </div>
     );
   }
 
-  if (phase === "error") {
+  if (isError) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{errorMsg}</p>
+          <p className="text-gray-300">
+            {error?.response?.data?.message || "Data load nahi ho paaya."}
+          </p>
           <button
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
@@ -2839,338 +2530,118 @@ const Challenge = () => {
     );
   }
 
-  // ── CREATE FLOW: Exam + Blueprint choose karo ──
-  if (phase === "create-select") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Dost Ko Challenge Karo 🔥</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            Ek test chuno, link banao, apne dosto ko bhejo — dekho kaun sabse aage hai!
-          </p>
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+        >
+          &larr; Wapas Jaayein
+        </button>
 
-          <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Exam Chuno</label>
-          <select
-            value={selectedExam}
-            onChange={(e) => handleExamSelect(e.target.value)}
-            className="w-full mb-6 px-4 py-3 rounded-lg bg-[#111827] border border-gray-800 text-white"
-          >
-            <option value="">-- Exam Select Karein --</option>
-            {examList.map((exam) => (
-              <option key={exam} value={exam}>{exam}</option>
-            ))}
-          </select>
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
+        <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
 
-          {blueprints.length > 0 && (
-            <>
-              <label className="text-xs font-semibold text-gray-400 uppercase mb-2 block">Mock Test Chuno</label>
-              <div className="space-y-3 mb-8">
-                {blueprints.map((bp) => (
-                  <button
-                    key={bp._id}
-                    onClick={() => setSelectedBlueprint(bp)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border transition-colors ${
-                      selectedBlueprint?._id === bp._id
-                        ? "border-[#7C3AED] bg-[#7C3AED]/15"
-                        : "border-gray-800 bg-[#111827] hover:border-gray-600"
-                    }`}
-                  >
-                    <p className="font-semibold">{bp.blueprintName}</p>
-                    <p className="text-xs text-gray-400 mt-1">{bp.totalQuestions} sawaal</p>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-
-          <button
-            onClick={handleCreateChallenge}
-            disabled={!selectedBlueprint}
-            className={`w-full py-3 rounded-lg font-semibold ${
-              selectedBlueprint
-                ? "bg-[#7C3AED] hover:bg-[#6D28D9]"
-                : "bg-gray-700 cursor-not-allowed text-gray-400"
-            }`}
-          >
-            Challenge Link Banao
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Challenge ban gaya — link share karo ──
-  if (phase === "created" && createdChallenge) {
-    const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
-            🎉
+        {/* Overview stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-green-400">{data?.overview?.correctCount}</p>
+            <p className="text-[11px] text-gray-500">Correct</p>
           </div>
-          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
-          <p className="text-gray-400 text-sm mb-6">
-            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
-          </p>
-
-          <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
-            {shareLink}
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-red-400">{data?.overview?.wrongCount}</p>
+            <p className="text-[11px] text-gray-500">Wrong</p>
           </div>
-
-          <button
-            onClick={copyLink}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
-          >
-            Link Copy Karein
-          </button>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── JOIN FLOW: Instructions dikhao ──
-  if (phase === "instructions" && challengeMeta) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
-          <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
-
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">{challengeMeta.totalQuestions}</p>
-              <p className="text-[11px] text-gray-500 mt-1">Questions</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">{challengeMeta.durationMinutes} min</p>
-              <p className="text-[11px] text-gray-500 mt-1">Duration</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">+{challengeMeta.marksPerQuestion}</p>
-              <p className="text-[11px] text-gray-500 mt-1">Marks/Q</p>
-            </div>
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-gray-300">{data?.overview?.unattemptedCount}</p>
+            <p className="text-[11px] text-gray-500">Unattempted</p>
           </div>
-
-          <p className="text-sm text-gray-400 mb-8">
-            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
-          </p>
-
-          <button
-            onClick={startChallengeTest}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
-          >
-            Challenge Accept Karo — Test Shuru Karo
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── TEST SCREEN ──
-  if (phase === "test" && challengeMeta && currentQuestion) {
-    const subject = challengeMeta.subjects[activeSubjectIdx];
-    const selected = answers[currentQuestion._id];
-    const timeLow = remainingSeconds <= 60;
-
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-800 sticky top-0 bg-[#0A0D14] z-10">
-          <span className="font-semibold text-sm sm:text-base">{challengeMeta.blueprintName}</span>
-          <span
-            className={`text-sm font-mono px-3 py-1 rounded-lg border ${
-              timeLow ? "border-red-500 text-red-400 bg-red-500/10" : "border-gray-700 text-gray-200 bg-[#111827]"
-            }`}
-          >
-            {formatTime(remainingSeconds)}
-          </span>
         </div>
 
-        <div className="flex gap-2 px-4 sm:px-6 py-3 overflow-x-auto border-b border-gray-800">
-          {challengeMeta.subjects.map((s, i) => (
+        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject ho */}
+        {subjects.length > 1 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
             <button
-              key={s.subjectName}
-              onClick={() => goToQuestion(i, 0)}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
-                i === activeSubjectIdx ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
+              onClick={() => setSubjectFilter("all")}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                subjectFilter === "all"
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
               }`}
             >
-              {s.subjectName}
+              Sabhi Subjects
+            </button>
+            {subjects.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSubjectFilter(s)}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  subjectFilter === s
+                    ? "bg-[#7C3AED] text-white"
+                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Status filter — All / Correct / Wrong / Unattempted */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                statusFilter === f.key
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {f.label} ({counts[f.key]})
             </button>
           ))}
         </div>
 
-        <div className="flex-1 px-4 sm:px-6 py-6">
-          <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-6">
+        {filteredQuestions.length === 0 && (
+          <p className="text-gray-400 text-sm py-10 text-center">
+            Is category mein koi sawaal nahi hai.
+          </p>
+        )}
+
+        {currentQ && (
+          <>
             <p className="text-xs text-gray-500 mb-3">
-              Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
+              Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
             </p>
-            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+            <QuestionDetailCard q={currentQ} />
 
-            <div className="space-y-3 mb-8">
-              {[1, 2, 3, 4].map((n) => {
-                const optText = currentQuestion[`option${n}`];
-                const isSelected = selected === String(n);
-                return (
-                  <button
-                    key={n}
-                    onClick={() => selectAnswer(n)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 ${
-                      isSelected
-                        ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white"
-                        : "border-gray-800 bg-[#1F2937] text-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
-                        isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
-                      }`}
-                    >
-                      {n}
-                    </span>
-                    <span>{optText}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button onClick={goPrev} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
-                Previous
-              </button>
-              <button onClick={goNext} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
-                Next
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                disabled={index === 0}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &larr; Previous
               </button>
               <button
-                onClick={handleSubmit}
-                className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
+                disabled={index >= filteredQuestions.length - 1}
+                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Submit Karo
+                Next &rarr;
               </button>
             </div>
-          </div>
-        </div>
+          </>
+        )}
       </div>
-    );
-  }
-
-  // ── RESULT SCREEN — score + rank ──
-  if (phase === "result" && resultData) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto text-center">
-          <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
-          <p className="text-gray-400 text-sm mb-8">Dekho tum kahan khade ho</p>
-
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
-            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
-            <p className="text-sm text-gray-500 mt-1">Total Score</p>
-          </div>
-
-          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-8">
-            <p className="text-3xl font-bold">#{resultData.currentRank}</p>
-            <p className="text-sm text-white/80 mt-1">
-              {resultData.totalParticipants} logo mein se aapki rank
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
-              <p className="text-[11px] text-gray-500">Correct</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
-              <p className="text-[11px] text-gray-500">Wrong</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
-              <p className="text-[11px] text-gray-500">Unattempted</p>
-            </div>
-          </div>
-
-          <button
-            onClick={() => setPhase("leaderboard")}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
-          >
-            Poora Leaderboard Dekho
-          </button>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── LEADERBOARD SCREEN ──
-  if (phase === "leaderboard") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
-          </p>
-
-          {!leaderboard || leaderboard.leaderboard.length === 0 ? (
-            <p className="text-gray-400 text-sm">Abhi tak koi attempt nahi hua.</p>
-          ) : (
-            <div className="space-y-3">
-              {leaderboard.leaderboard.map((entry) => (
-                <div
-                  key={entry.userId}
-                  className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
-                    entry.userName === userName
-                      ? "border-[#7C3AED] bg-[#7C3AED]/10"
-                      : "border-gray-800 bg-[#111827]"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
-                    <span
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        entry.rank === 1
-                          ? "bg-yellow-500/20 text-yellow-400"
-                          : entry.rank === 2
-                          ? "bg-gray-400/20 text-gray-300"
-                          : entry.rank === 3
-                          ? "bg-orange-500/20 text-orange-400"
-                          : "bg-gray-800 text-gray-500"
-                      }`}
-                    >
-                      {entry.rank}
-                    </span>
-                    <span className="font-medium">{entry.userName}</span>
-                  </div>
-                  <span className="font-bold text-[#A78BFA]">{entry.totalScore}</span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
-export default Challenge;
+export default ChallengeReview;
 </file>
 
 <file path="frontend/src/pages/ProfilePage.jsx">
@@ -3510,186 +2981,6 @@ export default defineConfig({
 })
 </file>
 
-<file path="analysise.txt">
-FOR ADD   QUESTIONN
-1) questionn
-2) char option with wronge and right option 
-3) answer explane
-4) subject name and question exam name with multipal exam option 
-
-
-GEMINI ADDMOCK.JS CODE 
-// controllers/addMocktest.js
-import Blueprint from "../models/bluePrint.js";
-import Performance from "../models/Performance.js";
-import { Question } from "../models/rowQuestionSchema.js";
-
-export const addMocktest = async (req, res) => {
-  try {
-    // ⬇️ STEP 1: Request aayi
-    const { userId, examName } = req.body;
-
-    if (!userId || !examName) {
-      return res.status(400).json({ success: false, message: "userId aur examName zaroori hai!" });
-    }
-
-    // Blueprint dhundo (examName se)
-    // Note: Agar multiple mocks hain, toh yeh pehla matching uthayega. Future me tum ise blueprintName bhi bhej kar specific kar sakte ho.
-    const blueprint = await Blueprint.findOne({ examName });
-    if (!blueprint) {
-      return res.status(404).json({ success: false, message: `❌ ${examName} ka koi Blueprint nahi mila!` });
-    }
-
-    // ⬇️ STEP 2: Performance (Past attempts nikalo)
-    const pastAttempts = await Performance.find({ userId, examName });
-    const isNewUser = pastAttempts.length === 0;
-
-    // Weak topics map banao: { "Hindi": { "Sandhi": 2, "Samas": 1 } }
-    const weakTopicsMap = {}; 
-
-    if (!isNewUser) {
-      const wrongQuestionIds = [];
-      pastAttempts.forEach(attempt => {
-        attempt.attemptedQuestions.forEach(q => {
-          if (q.isCorrect === false) wrongQuestionIds.push(q.questionId);
-        });
-      });
-
-      if (wrongQuestionIds.length > 0) {
-        // Question DB se topicName aur subjectName nikalo
-        const wrongQs = await Question.find({ _id: { $in: wrongQuestionIds } }).select("topicName subjectName");
-        wrongQs.forEach(q => {
-          if (!weakTopicsMap[q.subjectName]) weakTopicsMap[q.subjectName] = {};
-          weakTopicsMap[q.subjectName][q.topicName] = (weakTopicsMap[q.subjectName][q.topicName] || 0) + 1;
-        });
-      }
-    }
-
-    const finalSubjectsArray = [];
-    let totalActualQuestions = 0;
-
-    // ⬇️ STEP 3: Har subject ke liye loop
-    for (const sub of blueprint.subjects) {
-      const subjectName = sub.subjectName;
-      const targetCount = sub.questionCount;
-      const importantTopics = sub.importantTopics || [];
-
-      let subjectQuestions = [];
-      const topicSelectionCount = {}; // Track karega ki kis topic se kitne sawal liye gaye
-
-      // ⚡ OPTIMIZATION: DB pe load kam karne ke liye ek hi baar me saare sawal memory me laye
-      const allSubjectQs = await Question.find({ examName: examName, subjectName });
-      const topicsGroup = {};
-      
-      allSubjectQs.forEach(q => {
-        if (!topicsGroup[q.topicName]) topicsGroup[q.topicName] = [];
-        topicsGroup[q.topicName].push(q);
-      });
-
-      // Har topic ke array ko shuffle kar do taaki 'base allocation' me random aaye
-      for (const t in topicsGroup) {
-        topicsGroup[t].sort(() => Math.random() - 0.5);
-      }
-
-      // 3a. Us subject ke sare UNIQUE topics
-      const allUniqueTopics = Object.keys(topicsGroup);
-      if (allUniqueTopics.length === 0) continue; // Agar DB me subject ke sawal hi nahi hain
-
-      // 3b. BASE ALLOCATION: har topic se 1 question lo
-      allUniqueTopics.forEach(topic => {
-        if (subjectQuestions.length < targetCount && topicsGroup[topic].length > 0) {
-          subjectQuestions.push(topicsGroup[topic].shift()); // shift() array se nikal leta hai, toh exclude apne aap ho gaya
-          topicSelectionCount[topic] = 1;
-        } else {
-          topicSelectionCount[topic] = 0;
-        }
-      });
-
-      // 3c. EXTRA COUNT
-      let remainingExtras = targetCount - subjectQuestions.length;
-
-      // 3d. EXTRA POOL BANAO (Priority Order)
-      if (remainingExtras > 0) {
-        let priorityQueue = [];
-
-        if (isNewUser) {
-          const impTopicsAvailable = importantTopics.filter(t => allUniqueTopics.includes(t));
-          const otherTopics = allUniqueTopics.filter(t => !importantTopics.includes(t));
-          // New User: Imp Topics -> Other Topics
-          priorityQueue = [...impTopicsAvailable, ...otherTopics];
-        } else {
-          const subjectWeakMap = weakTopicsMap[subjectName] || {};
-          const weakTopics = Object.keys(subjectWeakMap);
-
-          const impAndWeak = importantTopics.filter(t => weakTopics.includes(t) && allUniqueTopics.includes(t));
-          const impNotWeak = importantTopics.filter(t => !weakTopics.includes(t) && allUniqueTopics.includes(t));
-          const weakNotImp = weakTopics.filter(t => !importantTopics.includes(t) && allUniqueTopics.includes(t));
-          const others = allUniqueTopics.filter(t => !importantTopics.includes(t) && !weakTopics.includes(t));
-
-          // Weakness ki severity ke hisab se sort (zyada galat kiye gaye pehle)
-          impAndWeak.sort((a, b) => subjectWeakMap[b] - subjectWeakMap[a]);
-          weakNotImp.sort((a, b) => subjectWeakMap[b] - subjectWeakMap[a]);
-
-          // Old User Priority Logic 🔥
-          priorityQueue = [...impAndWeak, ...impNotWeak, ...weakNotImp, ...others];
-        }
-
-        // 3e. Round-robin extra allocation (Cap: Max 3 questions per topic)
-        let madeChanges = true;
-        while (remainingExtras > 0 && madeChanges) {
-          madeChanges = false;
-          for (const topic of priorityQueue) {
-            if (remainingExtras === 0) break;
-
-            // Cap check: Pehle se allocate hue hain toh +2 (total 3), aur DB me available ho
-            if (topicSelectionCount[topic] < 3 && topicsGroup[topic] && topicsGroup[topic].length > 0) {
-              subjectQuestions.push(topicsGroup[topic].shift());
-              topicSelectionCount[topic]++;
-              remainingExtras--;
-              madeChanges = true;
-            }
-          }
-        }
-      }
-
-      // Final shuffle taaki pattern catch na ho
-      subjectQuestions.sort(() => Math.random() - 0.5);
-
-      // Final subject object ready
-      finalSubjectsArray.push({
-        subjectName: subjectName,
-        questions: subjectQuestions
-      });
-
-      totalActualQuestions += subjectQuestions.length;
-    }
-
-    // ⬇️ STEP 4 & 5: Sab combine karo aur Response bhejo
-    res.status(200).json({
-      success: true,
-      message: isNewUser ? "🎯 Fresh Mock Test Generated" : "🧠 Adaptive Weakness-Focused Mock Generated",
-      mockTest: {
-        examName: blueprint.examName,
-        blueprintName: blueprint.blueprintName,
-        marksPerQuestion: blueprint.marksPerQuestion,
-        negativeMarking: blueprint.negativeMarking,
-        totalQuestions: totalActualQuestions,
-        subjects: finalSubjectsArray
-      }
-    });
-
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: "❌ Algorithm crash ho gaya!",
-      error: error.message
-    });
-  }
-};
-////
-npx repomix
-</file>
-
 <file path="backend/controllers/addBlluePrient.js">
 // controllers/addBluePrint.js
 import Blueprint from "../models/bluePrint.js"; // 👈 Dhyan rahe filename exact match kare
@@ -4022,6 +3313,204 @@ export const addPerformence = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/createChallenge.js">
+// controllers/createChallenge.js
+import mongoose from "mongoose";
+import Blueprint from "../models/bluePrint.js";
+import Challenge from "../models/Challenge.js";
+import { Question } from "../models/rowQuestionSchema.js";
+
+// ─────────────────────────────────────────────
+// HELPER 1: Fisher-Yates Shuffle (unbiased)
+// addMockTest.js jaisa hi — random questions select karne ke liye
+// ─────────────────────────────────────────────
+const fisherYatesShuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// ─────────────────────────────────────────────
+// HELPER 2: Unique 6-character challenge code generate karo
+// (uppercase letters + digits — link mein short aur readable rahega)
+// ─────────────────────────────────────────────
+const generateChallengeCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0,O,1,I) hataye
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+};
+
+export const createChallenge = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // req.user middleware se aayega (userInfo middleware required hai route pe)
+    // ─────────────────────────────────────────────
+    const userId = req.user._id;
+    const { examName, blueprintName } = req.body;
+
+    if (!examName || !blueprintName) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur blueprintName dono zaroori hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Blueprint dhundo
+    // ─────────────────────────────────────────────
+    const blueprint = await Blueprint.findOne({ examName, blueprintName });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Har subject ke liye RANDOM questions select karo
+    //
+    // Note: Ye jaanbujh kar addMockTest.js ke adaptive-weakness
+    // logic se SIMPLE rakha gaya hai — kyunki challenge sabke
+    // liye FAIR/SAME hona chahiye. Agar personalization laga
+    // di to har dost ko alag questions milenge aur comparison
+    // hi meaningless ho jayega.
+    // ─────────────────────────────────────────────
+    const finalSubjects = [];
+    let totalActualQuestions = 0;
+
+    for (const subjectConfig of blueprint.subjects) {
+      const { subjectName, questionCount } = subjectConfig;
+
+      // Is subject ke saare questions DB se lao
+      // 👇 NAYA: answerExplain bhi select kar rahe hain — taaki baad mein
+      // "Detailed Analysis" screen pe user ko explanation dikhaya ja sake
+      const allQuestions = await Question.find({
+        examName: { $in: [examName] },
+        subjectName: subjectName,
+      }).select(
+        "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName questionNumber"
+      );
+
+      if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
+
+      // Shuffle karke jitne chahiye utne le lo
+      const shuffled = fisherYatesShuffle(allQuestions);
+      const picked = shuffled.slice(0, Math.min(questionCount, shuffled.length));
+
+      const questionsForFreeze = picked.map((q) => ({
+        questionId: q._id,
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correctOption: q.correctOption,
+        answerExplain: q.answerExplain, // 👈 NAYA — frozen question ke sath explanation bhi save
+        topicName: q.topicName,
+        subjectName: q.subjectName,
+        questionNumber: q.questionNumber,
+      }));
+
+      finalSubjects.push({
+        subjectName,
+        questions: questionsForFreeze,
+      });
+
+      totalActualQuestions += questionsForFreeze.length;
+    }
+
+    if (totalActualQuestions === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Is blueprint ke liye koi questions available nahi hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Unique challenge code generate karo
+    // (collision chance bahut kam hai but phir bhi retry-loop laga rahe hain safety ke liye)
+    // ─────────────────────────────────────────────
+    let challengeCode;
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+      challengeCode = generateChallengeCode();
+      const existing = await Challenge.findOne({ challengeCode });
+      if (!existing) isUnique = true;
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Duration + expiry calculate karo
+    // ─────────────────────────────────────────────
+    const durationMinutes =
+      blueprint.durationMinutes && blueprint.durationMinutes > 0
+        ? blueprint.durationMinutes
+        : Math.max(10, Math.round(totalActualQuestions * 0.8));
+
+    // Challenge 7 din baad expire ho jayega — TTL index isse apne aap delete kar dega
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Challenge document save karo
+    // ─────────────────────────────────────────────
+    const newChallenge = new Challenge({
+      createdBy: userId,
+      examName,
+      blueprintName,
+      challengeCode,
+      subjects: finalSubjects,
+      marksPerQuestion: blueprint.marksPerQuestion,
+      negativeMarking: blueprint.negativeMarking,
+      durationMinutes,
+      totalQuestions: totalActualQuestions,
+      expiresAt,
+    });
+
+    await newChallenge.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 6: Response — shareable code/link ke sath
+    // ─────────────────────────────────────────────
+    return res.status(201).json({
+      success: true,
+      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
+      data: {
+        challengeCode: newChallenge.challengeCode,
+        examName: newChallenge.examName,
+        blueprintName: newChallenge.blueprintName,
+        totalQuestions: newChallenge.totalQuestions,
+        durationMinutes: newChallenge.durationMinutes,
+        expiresAt: newChallenge.expiresAt,
+      },
+    });
+  } catch (error) {
+    console.error("createChallenge error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya challenge banate waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/models/bluePrint.js">
 // models/Blueprint.js
 import mongoose from "mongoose";
@@ -4098,107 +3587,123 @@ const Blueprint = rowQuestionConnection.model("Blueprint", blueprintSchema);
 export default Blueprint;
 </file>
 
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
+<file path="backend/models/Challenge.js">
+// models/Challenge.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
 
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
+const challengeSchema = new mongoose.Schema(
+  {
+    // Challenge kisne banaya — dost ko challenge bhejne wala user
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Challenge banane wale user ki ID zaroori hai"],
+    },
 
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
+    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+    },
+    blueprintName: {
+      type: String,
+      required: [true, "Blueprint ka naam zaroori hai"],
+      trim: true,
+    },
 
-// 👇 NAYA: Peer-Challenge feature ke controllers
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
+    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
+    challengeCode: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
+    },
 
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
+    // ─────────────────────────────────────────────
+    // FROZEN QUESTIONS — Ye sabse important part hai.
+    // Jab challenge banta hai, tab ek baar mock-jaisa
+    // question set generate karke yahan PERMANENTLY save
+    // kar diya jata hai. Isse fark nahi padta ki 5 log
+    // alag-alag din pe attempt karein — sabko EXACT same
+    // questions milenge, isliye comparison fair rahega.
+    //
+    // Note: Yahan hum poora question object store kar rahe
+    // hain (sirf ID nahi) — taaki agar original Question
+    // document baad mein edit/delete ho jaye, challenge
+    // fir bhi kaam kare aur data consistent rahe.
+    // ─────────────────────────────────────────────
+    subjects: [
+      {
+        subjectName: { type: String, required: true },
+        questions: [
+          {
+            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
+            questionId: {
+              type: mongoose.Schema.Types.ObjectId,
+              required: true,
+            },
+            question: { type: String, required: true },
+            option1: { type: String, required: true },
+            option2: { type: String, required: true },
+            option3: { type: String, required: true },
+            option4: { type: String, required: true },
+            correctOption: { type: Number, required: true },
+            answerExplain: { type: String },
+            topicName: { type: String },
+            subjectName: { type: String },
+            questionNumber: { type: Number },
+          },
+        ],
+      },
+    ],
 
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
+    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
+    // (agar baad mein blueprint ke marks/negative marking badal jaye,
+    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
+    marksPerQuestion: {
+      type: Number,
+      required: true,
+    },
+    negativeMarking: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    durationMinutes: {
+      type: Number,
+      required: true,
+    },
+    totalQuestions: {
+      type: Number,
+      required: true,
+    },
 
-const router = express.Router();
+    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
+    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+  },
+  {
+    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
+  }
+);
 
 // ─────────────────────────────────────────────
-// POST ROUTES
+// TTL INDEX — MongoDB khud is document ko expiresAt ke
+// 0 seconds baad automatically delete kar dega.
+// Isse humein manual cron job nahi likhni padegi purane
+// challenges saaf karne ke liye.
 // ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
+challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
-// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
-router.post("/create-challenge", userInfo, createChallenge);
+const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
 
-// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-// 3. User ke saare mocks ki list
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-
-// 4. Page 1 — Overview (average score, lifetime graph, subject list)
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-
-// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-
-// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-
-// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
-// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
-// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
-// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-
-export default router;
+export default Challenge;
 </file>
 
 <file path="frontend/src/api/api.js">
@@ -4594,6 +4099,646 @@ export default Singup;
 }
 </file>
 
+<file path="analysise.txt">
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "../api/api";
+
+const formatTime = (totalSeconds) => {
+  const safe = Math.max(0, Math.floor(totalSeconds || 0));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(m)}:${pad(s)}`;
+};
+
+// 👇 NAYA: localStorage key — har user ka apna alag saved "created challenge"
+const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+// Create-flow: apna challenge auto-generate ho raha hai (share-card jaisa skeleton)
+const CreateFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+    <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+      <SkeletonBlock className="w-16 h-16 rounded-full mx-auto mb-4" />
+      <SkeletonBlock className="w-48 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-56 h-4 mx-auto mb-6" />
+      <SkeletonBlock className="w-full h-14 rounded-lg mb-4" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+// Join-flow: kisi aur ka challenge load ho raha hai (instructions-card jaisa skeleton)
+const JoinFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+      <SkeletonBlock className="w-64 h-6 mb-3" />
+      <SkeletonBlock className="w-48 h-4 mb-6" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4">
+            <SkeletonBlock className="w-10 h-6 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-4 mb-2" />
+      <SkeletonBlock className="w-3/4 h-4 mb-8" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+// Submit ho raha hai (result-card jaisa skeleton)
+const SubmittingSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-xl mx-auto text-center">
+      <SkeletonBlock className="w-56 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-40 h-4 mx-auto mb-8" />
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+        <SkeletonBlock className="w-24 h-10 mx-auto mb-2" />
+        <SkeletonBlock className="w-20 h-3 mx-auto" />
+      </div>
+      <SkeletonBlock className="w-full h-20 rounded-2xl mb-8" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+const Challenge = () => {
+  const navigate = useNavigate();
+  const { code: codeParam } = useParams(); // URL mein code hai to "join" flow, warna "create" flow
+
+  const [phase, setPhase] = useState(codeParam ? "loading-join" : "loading-create");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  // ── Create-flow state ──
+  const [createdChallenge, setCreatedChallenge] = useState(null);
+
+  // ── Join/Test-flow state ──
+  const [challengeMeta, setChallengeMeta] = useState(null);
+  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
+  const [activeQIdx, setActiveQIdx] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeSpent, setTimeSpent] = useState({});
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [endTimestamp, setEndTimestamp] = useState(null);
+  const [resultData, setResultData] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+
+  const questionStartRef = useRef(Date.now());
+  const currentQIdRef = useRef(null);
+  const submittingRef = useRef(false);
+
+  // 👇 Effective challenge code — URL se (join) ya khud banaye challenge se (own-test)
+  const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
+
+  // ── Step 1: Init — decide karo create-flow ya join-flow ──
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      setPhase(codeParam ? "loading-join" : "loading-create");
+      try {
+        const meRes = await api.get("/me");
+        if (cancelled) return;
+        const user = meRes.data.data;
+        setUserName(user.name);
+        setUserId(user._id);
+
+        if (codeParam) {
+          // ── JOIN FLOW: kisi ne link bheja hai ──
+          const chRes = await api.get(`/challenge/${codeParam}`);
+          if (cancelled) return;
+          const data = chRes.data.data;
+          setChallengeMeta(data);
+
+          if (data.alreadyAttempted) {
+            await loadLeaderboard(codeParam);
+            setPhase("leaderboard");
+          } else {
+            setPhase("instructions");
+          }
+          return;
+        }
+
+        // ── CREATE FLOW: pehle localStorage check karo — dobara generate na ho ──
+        const storageKey = getChallengeStorageKey(user._id);
+        const savedRaw = localStorage.getItem(storageKey);
+        if (savedRaw) {
+          try {
+            const saved = JSON.parse(savedRaw);
+            const notExpired = saved?.expiresAt && new Date(saved.expiresAt) > new Date();
+            const sameExam = saved?.examName === user.exam;
+            if (saved?.challengeCode && notExpired && sameExam) {
+              setCreatedChallenge(saved);
+              setPhase("created");
+              return;
+            }
+            localStorage.removeItem(storageKey);
+          } catch {
+            localStorage.removeItem(storageKey);
+          }
+        }
+
+        // Koi valid saved challenge nahi mila — seedha naya generate karo
+        const bpRes = await api.get(`/blueprints/${encodeURIComponent(user.exam)}`);
+        if (cancelled) return;
+        const list = bpRes.data.data || [];
+        if (list.length === 0) {
+          throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
+        }
+        const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
+
+        const createRes = await api.post("/create-challenge", {
+          examName: user.exam,
+          blueprintName: chosenBlueprint.blueprintName,
+        });
+        if (cancelled) return;
+        const created = createRes.data.data;
+        setCreatedChallenge(created);
+        localStorage.setItem(storageKey, JSON.stringify(created));
+        setPhase("created");
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err.response?.data?.message || err.message);
+          setPhase("error");
+        }
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeParam]);
+
+  // ── Apna khud ka challenge test dene ke liye ──
+  const startOwnTest = async () => {
+    if (!createdChallenge) return;
+    setPhase("loading-join");
+    try {
+      const chRes = await api.get(`/challenge/${createdChallenge.challengeCode}`);
+      const data = chRes.data.data;
+      setChallengeMeta(data);
+
+      if (data.alreadyAttempted) {
+        await loadLeaderboard(createdChallenge.challengeCode);
+        setPhase("leaderboard");
+      } else {
+        setPhase("instructions");
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
+      setPhase("error");
+    }
+  };
+
+  // ── Test start karo (join-flow ya khud ka test) ──
+  const startChallengeTest = () => {
+    setAnswers({});
+    setTimeSpent({});
+    setActiveSubjectIdx(0);
+    setActiveQIdx(0);
+    submittingRef.current = false;
+
+    const firstQ = challengeMeta.subjects[0].questions[0];
+    currentQIdRef.current = firstQ._id;
+    questionStartRef.current = Date.now();
+
+    const totalSeconds = challengeMeta.durationMinutes * 60;
+    setEndTimestamp(Date.now() + totalSeconds * 1000);
+    setRemainingSeconds(totalSeconds);
+    setPhase("test");
+  };
+
+  const flushTime = () => {
+    const qId = currentQIdRef.current;
+    if (!qId) return;
+    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+    if (elapsed > 0) {
+      setTimeSpent((prev) => ({ ...prev, [qId]: (prev[qId] || 0) + elapsed }));
+    }
+    questionStartRef.current = Date.now();
+  };
+
+  const goToQuestion = (subjIdx, qIdx) => {
+    flushTime();
+    const q = challengeMeta.subjects[subjIdx].questions[qIdx];
+    currentQIdRef.current = q ? q._id : null;
+    setActiveSubjectIdx(subjIdx);
+    setActiveQIdx(qIdx);
+  };
+
+  const currentSubject = challengeMeta ? challengeMeta.subjects[activeSubjectIdx] : null;
+  const currentQuestion = currentSubject ? currentSubject.questions[activeQIdx] : null;
+
+  const selectAnswer = (n) => {
+    if (!currentQuestion) return;
+    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
+  };
+
+  const goNext = () => {
+    const subj = challengeMeta.subjects[activeSubjectIdx];
+    if (activeQIdx < subj.questions.length - 1) {
+      goToQuestion(activeSubjectIdx, activeQIdx + 1);
+    } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
+      goToQuestion(activeSubjectIdx + 1, 0);
+    }
+  };
+
+  const goPrev = () => {
+    if (activeQIdx > 0) {
+      goToQuestion(activeSubjectIdx, activeQIdx - 1);
+    } else if (activeSubjectIdx > 0) {
+      const prevSubj = challengeMeta.subjects[activeSubjectIdx - 1];
+      goToQuestion(activeSubjectIdx - 1, prevSubj.questions.length - 1);
+    }
+  };
+
+  const loadLeaderboard = async (challengeCode) => {
+    const cc = challengeCode || effectiveCode;
+    if (!cc) return;
+    try {
+      const res = await api.get(`/challenge/${cc}/leaderboard`);
+      setLeaderboard(res.data.data);
+    } catch (err) {
+      // silently fail — leaderboard optional hai result ke saath
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!challengeMeta || submittingRef.current || !effectiveCode) return;
+    submittingRef.current = true;
+    flushTime();
+    setPhase("submitting");
+    try {
+      const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
+        subj.questions.map((q) => ({
+          questionId: q._id,
+          userAnswer: answers[q._id] || null,
+          timeTakenInSeconds: timeSpent[q._id] || 0,
+        }))
+      );
+
+      const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
+      setResultData(res.data.data);
+      await loadLeaderboard(effectiveCode);
+      setPhase("result");
+    } catch (err) {
+      // Agar already-attempted error aaye, seedha leaderboard dikha do
+      if (err.response?.status === 409) {
+        await loadLeaderboard(effectiveCode);
+        setPhase("leaderboard");
+      } else {
+        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setPhase("error");
+      }
+    }
+  };
+
+  // ── Countdown timer ──
+  useEffect(() => {
+    if (phase !== "test") return;
+    if (remainingSeconds <= 0) {
+      const t = setTimeout(() => handleSubmit(), 0);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      if (endTimestamp) {
+        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
+      } else {
+        setRemainingSeconds((s) => Math.max(0, s - 1));
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, remainingSeconds, endTimestamp]);
+
+  const copyLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ────────────────────────────── RENDER ──────────────────────────────
+
+  if (phase === "loading-create") return <CreateFlowSkeleton />;
+  if (phase === "loading-join") return <JoinFlowSkeleton />;
+  if (phase === "submitting") return <SubmittingSkeleton />;
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Challenge ban gaya — link share karo + khud test bhi de sakte ho ──
+  if (phase === "created" && createdChallenge) {
+    const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
+            🎉
+          </div>
+          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
+          </p>
+
+          <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
+            {shareLink}
+          </div>
+
+          <button
+            onClick={copyLink}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+          >
+            {copied ? "Link Copy Ho Gaya ✓" : "Link Copy Karein"}
+          </button>
+          <button
+            onClick={startOwnTest}
+            className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
+          >
+            Khud Mock Test Do
+          </button>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── JOIN FLOW: Instructions dikhao ──
+  if (phase === "instructions" && challengeMeta) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
+          <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.totalQuestions}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Questions</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.durationMinutes} min</p>
+              <p className="text-[11px] text-gray-500 mt-1">Duration</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">+{challengeMeta.marksPerQuestion}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Marks/Q</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-400 mb-8">
+            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
+          </p>
+
+          <button
+            onClick={startChallengeTest}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+          >
+            Challenge Accept Karo — Test Shuru Karo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── TEST SCREEN ──
+  if (phase === "test" && challengeMeta && currentQuestion) {
+    const subject = challengeMeta.subjects[activeSubjectIdx];
+    const selected = answers[currentQuestion._id];
+    const timeLow = remainingSeconds <= 60;
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-800 sticky top-0 bg-[#0A0D14] z-10">
+          <span className="font-semibold text-sm sm:text-base">{challengeMeta.blueprintName}</span>
+          <span
+            className={`text-sm font-mono px-3 py-1 rounded-lg border ${
+              timeLow ? "border-red-500 text-red-400 bg-red-500/10" : "border-gray-700 text-gray-200 bg-[#111827]"
+            }`}
+          >
+            {formatTime(remainingSeconds)}
+          </span>
+        </div>
+
+        <div className="flex gap-2 px-4 sm:px-6 py-3 overflow-x-auto border-b border-gray-800">
+          {challengeMeta.subjects.map((s, i) => (
+            <button
+              key={s.subjectName}
+              onClick={() => goToQuestion(i, 0)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
+                i === activeSubjectIdx ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
+              }`}
+            >
+              {s.subjectName}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 px-4 sm:px-6 py-6">
+          <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-6">
+            <p className="text-xs text-gray-500 mb-3">
+              Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
+            </p>
+            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+
+            <div className="space-y-3 mb-8">
+              {[1, 2, 3, 4].map((n) => {
+                const optText = currentQuestion[`option${n}`];
+                const isSelected = selected === String(n);
+                return (
+                  <button
+                    key={n}
+                    onClick={() => selectAnswer(n)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 ${
+                      isSelected
+                        ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white"
+                        : "border-gray-800 bg-[#1F2937] text-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
+                        isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
+                      }`}
+                    >
+                      {n}
+                    </span>
+                    <span>{optText}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button onClick={goPrev} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Previous
+              </button>
+              <button onClick={goNext} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Next
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+              >
+                Submit Karo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── RESULT SCREEN — score + rank ──
+  if (phase === "result" && resultData) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
+          <p className="text-gray-400 text-sm mb-8">Dekho tum kahan khade ho</p>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
+            <p className="text-sm text-gray-500 mt-1">Total Score</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-8">
+            <p className="text-3xl font-bold">#{resultData.currentRank}</p>
+            <p className="text-sm text-white/80 mt-1">
+              {resultData.totalParticipants} logo mein se aapki rank
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
+              <p className="text-[11px] text-gray-500">Correct</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
+              <p className="text-[11px] text-gray-500">Wrong</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
+              <p className="text-[11px] text-gray-500">Unattempted</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setPhase("leaderboard")}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+          >
+            Poora Leaderboard Dekho
+          </button>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── LEADERBOARD SCREEN ──
+  if (phase === "leaderboard") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
+          </p>
+
+          {!leaderboard || leaderboard.leaderboard.length === 0 ? (
+            <p className="text-gray-400 text-sm">Abhi tak koi attempt nahi hua.</p>
+          ) : (
+            <div className="space-y-3">
+              {leaderboard.leaderboard.map((entry) => (
+                <div
+                  key={entry.userId}
+                  className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
+                    entry.userName === userName
+                      ? "border-[#7C3AED] bg-[#7C3AED]/10"
+                      : "border-gray-800 bg-[#111827]"
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <span
+                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                        entry.rank === 1
+                          ? "bg-yellow-500/20 text-yellow-400"
+                          : entry.rank === 2
+                          ? "bg-gray-400/20 text-gray-300"
+                          : entry.rank === 3
+                          ? "bg-orange-500/20 text-orange-400"
+                          : "bg-gray-800 text-gray-500"
+                      }`}
+                    >
+                      {entry.rank}
+                    </span>
+                    <span className="font-medium">{entry.userName}</span>
+                  </div>
+                  <span className="font-bold text-[#A78BFA]">{entry.totalScore}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default Challenge;
+</file>
+
 <file path="backend/controllers/addUser.js">
 // controllers/addUser.js
 import User from "../models/User.js";
@@ -4743,6 +4888,112 @@ export const loginUser = async (req, res) => {
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
 };
+</file>
+
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+
+// 👇 NAYA: Peer-Challenge feature ke controllers
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
+router.post("/create-challenge", userInfo, createChallenge);
+
+// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+// 3. User ke saare mocks ki list
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+
+// 4. Page 1 — Overview (average score, lifetime graph, subject list)
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+
+// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+
+// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+
+// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
+// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
+// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
+// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+
+export default router;
 </file>
 
 <file path="frontend/src/pages/Login.jsx">
@@ -7582,58 +7833,6 @@ const QuestionDetailCard = ({ q }) => {
 export default UserAllAnalysis;
 </file>
 
-<file path="frontend/src/App.jsx">
-// App.jsx
-import { HashRouter, Routes, Route } from 'react-router-dom'; 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import MockTest from './pages/MockTest';
-import UserAllAnalysis from './pages/UserAllAnalysis';
-import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
-import UserTopicAnalysis from './pages/UserTopicAnalysis';
-import Login from './pages/Login';
-import Singup from './pages/Singup';
-import HomePage from './pages/HomePage';
-import ProfilePage from './pages/ProfilePage';
-import Challenge from './pages/Challenge';
-
-// Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30 * 1000, // 1 min tak data "fresh" maana jayega, dobara fetch nahi hoga
-      retry: 1,
-    },
-  },
-});
-
-const App = () => { 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <div>
-          <Routes>
-            <Route path="/" element={<HomePage/>} />
-            <Route path="/MockTest" element={<MockTest/>} />
-            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
-            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
-            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
-            <Route path="/Login" element={<Login/>} />
-            <Route path="/Singup" element={<Singup/>} />
-            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
-            <Route path="/HomePage" element={<HomePage/>} />
-            <Route path="/ProfilePage" element={<ProfilePage/>} />
-            <Route path="/Challenge" element={<Challenge/>} />
-            <Route path="/Challenge/:code" element={<Challenge/>} />
-          </Routes>
-        </div>
-      </HashRouter>
-    </QueryClientProvider>
-  )
-}
-
-export default App;
-</file>
-
 <file path="frontend/src/pages/HomePage.jsx">
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -7874,6 +8073,802 @@ const HomePage = () => {
 };
 
 export default HomePage;
+</file>
+
+<file path="frontend/src/App.jsx">
+// App.jsx
+import { HashRouter, Routes, Route } from 'react-router-dom'; 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MockTest from './pages/MockTest';
+import UserAllAnalysis from './pages/UserAllAnalysis';
+import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
+import UserTopicAnalysis from './pages/UserTopicAnalysis';
+import Login from './pages/Login';
+import Singup from './pages/Singup';
+import HomePage from './pages/HomePage';
+import ProfilePage from './pages/ProfilePage';
+import Challenge from './pages/Challenge';
+import ChallengeReview from './pages/ChallengeReview';
+
+// Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000, // 1 min tak data "fresh" maana jayega, dobara fetch nahi hoga
+      retry: 1,
+    },
+  },
+});
+
+const App = () => { 
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <div>
+          <Routes>
+            <Route path="/" element={<HomePage/>} />
+            <Route path="/MockTest" element={<MockTest/>} />
+            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
+            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
+            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
+            <Route path="/Login" element={<Login/>} />
+            <Route path="/Singup" element={<Singup/>} />
+            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
+            <Route path="/HomePage" element={<HomePage/>} />
+            <Route path="/ProfilePage" element={<ProfilePage/>} />
+            <Route path="/Challenge" element={<Challenge/>} />
+            <Route path="/Challenge/:code" element={<Challenge/>} />
+            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
+          </Routes>
+        </div>
+      </HashRouter>
+    </QueryClientProvider>
+  )
+}
+
+export default App;
+</file>
+
+<file path="frontend/src/pages/Challenge.jsx">
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "../api/api";
+
+const formatTime = (totalSeconds) => {
+  const safe = Math.max(0, Math.floor(totalSeconds || 0));
+  const m = Math.floor(safe / 60);
+  const s = safe % 60;
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${pad(m)}:${pad(s)}`;
+};
+
+// localStorage key — har user ka apna alag saved "created challenge"
+const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
+
+// ──────────────────────────────────────────────
+// Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const CreateFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+    <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+      <SkeletonBlock className="w-16 h-16 rounded-full mx-auto mb-4" />
+      <SkeletonBlock className="w-48 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-56 h-4 mx-auto mb-6" />
+      <SkeletonBlock className="w-full h-14 rounded-lg mb-4" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+const JoinFlowSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+      <SkeletonBlock className="w-64 h-6 mb-3" />
+      <SkeletonBlock className="w-48 h-4 mb-6" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4">
+            <SkeletonBlock className="w-10 h-6 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-4 mb-2" />
+      <SkeletonBlock className="w-3/4 h-4 mb-8" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+const SubmittingSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-xl mx-auto text-center">
+      <SkeletonBlock className="w-56 h-6 mx-auto mb-3" />
+      <SkeletonBlock className="w-40 h-4 mx-auto mb-8" />
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+        <SkeletonBlock className="w-24 h-10 mx-auto mb-2" />
+        <SkeletonBlock className="w-20 h-3 mx-auto" />
+      </div>
+      <SkeletonBlock className="w-full h-20 rounded-2xl mb-8" />
+      <div className="grid grid-cols-3 gap-4 mb-8">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="h-16 rounded-xl" />
+        ))}
+      </div>
+      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
+      <SkeletonBlock className="w-full h-12 rounded-lg" />
+    </div>
+  </div>
+);
+
+// ──────────────────────────────────────────────
+// Reusable Leaderboard list component
+// ──────────────────────────────────────────────
+const LeaderboardList = ({ leaderboard, currentUserName }) => {
+  if (!leaderboard || leaderboard.leaderboard.length === 0) {
+    return (
+      <p className="text-gray-400 text-sm text-center py-6">
+        Abhi tak koi attempt nahi hua.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {leaderboard.leaderboard.map((entry) => {
+        const isMe = entry.userName === currentUserName;
+        return (
+          <div
+            key={entry.userId}
+            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+              isMe
+                ? "border-[#7C3AED] bg-[#7C3AED]/10"
+                : "border-gray-800 bg-[#1F2937]/60"
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span
+                className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                  entry.rank === 1
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : entry.rank === 2
+                    ? "bg-gray-400/20 text-gray-300"
+                    : entry.rank === 3
+                    ? "bg-orange-500/20 text-orange-400"
+                    : "bg-gray-800 text-gray-500"
+                }`}
+              >
+                {entry.rank}
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                </p>
+              </div>
+            </div>
+            <span className="font-bold text-[#A78BFA] flex-shrink-0 ml-2">{entry.totalScore}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const Challenge = () => {
+  const navigate = useNavigate();
+  const { code: codeParam } = useParams();
+
+  const [phase, setPhase] = useState(codeParam ? "loading-join" : "loading-create");
+  const [errorMsg, setErrorMsg] = useState("");
+  const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
+  const [userExam, setUserExam] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const [createdChallenge, setCreatedChallenge] = useState(null);
+
+  const [challengeMeta, setChallengeMeta] = useState(null);
+  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
+  const [activeQIdx, setActiveQIdx] = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [timeSpent, setTimeSpent] = useState({});
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [endTimestamp, setEndTimestamp] = useState(null);
+  const [resultData, setResultData] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+
+  const questionStartRef = useRef(Date.now());
+  const currentQIdRef = useRef(null);
+  const submittingRef = useRef(false);
+
+  const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
+
+  const isOwnChallenge = !codeParam && !!createdChallenge;
+
+  const generateNewChallenge = async (exam, uid) => {
+    const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
+    const list = bpRes.data.data || [];
+    if (list.length === 0) {
+      throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
+    }
+    const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
+
+    const createRes = await api.post("/create-challenge", {
+      examName: exam,
+      blueprintName: chosenBlueprint.blueprintName,
+    });
+    const created = createRes.data.data;
+    setCreatedChallenge(created);
+    localStorage.setItem(getChallengeStorageKey(uid), JSON.stringify(created));
+    return created;
+  };
+
+  const handleCreateNewChallenge = async () => {
+    setPhase("loading-create");
+    try {
+      localStorage.removeItem(getChallengeStorageKey(userId));
+      await generateNewChallenge(userExam, userId);
+      setPhase("created");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || err.message || "Naya challenge nahi ban paaya.");
+      setPhase("error");
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      setPhase(codeParam ? "loading-join" : "loading-create");
+      try {
+        const meRes = await api.get("/me");
+        if (cancelled) return;
+        const user = meRes.data.data;
+        setUserName(user.name);
+        setUserId(user._id);
+        setUserExam(user.exam);
+
+        if (codeParam) {
+          const chRes = await api.get(`/challenge/${codeParam}`);
+          if (cancelled) return;
+          const data = chRes.data.data;
+          setChallengeMeta(data);
+
+          if (data.alreadyAttempted) {
+            await loadLeaderboard(codeParam);
+            setPhase("leaderboard");
+          } else {
+            setPhase("instructions");
+          }
+          return;
+        }
+
+        const storageKey = getChallengeStorageKey(user._id);
+        const savedRaw = localStorage.getItem(storageKey);
+        if (savedRaw) {
+          try {
+            const saved = JSON.parse(savedRaw);
+            const notExpired = saved?.expiresAt && new Date(saved.expiresAt) > new Date();
+            const sameExam = saved?.examName === user.exam;
+
+            if (saved?.challengeCode && notExpired && sameExam) {
+              const checkRes = await api.get(`/challenge/${saved.challengeCode}`);
+              if (cancelled) return;
+
+              if (checkRes.data.data.alreadyAttempted) {
+                localStorage.removeItem(storageKey);
+              } else {
+                setCreatedChallenge(saved);
+                setPhase("created");
+                return;
+              }
+            } else {
+              localStorage.removeItem(storageKey);
+            }
+          } catch {
+            localStorage.removeItem(storageKey);
+          }
+        }
+
+        await generateNewChallenge(user.exam, user._id);
+        setPhase("created");
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err.response?.data?.message || err.message);
+          setPhase("error");
+        }
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [codeParam]);
+
+  const startOwnTest = async () => {
+    if (!createdChallenge) return;
+    setPhase("loading-join");
+    try {
+      const chRes = await api.get(`/challenge/${createdChallenge.challengeCode}`);
+      const data = chRes.data.data;
+      setChallengeMeta(data);
+
+      if (data.alreadyAttempted) {
+        await loadLeaderboard(createdChallenge.challengeCode);
+        setPhase("leaderboard");
+      } else {
+        setPhase("instructions");
+      }
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
+      setPhase("error");
+    }
+  };
+
+  const startChallengeTest = () => {
+    setAnswers({});
+    setTimeSpent({});
+    setActiveSubjectIdx(0);
+    setActiveQIdx(0);
+    submittingRef.current = false;
+
+    const firstQ = challengeMeta.subjects[0].questions[0];
+    currentQIdRef.current = firstQ._id;
+    questionStartRef.current = Date.now();
+
+    const totalSeconds = challengeMeta.durationMinutes * 60;
+    setEndTimestamp(Date.now() + totalSeconds * 1000);
+    setRemainingSeconds(totalSeconds);
+    setPhase("test");
+  };
+
+  const flushTime = () => {
+    const qId = currentQIdRef.current;
+    if (!qId) return;
+    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+    if (elapsed > 0) {
+      setTimeSpent((prev) => ({ ...prev, [qId]: (prev[qId] || 0) + elapsed }));
+    }
+    questionStartRef.current = Date.now();
+  };
+
+  const goToQuestion = (subjIdx, qIdx) => {
+    flushTime();
+    const q = challengeMeta.subjects[subjIdx].questions[qIdx];
+    currentQIdRef.current = q ? q._id : null;
+    setActiveSubjectIdx(subjIdx);
+    setActiveQIdx(qIdx);
+  };
+
+  const currentSubject = challengeMeta ? challengeMeta.subjects[activeSubjectIdx] : null;
+  const currentQuestion = currentSubject ? currentSubject.questions[activeQIdx] : null;
+
+  const selectAnswer = (n) => {
+    if (!currentQuestion) return;
+    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
+  };
+
+  const goNext = () => {
+    const subj = challengeMeta.subjects[activeSubjectIdx];
+    if (activeQIdx < subj.questions.length - 1) {
+      goToQuestion(activeSubjectIdx, activeQIdx + 1);
+    } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
+      goToQuestion(activeSubjectIdx + 1, 0);
+    }
+  };
+
+  const goPrev = () => {
+    if (activeQIdx > 0) {
+      goToQuestion(activeSubjectIdx, activeQIdx - 1);
+    } else if (activeSubjectIdx > 0) {
+      const prevSubj = challengeMeta.subjects[activeSubjectIdx - 1];
+      goToQuestion(activeSubjectIdx - 1, prevSubj.questions.length - 1);
+    }
+  };
+
+  const loadLeaderboard = async (challengeCode) => {
+    const cc = challengeCode || effectiveCode;
+    if (!cc) return;
+    try {
+      const res = await api.get(`/challenge/${cc}/leaderboard`);
+      setLeaderboard(res.data.data);
+    } catch (err) {
+      // silently fail
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!challengeMeta || submittingRef.current || !effectiveCode) return;
+    submittingRef.current = true;
+    flushTime();
+    setPhase("submitting");
+    try {
+      const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
+        subj.questions.map((q) => ({
+          questionId: q._id,
+          userAnswer: answers[q._id] || null,
+          timeTakenInSeconds: timeSpent[q._id] || 0,
+        }))
+      );
+
+      const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
+      setResultData(res.data.data);
+
+      if (isOwnChallenge) {
+        localStorage.removeItem(getChallengeStorageKey(userId));
+      }
+
+      await loadLeaderboard(effectiveCode);
+      setPhase("result");
+    } catch (err) {
+      if (err.response?.status === 409) {
+        if (isOwnChallenge) {
+          localStorage.removeItem(getChallengeStorageKey(userId));
+        }
+        await loadLeaderboard(effectiveCode);
+        setPhase("leaderboard");
+      } else {
+        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setPhase("error");
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (phase !== "test") return;
+    if (remainingSeconds <= 0) {
+      const t = setTimeout(() => handleSubmit(), 0);
+      return () => clearTimeout(t);
+    }
+    const t = setTimeout(() => {
+      if (endTimestamp) {
+        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
+      } else {
+        setRemainingSeconds((s) => Math.max(0, s - 1));
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, remainingSeconds, endTimestamp]);
+
+  const copyLink = () => {
+    const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  // ────────────────────────────── RENDER ──────────────────────────────
+
+  if (phase === "loading-create") return <CreateFlowSkeleton />;
+  if (phase === "loading-join") return <JoinFlowSkeleton />;
+  if (phase === "submitting") return <SubmittingSkeleton />;
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "created" && createdChallenge) {
+    const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
+          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
+            🎉
+          </div>
+          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
+          <p className="text-gray-400 text-sm mb-6">
+            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
+          </p>
+
+          <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
+            {shareLink}
+          </div>
+
+          <button
+            onClick={copyLink}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+          >
+            {copied ? "Link Copy Ho Gaya ✓" : "Link Copy Karein"}
+          </button>
+          <button
+            onClick={startOwnTest}
+            className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
+          >
+            Khud Mock Test Do
+          </button>
+          <button
+            onClick={handleCreateNewChallenge}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 font-medium mb-3"
+          >
+            Ek Naya Challenge Banao
+          </button>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "instructions" && challengeMeta) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
+          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
+          <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.totalQuestions}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Questions</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">{challengeMeta.durationMinutes} min</p>
+              <p className="text-[11px] text-gray-500 mt-1">Duration</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-xl font-bold">+{challengeMeta.marksPerQuestion}</p>
+              <p className="text-[11px] text-gray-500 mt-1">Marks/Q</p>
+            </div>
+          </div>
+
+          <p className="text-sm text-gray-400 mb-8">
+            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
+          </p>
+
+          <button
+            onClick={startChallengeTest}
+            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+          >
+            Challenge Accept Karo — Test Shuru Karo
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "test" && challengeMeta && currentQuestion) {
+    const subject = challengeMeta.subjects[activeSubjectIdx];
+    const selected = answers[currentQuestion._id];
+    const timeLow = remainingSeconds <= 60;
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-800 sticky top-0 bg-[#0A0D14] z-10">
+          <span className="font-semibold text-sm sm:text-base">{challengeMeta.blueprintName}</span>
+          <span
+            className={`text-sm font-mono px-3 py-1 rounded-lg border ${
+              timeLow ? "border-red-500 text-red-400 bg-red-500/10" : "border-gray-700 text-gray-200 bg-[#111827]"
+            }`}
+          >
+            {formatTime(remainingSeconds)}
+          </span>
+        </div>
+
+        <div className="flex gap-2 px-4 sm:px-6 py-3 overflow-x-auto border-b border-gray-800">
+          {challengeMeta.subjects.map((s, i) => (
+            <button
+              key={s.subjectName}
+              onClick={() => goToQuestion(i, 0)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
+                i === activeSubjectIdx ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
+              }`}
+            >
+              {s.subjectName}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex-1 px-4 sm:px-6 py-6">
+          <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-6">
+            <p className="text-xs text-gray-500 mb-3">
+              Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
+            </p>
+            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+
+            <div className="space-y-3 mb-8">
+              {[1, 2, 3, 4].map((n) => {
+                const optText = currentQuestion[`option${n}`];
+                const isSelected = selected === String(n);
+                return (
+                  <button
+                    key={n}
+                    onClick={() => selectAnswer(n)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 ${
+                      isSelected
+                        ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white"
+                        : "border-gray-800 bg-[#1F2937] text-gray-300"
+                    }`}
+                  >
+                    <span
+                      className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
+                        isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
+                      }`}
+                    >
+                      {n}
+                    </span>
+                    <span>{optText}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button onClick={goPrev} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Previous
+              </button>
+              <button onClick={goNext} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+                Next
+              </button>
+              <button
+                onClick={handleSubmit}
+                className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+              >
+                Submit Karo
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // RESULT SCREEN — submit karne ke turant baad ye dikhta hai.
+  // 👇 FIX: "Detailed Analysis Dekho" button yahan add kiya —
+  // pehle ye sirf "leaderboard" phase mein tha, jo submit ke
+  // baad kabhi trigger hi nahi hota tha.
+  // ─────────────────────────────────────────────
+  if (phase === "result" && resultData) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
+            <p className="text-gray-400 text-sm">Dekho tum kahan khade ho</p>
+          </div>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-4">
+            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
+            <p className="text-sm text-gray-500 mt-1">Total Score</p>
+          </div>
+
+          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-6 text-center">
+            <p className="text-3xl font-bold">#{resultData.currentRank}</p>
+            <p className="text-sm text-white/80 mt-1">
+              {resultData.totalParticipants} logo mein se aapki rank
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-10">
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
+              <p className="text-[11px] text-gray-500">Correct</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
+              <p className="text-[11px] text-gray-500">Wrong</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
+              <p className="text-[11px] text-gray-500">Unattempted</p>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                Leaderboard <span>🏆</span>
+              </h3>
+              <span className="text-xs text-gray-500">
+                {leaderboard?.totalParticipants || 0} participants
+              </span>
+            </div>
+            <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+          </div>
+
+          <div className="space-y-3">
+            {/* 👇 FIX: Ye button ab yahan hai — submit ke baad turant dikhega */}
+            <button
+              onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
+              className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
+            >
+              Detailed Analysis Dekho
+            </button>
+
+            {isOwnChallenge && (
+              <button
+                onClick={handleCreateNewChallenge}
+                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              >
+                Ek Naya Challenge Banao
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─────────────────────────────────────────────
+  // STANDALONE LEADERBOARD SCREEN — ye tab dikhta hai jab user
+  // direct link khol ke aaya ho aur pehle se attempt kar chuka ho
+  // ─────────────────────────────────────────────
+  if (phase === "leaderboard") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <div className="mb-8">
+            <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+            <p className="text-gray-400 text-sm">
+              {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
+            </p>
+          </div>
+
+          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+
+          {/* 👇 FIX: "..." ki jagah asli Tailwind classes lagayi */}
+          <div className="space-y-3 mt-8">
+            <button
+              onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
+              className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
+            >
+              Detailed Analysis Dekho
+            </button>
+
+            {isOwnChallenge && (
+              <button
+                onClick={handleCreateNewChallenge}
+                className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
+              >
+                Ek Naya Challenge Banao
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default Challenge;
 </file>
 
 </files>

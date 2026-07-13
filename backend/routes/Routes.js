@@ -2,7 +2,7 @@
 import express from "express";
 
 // ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
+import Blueprint from "../models/bluePrint.js";
 
 // ── Controllers ──────────────────────────────
 import { addQuestion }    from "../controllers/addQuestion.js";
@@ -16,15 +16,18 @@ import { allExamName } from "../controllers/allExamName.js";
 import { getChallenge } from "../controllers/getChallenge.js";
 import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
 
-
-// 👇 NAYA: Peer-Challenge feature ke controllers
 import { createChallenge } from "../controllers/createChallenge.js";
 import { submitChallenge } from "../controllers/submitChallenge.js";
 import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
 
+// 👇 NAYA: Question Bank Review (admin-only) ke controllers
+import { getQuestionMeta } from "../controllers/getQuestionMeta.js";
+import { getQuestionList } from "../controllers/getQuestionList.js";
+
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
+import { isAdmin } from "../middlewares/isAdmin.js"; // 👈 NAYA
 
 // ── Analysis functions ────────────────────────
 import {
@@ -48,22 +51,24 @@ router.post("/generate-mock",  userInfo, addMocktest);
 router.post("/user-Login",   loginUser);
 router.post("/user-update",  userInfo, updateUserInfo);
 
-// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
 router.post("/create-challenge", userInfo, createChallenge);
-
-// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
 router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
 // ─────────────────────────────────────────────
 
-// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
 router.get("/me", userInfo, (req, res) => {
     res.status(200).json({ success: true, data: req.user });
 });
 
-// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
+// 👇 NAYA: Frontend ko batata hai current user admin hai ya nahi —
+// isse HomePage pe "Question Review" button sirf admin ko dikhega
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
 router.get("/blueprints/:examName", userInfo, async (req, res) => {
     try {
         const { examName } = req.params;
@@ -75,29 +80,21 @@ router.get("/blueprints/:examName", userInfo, async (req, res) => {
     }
 });
 
-// 3. User ke saare mocks ki list
 router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-
-// 4. Page 1 — Overview (average score, lifetime graph, subject list)
 router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-
-// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
 router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-
-// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
 router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-
-// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
 router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
 
 router.get("/allExamName", allExamName);
 
-// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
-// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
-// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
-// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
 router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
 router.get("/challenge/:challengeCode", userInfo, getChallenge);
 router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+
+// 👇 NAYA: Question Bank Review routes — dono admin-only hain (userInfo + isAdmin)
+// kyunki inmein correctOption bhi hota hai, jo normal students ko nahi dikhna chahiye
+router.get("/questions/meta/:examName", userInfo, isAdmin, getQuestionMeta);
+router.get("/questions/list/:examName/:subjectName/:topicName", userInfo, isAdmin, getQuestionList);
 
 export default router;

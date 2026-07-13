@@ -10,6 +10,72 @@ const STATUS_FILTERS = [
   { key: "unattempted", label: "Unattempted" },
 ];
 
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ChallengeReviewSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+    <div className="max-w-3xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+
+      <SkeletonBlock className="w-48 h-7 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-6" />
+
+      {/* Overview stats skeleton */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <SkeletonBlock className="w-8 h-5 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Subject filter pills skeleton */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      {/* Status filter pills skeleton */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      <SkeletonBlock className="w-44 h-3 mb-3" />
+
+      {/* Question detail card skeleton */}
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <SkeletonBlock className="w-20 h-3" />
+          <SkeletonBlock className="w-16 h-5 rounded-full" />
+        </div>
+        <SkeletonBlock className="w-full h-5 mb-2" />
+        <SkeletonBlock className="w-3/4 h-5 mb-6" />
+        <div className="space-y-2.5 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
+          ))}
+        </div>
+        <SkeletonBlock className="w-full h-20 rounded-lg" />
+      </div>
+
+      {/* Prev/Next skeleton */}
+      <div className="flex justify-between items-center mt-6">
+        <SkeletonBlock className="w-28 h-10 rounded-lg" />
+        <SkeletonBlock className="w-24 h-10 rounded-lg" />
+      </div>
+    </div>
+  </div>
+);
+
 // ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =
@@ -131,14 +197,7 @@ const ChallengeReview = () => {
   }, [allQuestions, subjectFilter]);
 
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Analysis load ho raha hai...</p>
-        </div>
-      </div>
-    );
+    return <ChallengeReviewSkeleton />;
   }
 
   if (isError) {

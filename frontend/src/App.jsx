@@ -11,12 +11,12 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
+import QuestionBankReview from './pages/QuestionBankReview'; // 👈 NAYA
 
-// Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000, // 1 min tak data "fresh" maana jayega, dobara fetch nahi hoga
+      staleTime: 30 * 1000,
       retry: 1,
     },
   },
@@ -41,6 +41,7 @@ const App = () => {
             <Route path="/Challenge" element={<Challenge/>} />
             <Route path="/Challenge/:code" element={<Challenge/>} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
+            <Route path="/QuestionBankReview" element={<QuestionBankReview/>} /> {/* 👈 NAYA */}
           </Routes>
         </div>
       </HashRouter>
