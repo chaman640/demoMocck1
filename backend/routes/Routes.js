@@ -19,15 +19,11 @@ import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDet
 import { createChallenge } from "../controllers/createChallenge.js";
 import { submitChallenge } from "../controllers/submitChallenge.js";
 import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-
-// 👇 NAYA: Question Bank Review (admin-only) ke controllers
-import { getQuestionMeta } from "../controllers/getQuestionMeta.js";
-import { getQuestionList } from "../controllers/getQuestionList.js";
+import { getMyChallenges } from "../controllers/getMyChallenges.js";
 
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
-import { isAdmin } from "../middlewares/isAdmin.js"; // 👈 NAYA
 
 // ── Analysis functions ────────────────────────
 import {
@@ -91,10 +87,6 @@ router.get("/allExamName", allExamName);
 router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
 router.get("/challenge/:challengeCode", userInfo, getChallenge);
 router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-
-// 👇 NAYA: Question Bank Review routes — dono admin-only hain (userInfo + isAdmin)
-// kyunki inmein correctOption bhi hota hai, jo normal students ko nahi dikhna chahiye
-router.get("/questions/meta/:examName", userInfo, isAdmin, getQuestionMeta);
-router.get("/questions/list/:examName/:subjectName/:topicName", userInfo, isAdmin, getQuestionList);
+router.get("/my-challenges", userInfo, getMyChallenges);
 
 export default router;

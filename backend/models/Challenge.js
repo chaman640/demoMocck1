@@ -69,7 +69,10 @@ const challengeSchema = new mongoose.Schema(
         ],
       },
     ],
-
+     createdByName: {
+      type: String,
+      required: [true, "Challenge banane wale ka naam zaroori hai"],
+      },
     // Scoring rules bhi freeze kar rahe hain challenge ke waqt
     // (agar baad mein blueprint ke marks/negative marking badal jaye,
     // is challenge ke purane attempts ka scoring change nahi hona chahiye)

@@ -230,7 +230,11 @@ const ChallengeReview = () => {
 
         <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
         <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
-
+{/* 👇 NAYA: Total score card — data pehle se aa raha tha, UI mein nahi tha */}
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-6">
+          <p className="text-5xl font-bold text-[#A78BFA]">{data?.overview?.totalScore}</p>
+          <p className="text-sm text-gray-500 mt-1">Total Score</p>
+        </div>
         {/* Overview stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="bg-[#1F2937] rounded-xl p-4 text-center">
@@ -322,6 +326,13 @@ const ChallengeReview = () => {
                 Next &rarr;
               </button>
             </div>
+            {/* 👇 NAYA: Last button — home pe wapas */}
+        <button
+          onClick={() => navigate("/HomePage")}
+          className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500"
+        >
+          Home Jaayein
+        </button>
           </>
         )}
       </div>

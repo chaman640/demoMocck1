@@ -155,8 +155,9 @@ export const createChallenge = async (req, res) => {
     // STEP 5: Challenge document save karo
     // ─────────────────────────────────────────────
     const newChallenge = new Challenge({
-      createdBy: userId,
-      examName,
+  createdBy: userId,
+  createdByName: req.user.name,   // 👈 naya — extra query nahi lagi, req.user mein pehle se hai
+  examName,
       blueprintName,
       challengeCode,
       subjects: finalSubjects,

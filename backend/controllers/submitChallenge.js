@@ -141,9 +141,13 @@ export const submitChallenge = async (req, res) => {
     // STEP 6: ChallengeAttempt save karo
     // ─────────────────────────────────────────────
     const newAttempt = new ChallengeAttempt({
-      challengeId: challenge._id,
-      userId,
-      userName,
+  challengeId: challenge._id,
+  challengeCode: challenge.challengeCode,     // 👈 naya
+  examName: challenge.examName,               // 👈 naya
+  blueprintName: challenge.blueprintName,     // 👈 naya
+  createdByName: challenge.createdByName,     // 👈 naya
+  userId,
+  userName,
       attemptedQuestions: finalAttemptedQuestions,
       totalScore,
       correctCount,

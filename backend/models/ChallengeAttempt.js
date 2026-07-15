@@ -14,10 +14,11 @@ const challengeAttemptSchema = new mongoose.Schema(
 
     // Kisne attempt diya
     userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-    },
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  required: [true, "User ID zaroori hai"],
+  index: true,   // 👈 naya
+},
 
     // Leaderboard mein naam dikhane ke liye — har baar User collection
     // populate karne ki jagah yahin bhi save kar rahe hain (denormalized).
@@ -49,7 +50,10 @@ const challengeAttemptSchema = new mongoose.Schema(
         },
       },
     ],
-
+     challengeCode: { type: String, required: true },
+     examName: { type: String, required: true },
+     blueprintName: { type: String, required: true },
+     createdByName: { type: String, required: true },
     // Score summary — Performance.js jaisa hi pattern
     totalScore: { type: Number, default: 0 },
     correctCount: { type: Number, default: 0 },

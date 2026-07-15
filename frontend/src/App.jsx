@@ -11,7 +11,7 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
-import QuestionBankReview from './pages/QuestionBankReview'; // 👈 NAYA
+import MyChallenges from './pages/MyChallenges';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,7 +41,7 @@ const App = () => {
             <Route path="/Challenge" element={<Challenge/>} />
             <Route path="/Challenge/:code" element={<Challenge/>} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
-            <Route path="/QuestionBankReview" element={<QuestionBankReview/>} /> {/* 👈 NAYA */}
+            <Route path="/MyChallenges" element={<MyChallenges/>} />
           </Routes>
         </div>
       </HashRouter>

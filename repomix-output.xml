@@ -55,9 +55,12 @@ backend/
     getChallenge.js
     getChallengeAttemptDetail.js
     getChallengeLeaderboard.js
+    getQuestionList.js
+    getQuestionMeta.js
     submitChallenge.js
     updateSutf.js
   middlewares/
+    isAdmin.js
     processQuestion.js
     userInfo.js
   models/
@@ -96,6 +99,7 @@ frontend/
       Login.jsx
       MockTest.jsx
       ProfilePage.jsx
+      QuestionBankReview.jsx
       Singup.jsx
       UserAllAnalysis.jsx
       UserSubjectAnallysis.jsx
@@ -956,6 +960,103 @@ export const getChallengeLeaderboard = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/getQuestionList.js">
+// controllers/getQuestionList.js
+import { Question } from "../models/rowQuestionSchema.js";
+
+// Ek exam + subject (+ optional topic) ke saare questions — poora detail,
+// review karne ke liye (correctOption bhi shamil hai — isliye ye route admin-only hai)
+export const getQuestionList = async (req, res) => {
+  try {
+    const { examName, subjectName, topicName } = req.params;
+
+    if (!examName || !subjectName) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur subjectName zaroori hain!",
+      });
+    }
+
+    const filter = {
+      examName: { $in: [examName] },
+      subjectName,
+    };
+
+    // "all" ka matlab — topic se filter mat karo, poora subject dikhao
+    if (topicName && topicName !== "all") {
+      filter.topicName = topicName;
+    }
+
+    const questions = await Question.find(filter).sort({ topicName: 1, questionNumber: 1 });
+
+    return res.status(200).json({
+      success: true,
+      totalQuestions: questions.length,
+      data: questions,
+    });
+  } catch (error) {
+    console.error("getQuestionList error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Questions fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getQuestionMeta.js">
+// controllers/getQuestionMeta.js
+import { Question } from "../models/rowQuestionSchema.js";
+
+// Exam ke andar kaunse subjects hain, aur har subject mein kaunse topics —
+// Question Review page pe filter pills banane ke liye (ek hi call mein sab mil jaata hai)
+export const getQuestionMeta = async (req, res) => {
+  try {
+    const { examName } = req.params;
+
+    if (!examName) {
+      return res.status(400).json({ success: false, message: "examName zaroori hai!" });
+    }
+
+    const docs = await Question.find({ examName: { $in: [examName] } }).select(
+      "subjectName topicName"
+    );
+
+    if (docs.length === 0) {
+      return res.status(200).json({ success: true, data: { subjects: [] } });
+    }
+
+    const subjectMap = {};
+    for (const doc of docs) {
+      const subj = doc.subjectName;
+      if (!subjectMap[subj]) {
+        subjectMap[subj] = { topics: new Set(), count: 0 };
+      }
+      subjectMap[subj].topics.add(doc.topicName);
+      subjectMap[subj].count++;
+    }
+
+    const subjects = Object.keys(subjectMap)
+      .sort()
+      .map((subjectName) => ({
+        subjectName,
+        totalQuestions: subjectMap[subjectName].count,
+        topics: Array.from(subjectMap[subjectName].topics).sort(),
+      }));
+
+    return res.status(200).json({ success: true, data: { subjects } });
+  } catch (error) {
+    console.error("getQuestionMeta error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Question meta fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/submitChallenge.js">
 // controllers/submitChallenge.js
 import Challenge from "../models/Challenge.js";
@@ -1220,6 +1321,33 @@ export const updateUserInfo = async (req, res) => {
         console.error("Update Error:", error);
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
+};
+</file>
+
+<file path="backend/middlewares/isAdmin.js">
+// middlewares/isAdmin.js
+// Question Review jaise routes sirf admin (tumhare) ke liye hain —
+// warna koi bhi normal signed-up student correctOption dekh sakta tha
+// aur exam ka poora answer-key leak ho jaata!
+export const isAdmin = (req, res, next) => {
+  const adminEmail = process.env.ADMIN_EMAIL;
+
+  if (!adminEmail) {
+    console.error("ADMIN_EMAIL .env mein set nahi hai — admin routes block ho rahe hain.");
+    return res.status(500).json({
+      success: false,
+      message: "Admin access configure nahi hai. Server .env mein ADMIN_EMAIL set karein.",
+    });
+  }
+
+  if (!req.user || req.user.email !== adminEmail) {
+    return res.status(403).json({
+      success: false,
+      message: "Ye route sirf admin ke liye hai.",
+    });
+  }
+
+  next();
 };
 </file>
 
@@ -2368,157 +2496,237 @@ const AnalysisPage = () => {
 export default AnalysisPage
 </file>
 
-<file path="frontend/src/pages/ChallengeReview.jsx">
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+<file path="frontend/src/pages/ProfilePage.jsx">
+const ProfilePage = () => { 
+  return (
+    <h1 className="text-6xl font-bold underline text-red-500 bg-yellow-200 p-4">
+  profile
+</h1>
+  )
+}
+
+export default ProfilePage
+</file>
+
+<file path="frontend/src/pages/QuestionBankReview.jsx">
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 
-const STATUS_FILTERS = [
-  { key: "all", label: "All" },
-  { key: "correct", label: "Correct" },
-  { key: "wrong", label: "Wrong" },
-  { key: "unattempted", label: "Unattempted" },
-];
+// ──────────────────────────────────────────────
+// Skeleton building blocks — pehle se established pattern
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
 
-// ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
-const QuestionDetailCard = ({ q }) => {
-  const statusLabel =
-    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
-  const statusColor =
-    q.isCorrect === true
-      ? "text-green-400 bg-green-500/10 border-green-500/30"
-      : q.isCorrect === false
-      ? "text-red-400 bg-red-500/10 border-red-500/30"
-      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
-
-  return (
-    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <span className="text-xs text-gray-500">{q.topicName}</span>
-        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
-          {statusLabel}
-        </span>
+const PillsSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto">
+      <SkeletonBlock className="w-56 h-7 mb-2" />
+      <SkeletonBlock className="w-72 h-4 mb-8" />
+      <div className="flex flex-wrap gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-32 h-11 rounded-xl" />
+        ))}
       </div>
-
-      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
-
-      <div className="space-y-2.5 mb-6">
-        {[1, 2, 3, 4].map((n) => {
-          const optText = q.options?.[`option${n}`];
-          const isCorrectOpt = q.correctOption === n;
-          const isUserPick = q.userAnswer === String(n);
-
-          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
-          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
-          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
-
-          return (
-            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
-              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
-                {n}
-              </span>
-              <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
-              {isUserPick && !isCorrectOpt && (
-                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {q.userAnswer == null && (
-        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
-      )}
-
-      {q.timeTakenInSeconds != null && (
-        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
-      )}
-
-      {q.answerExplain && (
-        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
-          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
-            Explanation
-          </p>
-          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
-        </div>
-      )}
     </div>
-  );
-};
+  </div>
+);
 
-const ChallengeReview = () => {
-  const navigate = useNavigate();
-  const { code } = useParams();
-
-  const [subjectFilter, setSubjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [index, setIndex] = useState(0);
-
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["challenge-attempt-detail", code],
-    queryFn: async () => {
-      const res = await api.get(`/challenge/${code}/my-attempt`);
-      return res.data.data;
-    },
-    enabled: !!code,
-  });
-
-  const allQuestions = data?.questionBreakdown || [];
-
-  const subjects = useMemo(() => {
-    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
-    return Array.from(set);
-  }, [allQuestions]);
-
-  const filteredQuestions = useMemo(() => {
-    return allQuestions.filter((q) => {
-      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
-      let statusMatch = true;
-      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
-      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
-      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
-      return subjMatch && statusMatch;
-    });
-  }, [allQuestions, subjectFilter, statusFilter]);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [subjectFilter, statusFilter]);
-
-  const currentQ = filteredQuestions[index];
-
-  const counts = useMemo(() => {
-    const base = allQuestions.filter(
-      (q) => subjectFilter === "all" || q.subjectName === subjectFilter
-    );
-    return {
-      all: base.length,
-      correct: base.filter((q) => q.isCorrect === true).length,
-      wrong: base.filter((q) => q.isCorrect === false).length,
-      unattempted: base.filter((q) => q.isCorrect === null).length,
-    };
-  }, [allQuestions, subjectFilter]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Analysis load ho raha hai...</p>
+const QuestionBrowseSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+    <div className="max-w-3xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-44 h-3 mb-3" />
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <SkeletonBlock className="w-20 h-3" />
+          <SkeletonBlock className="w-16 h-5 rounded-full" />
         </div>
+        <SkeletonBlock className="w-full h-5 mb-2" />
+        <SkeletonBlock className="w-3/4 h-5 mb-6" />
+        <div className="space-y-2.5 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
+          ))}
+        </div>
+        <SkeletonBlock className="w-full h-20 rounded-lg" />
       </div>
-    );
-  }
+      <div className="flex justify-between items-center mt-6">
+        <SkeletonBlock className="w-28 h-10 rounded-lg" />
+        <SkeletonBlock className="w-24 h-10 rounded-lg" />
+      </div>
+    </div>
+  </div>
+);
 
-  if (isError) {
+// ── Ek question ka detail card — correct option green mein highlight ──
+// (userAnswer/wrong ka concept nahi hai yahan — sirf raw review hai)
+const QuestionCard = ({ q, index, total }) => (
+  <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+    <div className="flex items-center justify-between mb-4 gap-3">
+      <span className="text-xs text-gray-500">
+        {q.topicName} {q.questionNumber != null && <>&middot; #{q.questionNumber}</>}
+      </span>
+      <span className="text-xs px-2.5 py-1 rounded-full border border-gray-700 text-gray-400 font-medium">
+        {index + 1} / {total}
+      </span>
+    </div>
+
+    <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
+
+    <div className="space-y-2.5 mb-6">
+      {[1, 2, 3, 4].map((n) => {
+        const optText = q[`option${n}`];
+        const isCorrectOpt = q.correctOption === n;
+        const style = isCorrectOpt
+          ? "border-green-500/40 bg-green-500/10 text-green-300"
+          : "border-gray-800 bg-[#1F2937] text-gray-300";
+
+        return (
+          <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+            <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
+              {n}
+            </span>
+            <span className="flex-1">{optText}</span>
+            {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+          </div>
+        );
+      })}
+    </div>
+
+    {q.answerExplain && (
+      <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+        <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
+          Explanation
+        </p>
+        <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+      </div>
+    )}
+  </div>
+);
+
+const QuestionBankReview = () => {
+  const navigate = useNavigate();
+
+  // loading-exams | pick-exam | loading-meta | pick-subject | pick-topic |
+  // loading-questions | browsing | error | forbidden
+  const [phase, setPhase] = useState("loading-exams");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [examList, setExamList] = useState([]);
+  const [selectedExam, setSelectedExam] = useState(null);
+
+  const [subjectsMeta, setSubjectsMeta] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState(null);
+
+  const [questions, setQuestions] = useState([]);
+  const [index, setIndex] = useState(0);
+  const [breadcrumb, setBreadcrumb] = useState({ exam: "", subject: "", topic: "" });
+
+  const handleApiError = (err) => {
+    if (err.response?.status === 403) {
+      setPhase("forbidden");
+      return;
+    }
+    setErrorMsg(err.response?.data?.message || err.message || "Kuch galat ho gaya.");
+    setPhase("error");
+  };
+
+  // ── Step 1: Exam list load karo ──
+  useEffect(() => {
+    let cancelled = false;
+    const loadExams = async () => {
+      setPhase("loading-exams");
+      try {
+        const res = await api.get("/allExamName");
+        if (cancelled) return;
+        setExamList(res.data.data || []);
+        setPhase("pick-exam");
+      } catch (err) {
+        if (!cancelled) handleApiError(err);
+      }
+    };
+    loadExams();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Step 2: Exam select karne pe subject/topic meta lao ──
+  const pickExam = async (exam) => {
+    setSelectedExam(exam);
+    setPhase("loading-meta");
+    try {
+      const res = await api.get(`/questions/meta/${encodeURIComponent(exam)}`);
+      setSubjectsMeta(res.data.data.subjects || []);
+      setPhase("pick-subject");
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  // ── Step 3: Subject select karne pe topic list dikhao ──
+  const pickSubject = (subj) => {
+    setSelectedSubject(subj);
+    setPhase("pick-topic");
+  };
+
+  // ── Step 4: Topic (ya "All Topics") select karne pe questions lao ──
+  const pickTopic = async (topicName) => {
+    setPhase("loading-questions");
+    try {
+      const res = await api.get(
+        `/questions/list/${encodeURIComponent(selectedExam)}/${encodeURIComponent(
+          selectedSubject.subjectName
+        )}/${encodeURIComponent(topicName)}`
+      );
+      const list = res.data.data || [];
+      if (list.length === 0) {
+        setErrorMsg("Is topic mein koi question nahi mila.");
+        setPhase("error");
+        return;
+      }
+      setQuestions(list);
+      setIndex(0);
+      setBreadcrumb({
+        exam: selectedExam,
+        subject: selectedSubject.subjectName,
+        topic: topicName === "all" ? "Sabhi Topics" : topicName,
+      });
+      setPhase("browsing");
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const backToExams = () => {
+    setSelectedExam(null);
+    setSubjectsMeta([]);
+    setPhase("pick-exam");
+  };
+
+  const backToSubjects = () => {
+    setSelectedSubject(null);
+    setPhase("pick-subject");
+  };
+
+  const backToTopics = () => {
+    setQuestions([]);
+    setPhase("pick-topic");
+  };
+
+  const currentQ = questions[index];
+
+  // ────────────────────────────── RENDER ──────────────────────────────
+
+  if (phase === "loading-exams" || phase === "loading-meta") return <PillsSkeleton />;
+  if (phase === "loading-questions") return <QuestionBrowseSkeleton />;
+
+  if (phase === "forbidden") {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">
-            {error?.response?.data?.message || "Data load nahi ho paaya."}
-          </p>
+          <p className="text-gray-300">Ye page sirf admin ke liye hai.</p>
           <button
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
@@ -2530,130 +2738,161 @@ const ChallengeReview = () => {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
-      <div className="max-w-3xl mx-auto">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-        >
-          &larr; Wapas Jaayein
-        </button>
-
-        <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
-        <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
-
-        {/* Overview stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-green-400">{data?.overview?.correctCount}</p>
-            <p className="text-[11px] text-gray-500">Correct</p>
-          </div>
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-red-400">{data?.overview?.wrongCount}</p>
-            <p className="text-[11px] text-gray-500">Wrong</p>
-          </div>
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-gray-300">{data?.overview?.unattemptedCount}</p>
-            <p className="text-[11px] text-gray-500">Unattempted</p>
-          </div>
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
         </div>
+      </div>
+    );
+  }
 
-        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject ho */}
-        {subjects.length > 1 && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            <button
-              onClick={() => setSubjectFilter("all")}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                subjectFilter === "all"
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              Sabhi Subjects
-            </button>
-            {subjects.map((s) => (
+  if (phase === "pick-exam") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <h1 className="text-2xl font-bold mb-1">Question Bank Review</h1>
+          <p className="text-gray-400 text-sm mb-8">Exam chuniye jiske questions review karne hain</p>
+          <div className="flex flex-wrap gap-3">
+            {examList.map((exam) => (
               <button
-                key={s}
-                onClick={() => setSubjectFilter(s)}
-                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                  subjectFilter === s
-                    ? "bg-[#7C3AED] text-white"
-                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-                }`}
+                key={exam}
+                onClick={() => pickExam(exam)}
+                className="px-5 py-2.5 rounded-xl bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 text-sm font-medium transition-colors"
               >
-                {s}
+                {exam}
               </button>
             ))}
           </div>
-        )}
-
-        {/* Status filter — All / Correct / Wrong / Unattempted */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                statusFilter === f.key
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              {f.label} ({counts[f.key]})
-            </button>
-          ))}
         </div>
-
-        {filteredQuestions.length === 0 && (
-          <p className="text-gray-400 text-sm py-10 text-center">
-            Is category mein koi sawaal nahi hai.
-          </p>
-        )}
-
-        {currentQ && (
-          <>
-            <p className="text-xs text-gray-500 mb-3">
-              Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
-            </p>
-            <QuestionDetailCard q={currentQ} />
-
-            <div className="flex justify-between items-center mt-6">
-              <button
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                disabled={index === 0}
-                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                &larr; Previous
-              </button>
-              <button
-                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
-                disabled={index >= filteredQuestions.length - 1}
-                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next &rarr;
-              </button>
-            </div>
-          </>
-        )}
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (phase === "pick-subject") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={backToExams}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Exam Badlein
+          </button>
+          <h1 className="text-2xl font-bold mb-1">{selectedExam}</h1>
+          <p className="text-gray-400 text-sm mb-8">Subject chuniye</p>
+
+          {subjectsMeta.length === 0 ? (
+            <p className="text-gray-400 text-sm">Is exam ke liye koi question nahi mila.</p>
+          ) : (
+            <div className="space-y-3">
+              {subjectsMeta.map((s) => (
+                <button
+                  key={s.subjectName}
+                  onClick={() => pickSubject(s)}
+                  className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 transition-colors flex items-center justify-between"
+                >
+                  <div>
+                    <h3 className="font-semibold text-base">{s.subjectName}</h3>
+                    <p className="text-xs text-gray-500 mt-1">{s.topics.length} topics</p>
+                  </div>
+                  <span className="text-sm px-2.5 py-1 rounded-full bg-[#7C3AED]/20 text-[#A78BFA] flex-shrink-0">
+                    {s.totalQuestions} sawaal
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "pick-topic" && selectedSubject) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={backToSubjects}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Subject Badlein
+          </button>
+          <h1 className="text-2xl font-bold mb-1">{selectedSubject.subjectName}</h1>
+          <p className="text-gray-400 text-sm mb-8">Topic chuniye (ya sabhi ek sath dekhein)</p>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => pickTopic("all")}
+              className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+            >
+              Sabhi Topics ({selectedSubject.totalQuestions})
+            </button>
+            {selectedSubject.topics.map((t) => (
+              <button
+                key={t}
+                onClick={() => pickTopic(t)}
+                className="px-5 py-2.5 rounded-xl bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 text-sm font-medium transition-colors"
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "browsing" && currentQ) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+        <div className="max-w-3xl mx-auto">
+          <button
+            onClick={backToTopics}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Topic Badlein
+          </button>
+
+          <h1 className="text-xl sm:text-2xl font-bold mb-1">{breadcrumb.subject}</h1>
+          <p className="text-gray-400 text-sm mb-6">
+            {breadcrumb.exam} &middot; {breadcrumb.topic}
+          </p>
+
+          <QuestionCard q={currentQ} index={index} total={questions.length} />
+
+          <div className="flex justify-between items-center mt-6">
+            <button
+              onClick={() => setIndex((i) => Math.max(0, i - 1))}
+              disabled={index === 0}
+              className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              &larr; Previous
+            </button>
+            <button
+              onClick={() => setIndex((i) => Math.min(questions.length - 1, i + 1))}
+              disabled={index >= questions.length - 1}
+              className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
-export default ChallengeReview;
-</file>
-
-<file path="frontend/src/pages/ProfilePage.jsx">
-const ProfilePage = () => { 
-  return (
-    <h1 className="text-6xl font-bold underline text-red-500 bg-yellow-200 p-4">
-  profile
-</h1>
-  )
-}
-
-export default ProfilePage
+export default QuestionBankReview;
 </file>
 
 <file path="frontend/src/App.css">
@@ -3715,6 +3954,341 @@ const api = axios.create({
 });
 
 export default api;
+</file>
+
+<file path="frontend/src/pages/ChallengeReview.jsx">
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/api";
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ChallengeReviewSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+    <div className="max-w-3xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+
+      <SkeletonBlock className="w-48 h-7 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-6" />
+
+      {/* Overview stats skeleton */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <SkeletonBlock className="w-8 h-5 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Subject filter pills skeleton */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      {/* Status filter pills skeleton */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      <SkeletonBlock className="w-44 h-3 mb-3" />
+
+      {/* Question detail card skeleton */}
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <SkeletonBlock className="w-20 h-3" />
+          <SkeletonBlock className="w-16 h-5 rounded-full" />
+        </div>
+        <SkeletonBlock className="w-full h-5 mb-2" />
+        <SkeletonBlock className="w-3/4 h-5 mb-6" />
+        <div className="space-y-2.5 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
+          ))}
+        </div>
+        <SkeletonBlock className="w-full h-20 rounded-lg" />
+      </div>
+
+      {/* Prev/Next skeleton */}
+      <div className="flex justify-between items-center mt-6">
+        <SkeletonBlock className="w-28 h-10 rounded-lg" />
+        <SkeletonBlock className="w-24 h-10 rounded-lg" />
+      </div>
+    </div>
+  </div>
+);
+
+// ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
+const QuestionDetailCard = ({ q }) => {
+  const statusLabel =
+    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+  const statusColor =
+    q.isCorrect === true
+      ? "text-green-400 bg-green-500/10 border-green-500/30"
+      : q.isCorrect === false
+      ? "text-red-400 bg-red-500/10 border-red-500/30"
+      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <span className="text-xs text-gray-500">{q.topicName}</span>
+        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
+
+      <div className="space-y-2.5 mb-6">
+        {[1, 2, 3, 4].map((n) => {
+          const optText = q.options?.[`option${n}`];
+          const isCorrectOpt = q.correctOption === n;
+          const isUserPick = q.userAnswer === String(n);
+
+          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
+          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
+          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
+
+          return (
+            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
+                {n}
+              </span>
+              <span className="flex-1">{optText}</span>
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isUserPick && !isCorrectOpt && (
+                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {q.userAnswer == null && (
+        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+      )}
+
+      {q.timeTakenInSeconds != null && (
+        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
+      )}
+
+      {q.answerExplain && (
+        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
+            Explanation
+          </p>
+          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChallengeReview = () => {
+  const navigate = useNavigate();
+  const { code } = useParams();
+
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [index, setIndex] = useState(0);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["challenge-attempt-detail", code],
+    queryFn: async () => {
+      const res = await api.get(`/challenge/${code}/my-attempt`);
+      return res.data.data;
+    },
+    enabled: !!code,
+  });
+
+  const allQuestions = data?.questionBreakdown || [];
+
+  const subjects = useMemo(() => {
+    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
+    return Array.from(set);
+  }, [allQuestions]);
+
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter((q) => {
+      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
+      let statusMatch = true;
+      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
+      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
+      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
+      return subjMatch && statusMatch;
+    });
+  }, [allQuestions, subjectFilter, statusFilter]);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [subjectFilter, statusFilter]);
+
+  const currentQ = filteredQuestions[index];
+
+  const counts = useMemo(() => {
+    const base = allQuestions.filter(
+      (q) => subjectFilter === "all" || q.subjectName === subjectFilter
+    );
+    return {
+      all: base.length,
+      correct: base.filter((q) => q.isCorrect === true).length,
+      wrong: base.filter((q) => q.isCorrect === false).length,
+      unattempted: base.filter((q) => q.isCorrect === null).length,
+    };
+  }, [allQuestions, subjectFilter]);
+
+  if (isLoading) {
+    return <ChallengeReviewSkeleton />;
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">
+            {error?.response?.data?.message || "Data load nahi ho paaya."}
+          </p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+        >
+          &larr; Wapas Jaayein
+        </button>
+
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
+        <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
+
+        {/* Overview stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-green-400">{data?.overview?.correctCount}</p>
+            <p className="text-[11px] text-gray-500">Correct</p>
+          </div>
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-red-400">{data?.overview?.wrongCount}</p>
+            <p className="text-[11px] text-gray-500">Wrong</p>
+          </div>
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-gray-300">{data?.overview?.unattemptedCount}</p>
+            <p className="text-[11px] text-gray-500">Unattempted</p>
+          </div>
+        </div>
+
+        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject ho */}
+        {subjects.length > 1 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <button
+              onClick={() => setSubjectFilter("all")}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                subjectFilter === "all"
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Sabhi Subjects
+            </button>
+            {subjects.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSubjectFilter(s)}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  subjectFilter === s
+                    ? "bg-[#7C3AED] text-white"
+                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Status filter — All / Correct / Wrong / Unattempted */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                statusFilter === f.key
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {f.label} ({counts[f.key]})
+            </button>
+          ))}
+        </div>
+
+        {filteredQuestions.length === 0 && (
+          <p className="text-gray-400 text-sm py-10 text-center">
+            Is category mein koi sawaal nahi hai.
+          </p>
+        )}
+
+        {currentQ && (
+          <>
+            <p className="text-xs text-gray-500 mb-3">
+              Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
+            </p>
+            <QuestionDetailCard q={currentQ} />
+
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                disabled={index === 0}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &larr; Previous
+              </button>
+              <button
+                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
+                disabled={index >= filteredQuestions.length - 1}
+                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next &rarr;
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ChallengeReview;
 </file>
 
 <file path="frontend/src/pages/Singup.jsx">
@@ -4890,112 +5464,6 @@ export const loginUser = async (req, res) => {
 };
 </file>
 
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js"; // 👈 Ye import missing tha jiske wajah se crash ho raha tha
-
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
-import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
-
-
-// 👇 NAYA: Peer-Challenge feature ke controllers
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-// 👇 NAYA: Challenge banane ke liye — login zaroori hai (userInfo middleware)
-router.post("/create-challenge", userInfo, createChallenge);
-
-// 👇 NAYA: Challenge submit karne ke liye — login zaroori hai
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-// 1. Logged-in user ka data fetch karne ke liye (MockTest start karne se pehle)
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-// 2. Exam ke hisaab se saare blueprints (mock tests) fetch karne ke liye
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-// 3. User ke saare mocks ki list
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-
-// 4. Page 1 — Overview (average score, lifetime graph, subject list)
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-
-// 5. Page 1 — Graph click → ek specific mock ka pura breakdown
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-
-// 6. Page 2 — Subject-wise analysis (topic list + weak topics)
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-
-// 7. Page 3 — Topic-wise analysis (good/wrong/unattempted)
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-// 👇 NAYA: Ek challenge ka leaderboard dekhne ke liye
-// Login zaroori nahi rakha yahan — agar chaho to userInfo laga sakte ho,
-// lekin leaderboard "public-ish" info hai (jaisa cricket score dekhna),
-// isliye abhi open rakha hai. Security-hardening ke waqt iska decide kar lena.
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-
-export default router;
-</file>
-
 <file path="frontend/src/pages/Login.jsx">
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -5917,6 +6385,109 @@ const QuestionCard = ({ q, index }) => {
 };
 
 export default UserTopicAnalysis;
+</file>
+
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js";
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+
+// 👇 NAYA: Question Bank Review (admin-only) ke controllers
+import { getQuestionMeta } from "../controllers/getQuestionMeta.js";
+import { getQuestionList } from "../controllers/getQuestionList.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+import { isAdmin } from "../middlewares/isAdmin.js"; // 👈 NAYA
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+router.post("/create-challenge", userInfo, createChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+// 👇 NAYA: Frontend ko batata hai current user admin hai ya nahi —
+// isse HomePage pe "Question Review" button sirf admin ko dikhega
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+
+// 👇 NAYA: Question Bank Review routes — dono admin-only hain (userInfo + isAdmin)
+// kyunki inmein correctOption bhi hota hai, jo normal students ko nahi dikhna chahiye
+router.get("/questions/meta/:examName", userInfo, isAdmin, getQuestionMeta);
+router.get("/questions/list/:examName/:subjectName/:topicName", userInfo, isAdmin, getQuestionList);
+
+export default router;
 </file>
 
 <file path="backend/server.js">
@@ -8089,12 +8660,12 @@ import HomePage from './pages/HomePage';
 import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
+import QuestionBankReview from './pages/QuestionBankReview'; // 👈 NAYA
 
-// Ek hi QueryClient poore app ke liye — cache yahi store hoti hai
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000, // 1 min tak data "fresh" maana jayega, dobara fetch nahi hoga
+      staleTime: 30 * 1000,
       retry: 1,
     },
   },
@@ -8119,6 +8690,7 @@ const App = () => {
             <Route path="/Challenge" element={<Challenge/>} />
             <Route path="/Challenge/:code" element={<Challenge/>} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
+            <Route path="/QuestionBankReview" element={<QuestionBankReview/>} /> {/* 👈 NAYA */}
           </Routes>
         </div>
       </HashRouter>

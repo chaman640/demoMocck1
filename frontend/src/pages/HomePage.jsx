@@ -66,6 +66,21 @@ const HomePage = () => {
             </div>
             <span className="text-2xl flex-shrink-0">&rarr;</span>
           </button>
+          {/* 👇 NAYA: Apne diye hue challenges ki list */}
+          <button
+            onClick={() => navigate("/MyChallenges")}
+            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
+          >
+            <div className="text-left">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                Apne Challenges Dekho <span>📊</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Leaderboard aur apna performance dekhein
+              </p>
+            </div>
+            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
+          </button>
         </section>
 
         {/* Hero */}
