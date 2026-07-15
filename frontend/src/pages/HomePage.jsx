@@ -1,35 +1,99 @@
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import api from "../api/api";
 
 const HomePage = () => {
   const navigate = useNavigate();
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["overview", "UP Police Constable"],
+  // ─────────────────────────────────────────────
+  // STEP 1: Pehle logged-in user ka data lao —
+  // isi se exam nikalega, jo pehle hardcoded tha
+  // ─────────────────────────────────────────────
+  const {
+    data: user,
+    isLoading: userLoading,
+    isError: userError,
+    error: userErrorObj,
+  } = useQuery({
+    queryKey: ["me"],
     queryFn: async () => {
-      const encodedExamName = encodeURIComponent("UP Police Constable");
+      const res = await api.get("/me");
+      return res.data.data;
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (userError && userErrorObj?.response?.status === 401) {
+      navigate("/Singup");
+    }
+  }, [userError, userErrorObj, navigate]);
+
+  const examName = user?.exam;
+
+  // ─────────────────────────────────────────────
+  // STEP 2: Overview — ab hardcoded exam ki jagah
+  // user ke apne exam se query hogi
+  // ─────────────────────────────────────────────
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewIsError,
+  } = useQuery({
+    queryKey: ["overview", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
       const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
       return res.data.data;
     },
-    retry: false, // 401 pe baar baar retry na kare
+    enabled: !!examName, // 👈 jab tak exam na mile, ye query fire hi nahi hogi
+    retry: false,
   });
 
-  // 👇 Agar user login nahi hai (401), Signup page pe bhejo
-  useEffect(() => {
-    if (isError && error?.response?.status === 401) {
-      navigate("/Singup");
-    }
-  }, [isError, error, navigate]);
+  // ─────────────────────────────────────────────
+  // STEP 3: 👇 NAYA — Rank Predictor data (expected cutoff + graph)
+  // ─────────────────────────────────────────────
+  const {
+    data: rankPredictor,
+    isLoading: rankLoading,
+  } = useQuery({
+    queryKey: ["rank-predictor-data", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(`/rank-predictor-data/${encodedExamName}`);
+      return res.data;
+    },
+    enabled: !!examName,
+    retry: false,
+  });
 
-  const averageScore = data?.averageScore ?? null;
+  const averageScore = overview?.averageScore ?? null;
+  const isLoading = userLoading || overviewLoading;
+  const isError = userError || overviewIsError;
   const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
   const scoreDashArray = averageScore !== null ? `${averageScore}, 100` : "0, 100";
 
-  // 👇 Bottom nav ke teeno buttons ke liye ek hi consistent style
   const navBtnClass =
     "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
+
+  // 👇 NAYA: Rank predictor ka data availability + chart-ready format
+  const rankData = rankPredictor?.available ? rankPredictor.data : null;
+  const chartData = rankData?.dataPoints
+    ? [...rankData.dataPoints]
+        .sort((a, b) => a.rank - b.rank) // rank ke hisaab se ascending — chart left-to-right sahi dikhe
+        .map((p) => ({ rank: p.rank, score: p.score }))
+    : [];
+  const expectedCutoff = rankData?.expectedCutoff || null;
 
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
@@ -50,7 +114,7 @@ const HomePage = () => {
       {/* Main Content */}
       <main className="px-5 py-8 max-w-lg mx-auto">
 
-        {/* 👇 NAYA: Challenge-a-Friend banner — sabse upar taaki turant dikhe */}
+        {/* Challenge-a-Friend banner */}
         <section className="mb-8">
           <button
             onClick={() => navigate("/Challenge")}
@@ -66,7 +130,6 @@ const HomePage = () => {
             </div>
             <span className="text-2xl flex-shrink-0">&rarr;</span>
           </button>
-          {/* 👇 NAYA: Apne diye hue challenges ki list */}
           <button
             onClick={() => navigate("/MyChallenges")}
             className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
@@ -164,6 +227,92 @@ const HomePage = () => {
           </div>
         </section>
 
+        {/* ───────────────────────────────────────────── */}
+        {/* 👇 NAYA: Rank Predictor Section — sirf tab dikhega
+            jab data available ho aur loading khatam ho chuki ho */}
+        {/* ───────────────────────────────────────────── */}
+        {!rankLoading && rankData && chartData.length >= 2 && (
+          <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm text-gray-400">Rank Predictor</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA]">
+                {rankData.year}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
+
+            {/* Expected Cutoff Card */}
+            {expectedCutoff && (
+              <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Expected Cutoff Score</p>
+                  <p className="text-2xl font-bold text-[#A78BFA]">
+                    {expectedCutoff.expectedScore}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Rank ~{expectedCutoff.targetRank.toLocaleString("en-IN")} ke liye
+                  </p>
+                </div>
+                <span
+                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
+                    expectedCutoff.confidence === "high"
+                      ? "bg-green-500/10 text-green-400"
+                      : expectedCutoff.confidence === "medium"
+                      ? "bg-yellow-500/10 text-yellow-400"
+                      : "bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {expectedCutoff.confidence} confidence
+                </span>
+              </div>
+            )}
+
+            {/* Score vs Rank Chart */}
+            <h4 className="text-xs text-gray-500 mb-3">Score vs Rank Trend</h4>
+            <div className="w-full h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
+                  <XAxis
+                    dataKey="rank"
+                    stroke="#4B5563"
+                    fontSize={11}
+                    tickFormatter={(v) => v.toLocaleString("en-IN")}
+                  />
+                  <YAxis stroke="#4B5563" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111827",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    labelFormatter={(v) => `Rank: ${v.toLocaleString("en-IN")}`}
+                    formatter={(value) => [value, "Score"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#A78BFA"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#7C3AED" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {rankData.totalVacancies && (
+              <p className="text-[11px] text-gray-600 mt-3 text-center">
+                Total Vacancies: {rankData.totalVacancies.toLocaleString("en-IN")}
+                {rankData.totalCandidates
+                  ? ` • Total Candidates: ${rankData.totalCandidates.toLocaleString("en-IN")}`
+                  : ""}
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Feature Row */}
         <section className="flex flex-col gap-5 py-8 border-y border-gray-800 mb-10">
           <div className="flex items-center gap-4">
@@ -224,7 +373,7 @@ const HomePage = () => {
         </section>
       </main>
 
-      {/* Bottom Navigation — teeno buttons consistent style */}
+      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
         <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

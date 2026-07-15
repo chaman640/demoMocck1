@@ -48,6 +48,7 @@ backend/
     addMockTest.js
     addPerformence.js
     addQuestion.js
+    addRankPredictorData.js
     addUser.js
     allExamName.js
     authentication.js
@@ -56,6 +57,8 @@ backend/
     getChallengeAttemptDetail.js
     getChallengeLeaderboard.js
     getMyChallenges.js
+    getRankPredictorData.js
+    predictRank.js
     submitChallenge.js
     updateSutf.js
   middlewares/
@@ -66,6 +69,7 @@ backend/
     Challenge.js
     ChallengeAttempt.js
     Performance.js
+    RankPredictorData.js
     rowQuestionSchema.js
     User.js
   pages/
@@ -118,6 +122,317 @@ analysise.txt
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="backend/controllers/addRankPredictorData.js">
+// controllers/addRankPredictorData.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+export const addRankPredictorData = async (req, res) => {
+  try {
+    const { examName, year, dataPoints, totalCandidates, totalVacancies } = req.body;
+
+    if (!examName || !year || !Array.isArray(dataPoints) || dataPoints.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "examName, year, aur kam se kam 2 dataPoints zaroori hain!",
+      });
+    }
+
+    // Validate: har point mein score aur rank dono ho
+    for (const point of dataPoints) {
+      if (typeof point.score !== "number" || typeof point.rank !== "number") {
+        return res.status(400).json({
+          success: false,
+          message: "Har dataPoint mein numeric score aur rank hona zaroori hai!",
+        });
+      }
+    }
+
+    // Score ke hisaab se descending sort kar do (high score = low rank)
+    // taaki interpolation logic simple rahe
+    const sortedPoints = [...dataPoints].sort((a, b) => b.score - a.score);
+
+    // Naya data active banayenge — isliye purana active data (agar hai) inactive kar do
+    await RankPredictorData.updateMany(
+      { examName, isActive: true },
+      { $set: { isActive: false } }
+    );
+
+    const newData = new RankPredictorData({
+      examName,
+      year,
+      dataPoints: sortedPoints,
+      totalCandidates,
+      totalVacancies,
+      isActive: true,
+    });
+
+    await newData.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Rank predictor data successfully save ho gaya!",
+      data: newData,
+    });
+  } catch (error) {
+    console.error("addRankPredictorData error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya data save karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getRankPredictorData.js">
+// controllers/getRankPredictorData.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+export const getRankPredictorData = async (req, res) => {
+  try {
+    const { examName } = req.params;
+
+    const rankData = await RankPredictorData.findOne({
+      examName,
+      isActive: true,
+    });
+
+    // ─────────────────────────────────────────────
+    // Note: Yahan 404 nahi bheja — jaanbujh kar 200 status
+    // ke sath "available: false" bheja hai. Isse frontend
+    // ko har baar try/catch se error handle nahi karna padega
+    // sirf "data hai ya nahi" check karne ke liye — simple
+    // if-else se kaam chal jayega.
+    // ─────────────────────────────────────────────
+    if (!rankData) {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      available: true,
+      data: {
+        examName: rankData.examName,
+        year: rankData.year,
+        dataPoints: rankData.dataPoints,
+        totalCandidates: rankData.totalCandidates,
+        totalVacancies: rankData.totalVacancies,
+        updatedAt: rankData.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("getRankPredictorData error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya rank predictor data fetch karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/predictRank.js">
+// controllers/predictRank.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+// ─────────────────────────────────────────────
+// HELPER: Linear interpolation
+// Do known points (score1,rank1) aur (score2,rank2) ke beech
+// diye gaye score ke liye rank estimate karta hai
+// ─────────────────────────────────────────────
+const interpolate = (score, lowerPoint, upperPoint) => {
+  // lowerPoint = lower score (higher rank number)
+  // upperPoint = higher score (lower rank number)
+  const { score: s1, rank: r1 } = upperPoint; // upper score, better rank
+  const { score: s2, rank: r2 } = lowerPoint; // lower score, worse rank
+
+  if (s1 === s2) return r1; // avoid divide by zero
+
+  // Linear interpolation formula
+  const ratio = (score - s2) / (s1 - s2);
+  const estimatedRank = r2 - ratio * (r2 - r1);
+
+  return Math.round(estimatedRank);
+};
+
+export const predictRank = async (req, res) => {
+  try {
+    const { examName } = req.params;
+    const { score } = req.query;
+
+    if (score === undefined || isNaN(Number(score))) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid score query parameter zaroori hai! (e.g. ?score=145)",
+      });
+    }
+
+    const userScore = Number(score);
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Is exam ka active data dhundo
+    // ─────────────────────────────────────────────
+    const rankData = await RankPredictorData.findOne({
+      examName,
+      isActive: true,
+    });
+
+    if (!rankData || rankData.dataPoints.length < 2) {
+      return res.status(404).json({
+        success: false,
+        message: "Is exam ke liye rank predictor data abhi available nahi hai.",
+      });
+    }
+
+    // dataPoints already descending order mein save hain (highest score first)
+    const points = rankData.dataPoints;
+
+    let estimatedRank;
+    let confidence = "medium"; // "high" | "medium" | "low" — kitna reliable estimate hai
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Edge cases handle karo
+    // ─────────────────────────────────────────────
+    if (userScore >= points[0].score) {
+      // User ka score sabse highest reference point se bhi zyada/equal hai
+      // Extrapolation risky hai — top rank ke aas-paas bata do, low confidence
+      estimatedRank = Math.max(1, points[0].rank - Math.round((userScore - points[0].score) * 10));
+      confidence = "low";
+    } else if (userScore <= points[points.length - 1].score) {
+      // User ka score sabse lowest reference point se bhi kam hai
+      const lastPoint = points[points.length - 1];
+      estimatedRank = lastPoint.rank + Math.round((lastPoint.score - userScore) * 50);
+      confidence = "low";
+    } else {
+      // ─────────────────────────────────────────────
+      // STEP 3: Normal case — do points ke beech interpolate karo
+      // ─────────────────────────────────────────────
+      for (let i = 0; i < points.length - 1; i++) {
+        const upper = points[i];     // higher score
+        const lower = points[i + 1]; // lower score
+
+        if (userScore <= upper.score && userScore >= lower.score) {
+          estimatedRank = interpolate(userScore, lower, upper);
+          confidence = "high"; // do actual reference points ke beech hai — reliable
+          break;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Rank ko ek RANGE mein convert karo
+    // Exact number dena galat expectation create karta hai —
+    // isliye ±10% ka range dikhayenge
+    // ─────────────────────────────────────────────
+    const rangeMargin = Math.max(50, Math.round(estimatedRank * 0.1));
+    const rankRangeLow = Math.max(1, estimatedRank - rangeMargin);
+    const rankRangeHigh = estimatedRank + rangeMargin;
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Selection chance (agar vacancies data hai)
+    // ─────────────────────────────────────────────
+    let selectionChance = null;
+    if (rankData.totalVacancies) {
+      if (rankRangeHigh <= rankData.totalVacancies) {
+        selectionChance = "strong"; // rank range poori tarah vacancy ke andar hai
+      } else if (rankRangeLow <= rankData.totalVacancies) {
+        selectionChance = "borderline"; // range vacancy line ke aas-paas hai
+      } else {
+        selectionChance = "unlikely";
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        examName: rankData.examName,
+        year: rankData.year,
+        userScore,
+        estimatedRank,
+        rankRangeLow,
+        rankRangeHigh,
+        confidence,
+        totalCandidates: rankData.totalCandidates || null,
+        totalVacancies: rankData.totalVacancies || null,
+        selectionChance,
+      },
+    });
+  } catch (error) {
+    console.error("predictRank error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya rank predict karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/models/RankPredictorData.js">
+// models/RankPredictorData.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const rankPredictorDataSchema = new mongoose.Schema(
+  {
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+      index: true,
+    },
+
+    // Kis saal/attempt ka data hai — future mein multiple years support
+    // karne ke liye (abhi ke liye ek hi "current" wala use hoga)
+    year: {
+      type: Number,
+      required: true,
+    },
+
+    // Reference points — score aur uske corresponding rank
+    // Frontend/backend isi array ko sort karke interpolate karega
+    dataPoints: [
+      {
+        score: { type: Number, required: true },
+        rank: { type: Number, required: true },
+      },
+    ],
+
+    // Total kitne candidates ne exam diya tha (context ke liye)
+    totalCandidates: {
+      type: Number,
+    },
+
+    // Total vacancies — "selection chance" dikhane ke liye
+    totalVacancies: {
+      type: Number,
+    },
+
+    // Kya ye data currently active hai (predictor mein use hoga)
+    // Agar naya saal ka data aaye, purana inactive kar denge
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { timestamps: true }
+);
+
+// Ek exam ke liye ek hi "active" year ka data ho — duplicate active entries na banein
+rankPredictorDataSchema.index({ examName: 1, isActive: 1 });
+
+const RankPredictorData = rowQuestionConnection.model(
+  "RankPredictorData",
+  rankPredictorDataSchema
+);
+
+export default RankPredictorData;
+</file>
 
 <file path="backend/config/rowQuestion.js">
 // config/rowQuestion.js
@@ -661,35 +976,6 @@ export const addQuestion = async (req, res) => {
       error: error.message
     });
   }
-};
-</file>
-
-<file path="backend/controllers/allExamName.js">
-// controllers/allExamName.js
-
-export const allExamName = async (req, res) => {
-    try {
-        // Aapki exam names ki list (Future me aap yahan aur exams add kar sakte hain)
-        const exams = [
-            "UP Police Constable",
-            "Ssc Gd",
-            "Ssc CGL"
-        ];
-
-        // Frontend ko list bhej dena
-        res.status(200).json({
-            success: true,
-            message: "Exam list fetched successfully",
-            data: exams
-        });
-
-    } catch (error) {
-        console.error("Error fetching exams:", error);
-        res.status(500).json({ 
-            success: false, 
-            message: "Internal Server Error" 
-        });
-    }
 };
 </file>
 
@@ -1388,638 +1674,6 @@ const userSchema = new mongoose.Schema(
 const User = rowQuestionConnection.model("User", userSchema);
 
 export default User;
-</file>
-
-<file path="backend/pages/user/analysicUser.js">
-import mongoose from "mongoose";
-import Performance from "../../models/Performance.js";
-import Blueprint from "../../models/bluePrint.js";
-import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
-
-
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 1
-// Overview: average score, lifetime graph, subject list (last 3)
-// Route: GET /analysis/overview/:userId/:examName
-// ─────────────────────────────────────────────
-export const getAllAnalysis1stPage = async (req, res) => {
-  try {
-    let { userId, examName } = req.params;
-
-    // 👇 YEH LOGIC MISSING HAI TUMHARI FILE MEIN
-    if (userId === "active_user") {
-      if (!req.user || !req.user._id) {
-        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
-      }
-      userId = req.user._id; // 'active_user' text ko real ID se replace kar dega
-    }
-    // 👆 YEH LOGIC ADD KARO
-
-    // 1. Sare mocks fetch karo
-    const allTests = await Performance.find({ userId, examName })
-      .sort({ createdAt: -1 });
-      
-    if (!allTests || allTests.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
-        data: null,
-      });
-    }
-
-    // 2. Average Score — sirf last 3 mocks ka
-    const last3Tests = allTests.slice(0, 3);
-    const totalScoreSum = last3Tests.reduce((acc, test) => acc + test.totalScore, 0);
-    const averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
-
-    // 3. Graph Data — LIFETIME ke saare mocks
-    // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
-    const graphData = allTests
-      .map((test) => ({
-        performanceId: test._id,
-        score: test.totalScore,
-        date: test.createdAt,
-      }))
-      .reverse(); // chronological order (purana → naya)
-
-    // 4. Subject-wise accuracy + time — last 3 mocks se
-    // BUG FIX: || 0 ki jagah ?? 0 use kiya —
-    // agar averageTimePerQuestion exactly 0 ho tab || 0 bhi 0 deta tha
-    // lekin ?? 0 sirf null/undefined pe fallback karta hai, 0 pe nahi
-    const subjectMap = {};
-    last3Tests.forEach((test) => {
-      if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
-        test.subjectAnalysis.forEach((sub) => {
-          if (!subjectMap[sub.subjectName]) {
-            subjectMap[sub.subjectName] = {
-              totalAcc: 0,
-              totalTime: 0,
-              count: 0,
-            };
-          }
-          subjectMap[sub.subjectName].totalAcc += sub.accuracy;
-          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0; // ✅ FIX
-          subjectMap[sub.subjectName].count += 1;
-        });
-      }
-    });
-
-    const subjectAnalysis = Object.keys(subjectMap).map((name) => ({
-      subjectName: name,
-      averageAccuracy: Number(
-        (subjectMap[name].totalAcc / subjectMap[name].count).toFixed(2)
-      ),
-      averageTimePerQuestion: Number(
-        (subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)
-      ),
-    }));
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        averageScore,
-        totalTestsGiven: allTests.length,
-        graphData,
-        subjectAnalysis,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 2
-// Graph click → ek specific mock ka pura breakdown
-// (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
-// Route: GET /analysis/mock-detail/:performanceId
-// ─────────────────────────────────────────────
-export const getPerformanceAnalysis = async (req, res) => {
-  try {
-    const { performanceId } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(performanceId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid Performance ID",
-      });
-    }
-
-    const performance = await Performance.findById(performanceId).populate({
-      path: "attemptedQuestions.questionId",
-      model: RowQuestion,
-    });
-
-    if (!performance) {
-      return res.status(404).json({
-        success: false,
-        message: "Performance nahi mila.",
-      });
-    }
-
-    const blueprint = await Blueprint.findOne({
-      blueprintName: performance.blueprintName,
-      examName: performance.examName,
-    });
-
-    if (!blueprint) {
-      return res.status(404).json({
-        success: false,
-        message: "Blueprint nahi mila.",
-      });
-    }
-
-    const totalQuestions = blueprint.totalQuestions;
-    const correct = performance.correctCount;
-    const wrong = performance.wrongCount;
-    const unattempted = performance.unattemptedCount;
-    const totalScore = performance.totalScore;
-
-    const accuracy =
-      totalQuestions === 0
-        ? 0
-        : Number(((correct / totalQuestions) * 100).toFixed(2));
-
-    // Total time: sirf jinka time data hai unka sum
-    let totalTimeTaken = 0;
-    for (const aq of performance.attemptedQuestions) {
-      totalTimeTaken += aq.timeTakenInSeconds ?? 0;
-    }
-
-    const averageTimePerQuestion =
-      totalQuestions === 0
-        ? 0
-        : Number((totalTimeTaken / totalQuestions).toFixed(2));
-
-    // Sawaal-by-sawaal breakdown
-    // Null-safe: agar koi question DB se delete ho gaya ho to crash nahi hoga
-    const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId; // populate ho gaya hai upar
-
-      return {
-        questionId: q ? q._id : aq.questionId,
-        question: q ? q.question : null,
-        options: q
-          ? {
-              option1: q.option1,
-              option2: q.option2,
-              option3: q.option3,
-              option4: q.option4,
-            }
-          : null,
-        correctOption: q ? q.correctOption : null,
-        userAnswer: aq.userAnswer,
-        isCorrect: aq.isCorrect,
-        answerExplain: q ? q.answerExplain : null,
-        answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
-        topicName: q ? q.topicName : null,
-        subjectName: q ? q.subjectName : null,
-        timeTakenInSeconds: aq.timeTakenInSeconds,
-      };
-    });
-
-    return res.status(200).json({
-      success: true,
-      overview: {
-        examName: performance.examName,
-        blueprintName: performance.blueprintName,
-        totalQuestions,
-        correct,
-        wrong,
-        unattempted,
-        totalScore,
-        accuracy,
-        totalTimeTaken,
-        averageTimePerQuestion,
-      },
-      questionBreakdown,
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-
-// ─────────────────────────────────────────────
-// PAGE 2: Subject-wise Analysis
-// Route: GET /analysis/subject/:userId/:examName/:subjectName
-// ─────────────────────────────────────────────
-export const getSubjectAnalysis = async (req, res) => {
-  try {
-    // FIX: 'const' ki jagah 'let' use kiya taaki hum userId ko update kar sakein
-    let { userId, examName, subjectName } = req.params;
-
-    // 👇 YEH LOGIC ADD KIYA HAI TAAKI "active_user" CRASH NA KARE
-    if (userId === "active_user") {
-      if (!req.user || !req.user._id) {
-        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
-      }
-      userId = req.user._id;
-    }
-    // 👆 YAHAN TAK
-
-    // 1. Last 3 mocks fetch karo
-    const last3Tests = await Performance.find({ userId, examName })
-      .sort({ createdAt: -1 })
-      .limit(3);
-
-    if (!last3Tests || last3Tests.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
-        data: null,
-      });
-    }
-
-    // 2. Subject ka average accuracy + time (last 3 mocks)
-    let totalAccuracy = 0;
-    let totalTime = 0;
-    let subjectFoundCount = 0;
-    const graphData = [];
-
-    for (const test of last3Tests) {
-      const subData = test.subjectAnalysis
-        ? test.subjectAnalysis.find((s) => s.subjectName === subjectName)
-        : null;
-
-      if (subData) {
-        totalAccuracy += subData.accuracy;
-        totalTime += subData.averageTimePerQuestion ?? 0;
-        subjectFoundCount++;
-
-        graphData.push({
-          performanceId: test._id,
-          date: test.createdAt,
-          accuracy: subData.accuracy,
-        });
-      }
-    }
-
-    graphData.reverse(); // chronological order
-
-    const averageAccuracy =
-      subjectFoundCount === 0
-        ? 0
-        : Number((totalAccuracy / subjectFoundCount).toFixed(2));
-
-    const averageTimePerQuestion =
-      subjectFoundCount === 0
-        ? 0
-        : Number((totalTime / subjectFoundCount).toFixed(2));
-
-    // 3. Topic-wise data (last 3 mocks se, runtime calculate)
-    // Topic data Performance mein store nahi — Question model se nikalna padega
-
-    // 3a. Sare questionIds (teen mocks ke)
-    const allQuestionIds = last3Tests.flatMap((test) =>
-      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
-    );
-
-    // 3b. Sirf is subject ke questions ka topicName fetch karo — ek query
-    const questionDocs = await RowQuestion.find({
-      _id: { $in: allQuestionIds },
-      subjectName: subjectName,
-    }).select("_id topicName");
-
-    // 3c. Lookup map: questionId → topicName
-    const topicNameMap = {};
-    for (const doc of questionDocs) {
-      topicNameMap[doc._id.toString()] = doc.topicName;
-    }
-
-    // 3d. Topic-wise group karo
-    const topicGroups = {};
-
-    for (const test of last3Tests) {
-      for (const aq of test.attemptedQuestions) {
-        if (!aq.questionId) continue;
-
-        const topicName = topicNameMap[aq.questionId.toString()];
-        if (!topicName) continue; // is subject ka question nahi — skip
-
-        if (!topicGroups[topicName]) {
-          topicGroups[topicName] = {
-            correct: 0,
-            wrong: 0,       
-            unattempted: 0, 
-            total: 0,
-            totalTime: 0,
-            timedCount: 0,
-          };
-        }
-
-        topicGroups[topicName].total++;
-
-        if (aq.isCorrect === true) {
-          topicGroups[topicName].correct++;
-        } else if (aq.isCorrect === false) {
-          topicGroups[topicName].wrong++;       
-        } else {
-          topicGroups[topicName].unattempted++; 
-        }
-
-        if (
-          typeof aq.timeTakenInSeconds === "number" &&
-          aq.timeTakenInSeconds >= 0
-        ) {
-          topicGroups[topicName].totalTime += aq.timeTakenInSeconds;
-          topicGroups[topicName].timedCount++;
-        }
-      }
-    }
-
-    // 3e. Topic list banao
-    const topicList = Object.keys(topicGroups).map((topicName) => {
-      const { correct, wrong, unattempted, total, totalTime, timedCount } =
-        topicGroups[topicName];
-
-      const efficiency =
-        total === 0 ? 0 : Number(((correct / total) * 100).toFixed(2));
-
-      const avgTime =
-        timedCount === 0
-          ? 0
-          : Number((totalTime / timedCount).toFixed(2));
-
-      return {
-        topicName,
-        efficiency,
-        totalAttempted: total,
-        correctCount: correct,
-        wrongCount: wrong,         
-        unattemptedCount: unattempted, 
-        averageTimePerQuestion: avgTime,
-      };
-    });
-
-    // 4. Top 5 weak topics
-    const weakTopics = [...topicList]
-      .filter((t) => t.totalAttempted > 0)
-      .sort((a, b) => {
-        const scoreA = a.wrongCount * 2 + a.averageTimePerQuestion / 30;
-        const scoreB = b.wrongCount * 2 + b.averageTimePerQuestion / 30;
-        return scoreB - scoreA;
-      })
-      .slice(0, 5)
-      .map((t) => ({
-        topicName: t.topicName,
-        efficiency: t.efficiency,
-        wrongCount: t.wrongCount,
-        averageTimePerQuestion: t.averageTimePerQuestion,
-        reason:
-          t.wrongCount > 0 && t.averageTimePerQuestion > 30
-            ? "Galat bhi kar rahe ho aur time bhi zyada lag raha hai"
-            : t.wrongCount > 0
-            ? "Is topic mein galat answers zyada hain"
-            : "Is topic mein time zyada lag raha hai",
-      }));
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        subjectName,
-        averageAccuracy,
-        averageTimePerQuestion,
-        totalTestsConsidered: subjectFoundCount,
-        graphData,
-        topicList,
-        weakTopics,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Subject analysis fetch karte waqt error aaya.",
-      error: error.message,
-    });
-  }
-};
-
-
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
-// Page 2 mein topic pe click karne pe ye page khulega
-// Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
-// ─────────────────────────────────────────────
-export const getTopicAnalysis = async (req, res) => {
-  try {
-    // 👇 Const ko let kiya taaki hum userId ko update kar sakein
-    let { userId, examName, subjectName, topicName } = req.params;
-
-    // 👇 YEH LOGIC ADD KARNA ZAROORI HAI
-    if (userId === "active_user") {
-      if (!req.user || !req.user._id) {
-        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
-      }
-      userId = req.user._id; 
-    }
-    // 👆 YEH LOGIC ADD KARNE KE BAAD HI MONGODB ERROR BAND HOGA
-
-    // ─────────────────────────────────────────────
-    // 1. LIFETIME ke saare mocks fetch karo
-    // ─────────────────────────────────────────────
-    const allTests = await Performance.find({ userId, examName })
-      .sort({ createdAt: -1 });
-    
-    // ... baaki ka purana code waisa hi rahega ...
-    if (!allTests || allTests.length === 0) {
-      return res.status(200).json({
-        success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
-        data: null,
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // 2. Sare mocks ke questionIds nikalo ek saath
-    // ─────────────────────────────────────────────
-    const allQuestionIds = allTests.flatMap((test) =>
-      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
-    );
-
-    // ─────────────────────────────────────────────
-    // 3. Sirf is topic + subject ke questions fetch karo — ek query
-    //    Pura question detail chahiye (sawaal, options, explanation)
-    // ─────────────────────────────────────────────
-    const questionDocs = await RowQuestion.find({
-      _id: { $in: allQuestionIds },
-      subjectName: subjectName,
-      topicName: topicName,
-    }).select(
-      "_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName"
-    );
-
-    // Lookup map: questionId → full question document
-    const questionMap = {};
-    for (const doc of questionDocs) {
-      questionMap[doc._id.toString()] = doc;
-    }
-
-    // ─────────────────────────────────────────────
-    // 4. Har mock ke har attempted question ko check karo
-    //    Agar wo is topic ka hai to uski entry banao
-    //    Same question multiple mocks mein aaya to teeno baar aayega (deduplicate nahi)
-    // ─────────────────────────────────────────────
-    const goodAtQuestions = [];    // isCorrect === true
-    const wrongQuestions = [];     // isCorrect === false
-    const unattemptedQuestions = []; // isCorrect === null
-
-    // Topic-level stats ke liye counters
-    let totalAttempted = 0;
-    let totalCorrect = 0;
-    let totalWrong = 0;
-    let totalUnattempted = 0;
-    let totalTime = 0;
-    let timedCount = 0;
-
-    for (const test of allTests) {
-      for (const aq of test.attemptedQuestions) {
-        if (!aq.questionId) continue;
-
-        const qId = aq.questionId.toString();
-        const qDoc = questionMap[qId];
-
-        // Sirf is topic ke questions process karo
-        if (!qDoc) continue;
-
-        totalAttempted++;
-
-        // Time tracking
-        if (
-          typeof aq.timeTakenInSeconds === "number" &&
-          aq.timeTakenInSeconds >= 0
-        ) {
-          totalTime += aq.timeTakenInSeconds;
-          timedCount++;
-        }
-
-        // Har entry mein performanceId bhi rakho taaki
-        // frontend track kar sake ye kaunse mock se hai
-        const entry = {
-          performanceId: test._id,
-          mockDate: test.createdAt,
-          questionId: qDoc._id,
-          question: qDoc.question,
-          options: {
-            option1: qDoc.option1,
-            option2: qDoc.option2,
-            option3: qDoc.option3,
-            option4: qDoc.option4,
-          },
-          correctOption: qDoc.correctOption,
-          userAnswer: aq.userAnswer,
-          answerExplain: qDoc.answerExplain,
-          answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
-          timeTakenInSeconds: aq.timeTakenInSeconds,
-        };
-
-        if (aq.isCorrect === true) {
-          totalCorrect++;
-          goodAtQuestions.push(entry);
-        } else if (aq.isCorrect === false) {
-          totalWrong++;
-          wrongQuestions.push(entry);
-        } else {
-          totalUnattempted++;
-          unattemptedQuestions.push(entry);
-        }
-      }
-    }
-
-    // ─────────────────────────────────────────────
-    // 5. Topic-level summary calculate karo
-    // ─────────────────────────────────────────────
-    const efficiency =
-      totalAttempted === 0
-        ? 0
-        : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
-
-    const averageTimePerQuestion =
-      timedCount === 0
-        ? 0
-        : Number((totalTime / timedCount).toFixed(2));
-
-    // ─────────────────────────────────────────────
-    // 6. Response
-    // ─────────────────────────────────────────────
-    return res.status(200).json({
-      success: true,
-      data: {
-        topicName,
-        subjectName,
-        // Upar dikhayi jaane wali summary
-        summary: {
-          efficiency,              // % sahi (correct / total * 100)
-          averageTimePerQuestion,  // sirf timed questions ka average
-          totalAttempted,
-          totalCorrect,
-          totalWrong,
-          totalUnattempted,
-          totalMocksConsidered: allTests.length,
-        },
-        // Teen sections — har ek mein pura sawaal + explanation
-        goodAt: goodAtQuestions,
-        wrong: wrongQuestions,
-        unattempted: unattemptedQuestions,
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Topic analysis fetch karte waqt error aaya.",
-      error: error.message,
-    });
-  }
-};
-
-
-// ─────────────────────────────────────────────
-// Mock test list — user ke sare mocks
-// Route: GET /analysis/mock-list/:userId/:examName
-// ─────────────────────────────────────────────
-export const getUserMockTests = async (req, res) => {
-  try {
-    const { userId, examName } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid User ID",
-      });
-    }
-
-    const tests = await Performance.find({ userId, examName })
-      .select(
-        "_id blueprintName examName totalScore correctCount wrongCount unattemptedCount createdAt"
-      )
-      .sort({ createdAt: -1 });
-
-    return res.status(200).json({
-      success: true,
-      totalTests: tests.length,
-      data: tests.map((test) => ({
-        performanceId: test._id,
-        blueprintName: test.blueprintName,
-        examName: test.examName,
-        totalScore: test.totalScore,
-        correctCount: test.correctCount,
-        wrongCount: test.wrongCount,
-        unattemptedCount: test.unattemptedCount,
-        date: test.createdAt,
-      })),
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Mock Test List fetch karte waqt error aaya.",
-      error: error.message,
-    });
-  }
-};
 </file>
 
 <file path="backend/.gitignore">
@@ -2771,6 +2425,35 @@ export const addPerformence = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/allExamName.js">
+// controllers/allExamName.js
+
+export const allExamName = async (req, res) => {
+    try {
+        // Aapki exam names ki list (Future me aap yahan aur exams add kar sakte hain)
+        const exams = [
+            "UP Police Constable",
+            "SSC Gd",
+            "SSC CGL"
+        ];
+
+        // Frontend ko list bhej dena
+        res.status(200).json({
+            success: true,
+            message: "Exam list fetched successfully",
+            data: exams
+        });
+
+    } catch (error) {
+        console.error("Error fetching exams:", error);
+        res.status(500).json({ 
+            success: false, 
+            message: "Internal Server Error" 
+        });
+    }
+};
+</file>
+
 <file path="backend/controllers/submitChallenge.js">
 // controllers/submitChallenge.js
 import Challenge from "../models/Challenge.js";
@@ -3145,6 +2828,639 @@ const ChallengeAttempt = rowQuestionConnection.model(
 );
 
 export default ChallengeAttempt;
+</file>
+
+<file path="backend/pages/user/analysicUser.js">
+import mongoose from "mongoose";
+import Performance from "../../models/Performance.js";
+import Blueprint from "../../models/bluePrint.js";
+import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
+
+
+// ─────────────────────────────────────────────
+// PAGE 1 — FUNCTION 1
+// Overview: average score, lifetime graph, subject list (last 3)
+// Route: GET /analysis/overview/:userId/:examName
+// ─────────────────────────────────────────────
+export const getAllAnalysis1stPage = async (req, res) => {
+  try {
+    let { userId, examName } = req.params;
+
+    // 👇 YEH LOGIC MISSING HAI TUMHARI FILE MEIN
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id; // 'active_user' text ko real ID se replace kar dega
+    }
+    // 👆 YEH LOGIC ADD KARO
+
+    // 1. Sare mocks fetch karo
+    const allTests = await Performance.find({ userId, examName })
+      .sort({ createdAt: -1 });
+      
+    if (!allTests || allTests.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "User ne abhi tak koi mock nahi diya hai.",
+        data: null,
+      });
+    }
+
+    // 2. Average Score — sirf last 3 mocks ka
+    const last3Tests = allTests.slice(0, 3);
+    const totalScoreSum = last3Tests.reduce((acc, test) => acc + test.totalScore, 0);
+    const averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
+
+    // 3. Graph Data — LIFETIME ke saare mocks
+    // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
+    const graphData = allTests
+  .map((test) => ({
+    performanceId: test._id,
+    score: test.totalScore,
+    date: test.createdAt,
+    blueprintName: test.blueprintName, // 👈 NAYA — Mini/Full + subject filter ke liye
+  }))
+  .reverse(); // chronological order (purana → naya)
+
+    // 4. Subject-wise accuracy + time — last 3 mocks se
+    // BUG FIX: || 0 ki jagah ?? 0 use kiya —
+    // agar averageTimePerQuestion exactly 0 ho tab || 0 bhi 0 deta tha
+    // lekin ?? 0 sirf null/undefined pe fallback karta hai, 0 pe nahi
+    const subjectMap = {};
+    last3Tests.forEach((test) => {
+      if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
+        test.subjectAnalysis.forEach((sub) => {
+          if (!subjectMap[sub.subjectName]) {
+            subjectMap[sub.subjectName] = {
+              totalAcc: 0,
+              totalTime: 0,
+              count: 0,
+            };
+          }
+          subjectMap[sub.subjectName].totalAcc += sub.accuracy;
+          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0; // ✅ FIX
+          subjectMap[sub.subjectName].count += 1;
+        });
+      }
+    });
+
+    const subjectAnalysis = Object.keys(subjectMap).map((name) => ({
+      subjectName: name,
+      averageAccuracy: Number(
+        (subjectMap[name].totalAcc / subjectMap[name].count).toFixed(2)
+      ),
+      averageTimePerQuestion: Number(
+        (subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)
+      ),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        averageScore,
+        totalTestsGiven: allTests.length,
+        graphData,
+        subjectAnalysis,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// ─────────────────────────────────────────────
+// PAGE 1 — FUNCTION 2
+// Graph click → ek specific mock ka pura breakdown
+// (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
+// Route: GET /analysis/mock-detail/:performanceId
+// ─────────────────────────────────────────────
+export const getPerformanceAnalysis = async (req, res) => {
+  try {
+    const { performanceId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(performanceId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Performance ID",
+      });
+    }
+
+    const performance = await Performance.findById(performanceId).populate({
+      path: "attemptedQuestions.questionId",
+      model: RowQuestion,
+    });
+
+    if (!performance) {
+      return res.status(404).json({
+        success: false,
+        message: "Performance nahi mila.",
+      });
+    }
+
+    const blueprint = await Blueprint.findOne({
+      blueprintName: performance.blueprintName,
+      examName: performance.examName,
+    });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: "Blueprint nahi mila.",
+      });
+    }
+
+    const totalQuestions = blueprint.totalQuestions;
+    const correct = performance.correctCount;
+    const wrong = performance.wrongCount;
+    const unattempted = performance.unattemptedCount;
+    const totalScore = performance.totalScore;
+
+    const accuracy =
+      totalQuestions === 0
+        ? 0
+        : Number(((correct / totalQuestions) * 100).toFixed(2));
+
+    // Total time: sirf jinka time data hai unka sum
+    let totalTimeTaken = 0;
+    for (const aq of performance.attemptedQuestions) {
+      totalTimeTaken += aq.timeTakenInSeconds ?? 0;
+    }
+
+    const averageTimePerQuestion =
+      totalQuestions === 0
+        ? 0
+        : Number((totalTimeTaken / totalQuestions).toFixed(2));
+
+    // Sawaal-by-sawaal breakdown
+    // Null-safe: agar koi question DB se delete ho gaya ho to crash nahi hoga
+    const questionBreakdown = performance.attemptedQuestions.map((aq) => {
+      const q = aq.questionId; // populate ho gaya hai upar
+
+      return {
+        questionId: q ? q._id : aq.questionId,
+        question: q ? q.question : null,
+        options: q
+          ? {
+              option1: q.option1,
+              option2: q.option2,
+              option3: q.option3,
+              option4: q.option4,
+            }
+          : null,
+        correctOption: q ? q.correctOption : null,
+        userAnswer: aq.userAnswer,
+        isCorrect: aq.isCorrect,
+        answerExplain: q ? q.answerExplain : null,
+        answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
+        topicName: q ? q.topicName : null,
+        subjectName: q ? q.subjectName : null,
+        timeTakenInSeconds: aq.timeTakenInSeconds,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      overview: {
+        examName: performance.examName,
+        blueprintName: performance.blueprintName,
+        totalQuestions,
+        correct,
+        wrong,
+        unattempted,
+        totalScore,
+        accuracy,
+        totalTimeTaken,
+        averageTimePerQuestion,
+      },
+      questionBreakdown,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+
+// ─────────────────────────────────────────────
+// PAGE 2: Subject-wise Analysis
+// Route: GET /analysis/subject/:userId/:examName/:subjectName
+// ─────────────────────────────────────────────
+export const getSubjectAnalysis = async (req, res) => {
+  try {
+    // FIX: 'const' ki jagah 'let' use kiya taaki hum userId ko update kar sakein
+    let { userId, examName, subjectName } = req.params;
+
+    // 👇 YEH LOGIC ADD KIYA HAI TAAKI "active_user" CRASH NA KARE
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id;
+    }
+    // 👆 YAHAN TAK
+
+    // 1. Last 3 mocks fetch karo
+    const last3Tests = await Performance.find({ userId, examName })
+      .sort({ createdAt: -1 })
+      .limit(3);
+
+    if (!last3Tests || last3Tests.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "User ne abhi tak koi mock nahi diya hai.",
+        data: null,
+      });
+    }
+
+    // 2. Subject ka average accuracy + time (last 3 mocks)
+    let totalAccuracy = 0;
+    let totalTime = 0;
+    let subjectFoundCount = 0;
+    const graphData = [];
+
+    for (const test of last3Tests) {
+      const subData = test.subjectAnalysis
+        ? test.subjectAnalysis.find((s) => s.subjectName === subjectName)
+        : null;
+
+      if (subData) {
+        totalAccuracy += subData.accuracy;
+        totalTime += subData.averageTimePerQuestion ?? 0;
+        subjectFoundCount++;
+
+        graphData.push({
+          performanceId: test._id,
+          date: test.createdAt,
+          accuracy: subData.accuracy,
+        });
+      }
+    }
+
+    graphData.reverse(); // chronological order
+
+    const averageAccuracy =
+      subjectFoundCount === 0
+        ? 0
+        : Number((totalAccuracy / subjectFoundCount).toFixed(2));
+
+    const averageTimePerQuestion =
+      subjectFoundCount === 0
+        ? 0
+        : Number((totalTime / subjectFoundCount).toFixed(2));
+
+    // 3. Topic-wise data (last 3 mocks se, runtime calculate)
+    // Topic data Performance mein store nahi — Question model se nikalna padega
+
+    // 3a. Sare questionIds (teen mocks ke)
+    const allQuestionIds = last3Tests.flatMap((test) =>
+      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
+    );
+
+    // 3b. Sirf is subject ke questions ka topicName fetch karo — ek query
+    const questionDocs = await RowQuestion.find({
+      _id: { $in: allQuestionIds },
+      subjectName: subjectName,
+    }).select("_id topicName");
+
+    // 3c. Lookup map: questionId → topicName
+    const topicNameMap = {};
+    for (const doc of questionDocs) {
+      topicNameMap[doc._id.toString()] = doc.topicName;
+    }
+
+    // 3d. Topic-wise group karo
+    const topicGroups = {};
+
+    for (const test of last3Tests) {
+      for (const aq of test.attemptedQuestions) {
+        if (!aq.questionId) continue;
+
+        const topicName = topicNameMap[aq.questionId.toString()];
+        if (!topicName) continue; // is subject ka question nahi — skip
+
+        if (!topicGroups[topicName]) {
+          topicGroups[topicName] = {
+            correct: 0,
+            wrong: 0,       
+            unattempted: 0, 
+            total: 0,
+            totalTime: 0,
+            timedCount: 0,
+          };
+        }
+
+        topicGroups[topicName].total++;
+
+        if (aq.isCorrect === true) {
+          topicGroups[topicName].correct++;
+        } else if (aq.isCorrect === false) {
+          topicGroups[topicName].wrong++;       
+        } else {
+          topicGroups[topicName].unattempted++; 
+        }
+
+        if (
+          typeof aq.timeTakenInSeconds === "number" &&
+          aq.timeTakenInSeconds >= 0
+        ) {
+          topicGroups[topicName].totalTime += aq.timeTakenInSeconds;
+          topicGroups[topicName].timedCount++;
+        }
+      }
+    }
+
+    // 3e. Topic list banao
+    const topicList = Object.keys(topicGroups).map((topicName) => {
+      const { correct, wrong, unattempted, total, totalTime, timedCount } =
+        topicGroups[topicName];
+
+      const efficiency =
+        total === 0 ? 0 : Number(((correct / total) * 100).toFixed(2));
+
+      const avgTime =
+        timedCount === 0
+          ? 0
+          : Number((totalTime / timedCount).toFixed(2));
+
+      return {
+        topicName,
+        efficiency,
+        totalAttempted: total,
+        correctCount: correct,
+        wrongCount: wrong,         
+        unattemptedCount: unattempted, 
+        averageTimePerQuestion: avgTime,
+      };
+    });
+
+    // 4. Top 5 weak topics
+    const weakTopics = [...topicList]
+      .filter((t) => t.totalAttempted > 0)
+      .sort((a, b) => {
+        const scoreA = a.wrongCount * 2 + a.averageTimePerQuestion / 30;
+        const scoreB = b.wrongCount * 2 + b.averageTimePerQuestion / 30;
+        return scoreB - scoreA;
+      })
+      .slice(0, 5)
+      .map((t) => ({
+        topicName: t.topicName,
+        efficiency: t.efficiency,
+        wrongCount: t.wrongCount,
+        averageTimePerQuestion: t.averageTimePerQuestion,
+        reason:
+          t.wrongCount > 0 && t.averageTimePerQuestion > 30
+            ? "Galat bhi kar rahe ho aur time bhi zyada lag raha hai"
+            : t.wrongCount > 0
+            ? "Is topic mein galat answers zyada hain"
+            : "Is topic mein time zyada lag raha hai",
+      }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        subjectName,
+        averageAccuracy,
+        averageTimePerQuestion,
+        totalTestsConsidered: subjectFoundCount,
+        graphData,
+        topicList,
+        weakTopics,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Subject analysis fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+
+
+// ─────────────────────────────────────────────
+// PAGE 3: Topic-wise Analysis
+// Page 2 mein topic pe click karne pe ye page khulega
+// Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PAGE 3: Topic-wise Analysis
+// ─────────────────────────────────────────────
+export const getTopicAnalysis = async (req, res) => {
+  try {
+    // 👇 Const ko let kiya taaki hum userId ko update kar sakein
+    let { userId, examName, subjectName, topicName } = req.params;
+
+    // 👇 YEH LOGIC ADD KARNA ZAROORI HAI
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id; 
+    }
+    // 👆 YEH LOGIC ADD KARNE KE BAAD HI MONGODB ERROR BAND HOGA
+
+    // ─────────────────────────────────────────────
+    // 1. LIFETIME ke saare mocks fetch karo
+    // ─────────────────────────────────────────────
+    const allTests = await Performance.find({ userId, examName })
+      .sort({ createdAt: -1 });
+    
+    // ... baaki ka purana code waisa hi rahega ...
+    if (!allTests || allTests.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "User ne abhi tak koi mock nahi diya hai.",
+        data: null,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // 2. Sare mocks ke questionIds nikalo ek saath
+    // ─────────────────────────────────────────────
+    const allQuestionIds = allTests.flatMap((test) =>
+      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
+    );
+
+    // ─────────────────────────────────────────────
+    // 3. Sirf is topic + subject ke questions fetch karo — ek query
+    //    Pura question detail chahiye (sawaal, options, explanation)
+    // ─────────────────────────────────────────────
+    const questionDocs = await RowQuestion.find({
+      _id: { $in: allQuestionIds },
+      subjectName: subjectName,
+      topicName: topicName,
+    }).select(
+      "_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName"
+    );
+
+    // Lookup map: questionId → full question document
+    const questionMap = {};
+    for (const doc of questionDocs) {
+      questionMap[doc._id.toString()] = doc;
+    }
+
+    // ─────────────────────────────────────────────
+    // 4. Har mock ke har attempted question ko check karo
+    //    Agar wo is topic ka hai to uski entry banao
+    //    Same question multiple mocks mein aaya to teeno baar aayega (deduplicate nahi)
+    // ─────────────────────────────────────────────
+    const goodAtQuestions = [];    // isCorrect === true
+    const wrongQuestions = [];     // isCorrect === false
+    const unattemptedQuestions = []; // isCorrect === null
+
+    // Topic-level stats ke liye counters
+    let totalAttempted = 0;
+    let totalCorrect = 0;
+    let totalWrong = 0;
+    let totalUnattempted = 0;
+    let totalTime = 0;
+    let timedCount = 0;
+
+    for (const test of allTests) {
+      for (const aq of test.attemptedQuestions) {
+        if (!aq.questionId) continue;
+
+        const qId = aq.questionId.toString();
+        const qDoc = questionMap[qId];
+
+        // Sirf is topic ke questions process karo
+        if (!qDoc) continue;
+
+        totalAttempted++;
+
+        // Time tracking
+        if (
+          typeof aq.timeTakenInSeconds === "number" &&
+          aq.timeTakenInSeconds >= 0
+        ) {
+          totalTime += aq.timeTakenInSeconds;
+          timedCount++;
+        }
+
+        // Har entry mein performanceId bhi rakho taaki
+        // frontend track kar sake ye kaunse mock se hai
+        const entry = {
+          performanceId: test._id,
+          mockDate: test.createdAt,
+          questionId: qDoc._id,
+          question: qDoc.question,
+          options: {
+            option1: qDoc.option1,
+            option2: qDoc.option2,
+            option3: qDoc.option3,
+            option4: qDoc.option4,
+          },
+          correctOption: qDoc.correctOption,
+          userAnswer: aq.userAnswer,
+          answerExplain: qDoc.answerExplain,
+          answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
+          timeTakenInSeconds: aq.timeTakenInSeconds,
+        };
+
+        if (aq.isCorrect === true) {
+          totalCorrect++;
+          goodAtQuestions.push(entry);
+        } else if (aq.isCorrect === false) {
+          totalWrong++;
+          wrongQuestions.push(entry);
+        } else {
+          totalUnattempted++;
+          unattemptedQuestions.push(entry);
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // 5. Topic-level summary calculate karo
+    // ─────────────────────────────────────────────
+    const efficiency =
+      totalAttempted === 0
+        ? 0
+        : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
+
+    const averageTimePerQuestion =
+      timedCount === 0
+        ? 0
+        : Number((totalTime / timedCount).toFixed(2));
+
+    // ─────────────────────────────────────────────
+    // 6. Response
+    // ─────────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      data: {
+        topicName,
+        subjectName,
+        // Upar dikhayi jaane wali summary
+        summary: {
+          efficiency,              // % sahi (correct / total * 100)
+          averageTimePerQuestion,  // sirf timed questions ka average
+          totalAttempted,
+          totalCorrect,
+          totalWrong,
+          totalUnattempted,
+          totalMocksConsidered: allTests.length,
+        },
+        // Teen sections — har ek mein pura sawaal + explanation
+        goodAt: goodAtQuestions,
+        wrong: wrongQuestions,
+        unattempted: unattemptedQuestions,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Topic analysis fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+
+
+// ─────────────────────────────────────────────
+// Mock test list — user ke sare mocks
+// Route: GET /analysis/mock-list/:userId/:examName
+// ─────────────────────────────────────────────
+export const getUserMockTests = async (req, res) => {
+  try {
+    const { userId, examName } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User ID",
+      });
+    }
+
+    const tests = await Performance.find({ userId, examName })
+      .select(
+        "_id blueprintName examName totalScore correctCount wrongCount unattemptedCount createdAt"
+      )
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      totalTests: tests.length,
+      data: tests.map((test) => ({
+        performanceId: test._id,
+        blueprintName: test.blueprintName,
+        examName: test.examName,
+        totalScore: test.totalScore,
+        correctCount: test.correctCount,
+        wrongCount: test.wrongCount,
+        unattemptedCount: test.unattemptedCount,
+        date: test.createdAt,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Mock Test List fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
 </file>
 
 <file path="frontend/src/api/api.js">
@@ -6290,11 +6606,118 @@ rowQuestionConnection.on("error", (err) => {
 });
 </file>
 
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js";
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+import { getMyChallenges } from "../controllers/getMyChallenges.js";
+
+// 👇 NAYA: Rank Predictor ke controllers
+import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
+import { predictRank } from "../controllers/predictRank.js";
+import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+router.post("/create-challenge", userInfo, createChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
+router.post("/add-rank-predictor-data", addRankPredictorData);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+router.get("/my-challenges", userInfo, getMyChallenges);
+
+// 👇 NAYA: Rank Predictor ke GET routes
+// Score query param se aayega: /rank-predictor/UP%20Police%20Constable?score=145
+router.get("/rank-predictor/:examName", userInfo, predictRank);
+// Data availability check karne ke liye (frontend button dikhana/chupana)
+router.get("/rank-predictor-data/:examName", getRankPredictorData);
+
+export default router;
+</file>
+
 <file path="frontend/src/pages/MockTest.jsx">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/api"; // 👈 api instance import kiya
+import api from "../api/api";
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -6321,7 +6744,7 @@ const formatTime = (totalSeconds) => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-// 👇 NAYA: localStorage key banane ka helper — har user ka apna alag saved test
+// localStorage key banane ka helper — har user ka apna alag saved test
 const getStorageKey = (userId) => `activeMockTest_${userId}`;
 
 const MockTest = () => {
@@ -6343,19 +6766,21 @@ const MockTest = () => {
   const [visited, setVisited] = useState(() => new Set());
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  // 👇 NAYA: Test kab khatam hoga uska absolute (wall-clock) timestamp
-  // Isse reload ke baad bhi timer sahi se calculate ho payega
-  const [endTimestamp, setEndTimestamp] = useState(null);
+  // 👇 UPDATED: endTimestamp (wall-clock) hata diya — ab tab-visibility se
+  // timer freeze hota hai, taaki website band/minimize karne par time bhi ruk jaye
+  const [isVisible, setIsVisible] = useState(true);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [resultData, setResultData] = useState(null);
 
-  // 👇 NAYA: Question Review screen ke liye state
-  // reviewConfig batata hai ki kaunse subject/status ke sath review khola gaya
+  // Question Review screen ke liye state
   const [reviewConfig, setReviewConfig] = useState({ subjectName: null, filter: "all" });
 
   const questionStartRef = useRef(Date.now());
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
+  // 👇 NAYA: remainingSeconds ka latest value ref mein — localStorage save ke liye
+  // (isse har second re-render/write nahi hota, sirf jab zaroorat ho tab latest milta hai)
+  const remainingSecondsRef = useRef(0);
 
   // ── Step 1: Init Data ──
   useEffect(() => {
@@ -6371,16 +6796,14 @@ const MockTest = () => {
         setExamName(exam);
 
         // ─────────────────────────────────────────────
-        // 👇 NAYA: Sabse pehle check karo ki koi in-progress
-        // test localStorage mein saved to nahi hai. Agar hai
-        // aur time bacha hua hai, to usko RESUME karo —
-        // naya mock generate mat karo.
+        // Sabse pehle check karo ki koi in-progress test
+        // localStorage mein saved to nahi hai. Agar hai,
+        // to usko RESUME karo — naya mock generate mat karo.
         // ─────────────────────────────────────────────
         const savedRaw = localStorage.getItem(getStorageKey(uid));
         if (savedRaw) {
           try {
             const saved = JSON.parse(savedRaw);
-            const remaining = Math.round((saved.endTimestamp - Date.now()) / 1000);
 
             if (saved.mockData && saved.selectedBlueprint) {
               // State restore karo
@@ -6392,8 +6815,9 @@ const MockTest = () => {
               setTimeSpent(saved.timeSpent || {});
               setActiveSubjectIdx(saved.activeSubjectIdx || 0);
               setActiveQIdx(saved.activeQIdx || 0);
-              setEndTimestamp(saved.endTimestamp);
-              setRemainingSeconds(Math.max(0, remaining));
+              // 👇 UPDATED: seedha saved remainingSeconds restore karo —
+              // koi wall-clock gap calculate nahi karna, jitna time chhoda tha utna hi milega
+              setRemainingSeconds(Math.max(0, saved.remainingSeconds ?? 0));
 
               const subj = saved.mockData.subjects[saved.activeSubjectIdx || 0];
               const q = subj ? subj.questions[saved.activeQIdx || 0] : null;
@@ -6477,9 +6901,8 @@ const MockTest = () => {
 
       const durMin = selectedBlueprint.durationMinutes || Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
       const totalSeconds = durMin * 60;
-      const newEndTimestamp = Date.now() + totalSeconds * 1000;
 
-      setEndTimestamp(newEndTimestamp);
+      // 👇 UPDATED: sirf remainingSeconds set karo, koi endTimestamp nahi
       setRemainingSeconds(totalSeconds);
       setPhase("test");
     } catch (err) {
@@ -6599,15 +7022,12 @@ const MockTest = () => {
   }, [answers, marked, visited, mockData]);
 
   // ─────────────────────────────────────────────
-  // 👇 NAYA: Jab bhi test ka koi bhi zaroori part change ho
+  // Jab bhi test ka koi bhi zaroori part change ho
   // (answer, mark, navigation, time), poora state localStorage
   // mein save kar do — taaki reload pe wahi se resume ho sake.
-  // Note: remainingSeconds ko dependency mein NAHI rakha — 
-  // warna har second localStorage write hota rahega (perf hit).
-  // Uski jagah fixed endTimestamp store hota hai.
   // ─────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== "test" || !mockData || !userId || !endTimestamp) return;
+    if (phase !== "test" || !mockData || !userId) return;
 
     const toSave = {
       selectedBlueprint,
@@ -6618,7 +7038,7 @@ const MockTest = () => {
       timeSpent,
       activeSubjectIdx,
       activeQIdx,
-      endTimestamp,
+      remainingSeconds: remainingSecondsRef.current,
     };
 
     try {
@@ -6635,8 +7055,76 @@ const MockTest = () => {
     timeSpent,
     activeSubjectIdx,
     activeQIdx,
-    endTimestamp,
     userId,
+    selectedBlueprint,
+  ]);
+
+  // 👇 NAYA: remainingSeconds ko ref mein sync rakho — taaki har second
+  // localStorage write na ho (perf), lekin jab bhi save ho, latest time mile
+  useEffect(() => {
+    remainingSecondsRef.current = remainingSeconds;
+  }, [remainingSeconds]);
+
+  // 👇 NAYA: Jab tab hide/minimize/band ho, turant time freeze karke save karo.
+  // Wapas visible hone par timer wahi se resume hoga, wall-clock gap se nahi.
+  useEffect(() => {
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setIsVisible(visible);
+
+      if (!visible && phase === "test" && mockData && userId) {
+        // Current question ka time turant (synchronously) flush karo
+        const qId = currentQIdRef.current;
+        let updatedTimeSpent = timeSpent;
+        if (qId) {
+          const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+          if (elapsed > 0) {
+            updatedTimeSpent = { ...timeSpent, [qId]: (timeSpent[qId] || 0) + elapsed };
+            setTimeSpent(updatedTimeSpent);
+          }
+          questionStartRef.current = Date.now();
+        }
+
+        const toSave = {
+          selectedBlueprint,
+          mockData,
+          answers,
+          marked: [...marked],
+          visited: [...visited],
+          timeSpent: updatedTimeSpent,
+          activeSubjectIdx,
+          activeQIdx,
+          remainingSeconds: remainingSecondsRef.current,
+        };
+        try {
+          localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave));
+        } catch (err) {
+          console.error("Hide-time save fail:", err);
+        }
+      } else if (visible && phase === "test") {
+        // Wapas aane par question timer reset — hidden duration
+        // is question ke time mein galti se add na ho
+        questionStartRef.current = Date.now();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    phase,
+    mockData,
+    userId,
+    answers,
+    marked,
+    visited,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
     selectedBlueprint,
   ]);
 
@@ -6659,8 +7147,7 @@ const MockTest = () => {
         userId, examName, blueprintName: selectedBlueprint.blueprintName, attemptedQuestions
       });
 
-      // 👇 NAYA: Submit successful hone ke baad saved in-progress test hata do
-      // warna agli baar dobara yahi purana test resume ho jayega
+      // Submit successful hone ke baad saved in-progress test hata do
       localStorage.removeItem(getStorageKey(userId));
 
       setResultData(res.data.data);
@@ -6672,12 +7159,12 @@ const MockTest = () => {
     }
   };
 
-  // ── Countdown timer — endTimestamp ke basis pe accurate rehta hai ──
+  // 👇 UPDATED: Timer sirf tab visible hone par hi tick karta hai.
+  // Tab hidden hote hi ye effect kuch nahi karta — time freeze ho jata hai.
   useEffect(() => {
-    if (phase !== "test") return;
+    if (phase !== "test" || !isVisible) return;
 
     if (remainingSeconds <= 0) {
-      // Direct call karne ki jagah setTimeout ka use karein
       const timer = setTimeout(() => {
         handleSubmit();
       }, 0);
@@ -6685,21 +7172,14 @@ const MockTest = () => {
     }
 
     const timer = setTimeout(() => {
-      // 👇 NAYA: endTimestamp se hi recalculate karo, sirf -1 mat karo
-      // Isse background tab throttling ya thoda drift bhi self-correct ho jata hai
-      if (endTimestamp) {
-        const newRemaining = Math.max(0, Math.round((endTimestamp - Date.now()) / 1000));
-        setRemainingSeconds(newRemaining);
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
+      setRemainingSeconds((s) => Math.max(0, s - 1));
     }, 1000);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
+  }, [phase, remainingSeconds, isVisible]);
 
-  // 👇 NAYA: Review screen kholne/band karne ke functions
+  // Review screen kholne/band karne ke functions
   const openReview = (subjectName = null, filter = "all") => {
     setReviewConfig({ subjectName, filter });
     setPhase("review");
@@ -6834,7 +7314,7 @@ const MockTest = () => {
     );
   }
 
-  // 👇 NAYA: Question Review screen
+  // Question Review screen
   if (phase === "review" && resultData) {
     return (
       <QuestionReviewScreen
@@ -7139,7 +7619,7 @@ const TestScreen = ({
   );
 };
 
-// 👇 Results screen — categories aur "Deep Analysis" clickable hain
+// Results screen — categories aur "Deep Analysis" clickable hain
 const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   const { scoreDetails, subjectAnalysis } = resultData;
   return (
@@ -7468,7 +7948,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// Seconds ko readable "Xm Ys" format me convert karta hai
 // ──────────────────────────────────────────────
 const formatDuration = (totalSeconds) => {
   if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
@@ -7480,7 +7960,7 @@ const formatDuration = (totalSeconds) => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Skeleton loading building blocks
+// Skeleton loading building blocks
 // ──────────────────────────────────────────────
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -7562,6 +8042,15 @@ const MockDetailSkeleton = () => (
   </div>
 );
 
+// ──────────────────────────────────────────────
+// 👇 NAYA: Test History ke Level-1 filter tabs
+// ──────────────────────────────────────────────
+const MOCK_TYPE_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "Full", label: "Full Mock" },
+  { key: "Mini", label: "Mini Mock" },
+];
+
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
@@ -7569,8 +8058,15 @@ const UserAllAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 👇 NAYA: Subject-wise question count, blueprint se aata hai
+  // Subject-wise question count, blueprint se aata hai
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({});
+
+  // 👇 NAYA: Poori blueprint list — Test History ko Mini/Full + subject se filter karne ke liye
+  const [blueprints, setBlueprints] = useState([]);
+
+  // 👇 NAYA: Test History ke filter states
+  const [mockTypeFilter, setMockTypeFilter] = useState("all"); // "all" | "Full" | "Mini"
+  const [miniSubjectFilter, setMiniSubjectFilter] = useState("all"); // "all" | subjectName
 
   const [viewingMockId, setViewingMockId] = useState(null);
 
@@ -7594,9 +8090,12 @@ const UserAllAnalysis = () => {
 
         setOverview(overviewRes.data.data);
 
-        // 👇 NAYA: Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
+        const blueprintList = blueprintsRes.data.data || [];
+        setBlueprints(blueprintList); // 👈 NAYA
+
+        // Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
         const countMap = {};
-        (blueprintsRes.data.data || []).forEach((bp) => {
+        blueprintList.forEach((bp) => {
           (bp.subjects || []).forEach((s) => {
             if (!(s.subjectName in countMap)) {
               countMap[s.subjectName] = s.questionCount;
@@ -7618,6 +8117,75 @@ const UserAllAnalysis = () => {
     if (!overview?.graphData) return [];
     return [...overview.graphData].reverse();
   }, [overview]);
+
+  // 👇 NAYA: blueprintName → { mockType, subjectNames } lookup map
+  const blueprintMetaMap = useMemo(() => {
+    const map = {};
+    blueprints.forEach((bp) => {
+      map[bp.blueprintName] = {
+        mockType: bp.mockType,
+        subjectNames: (bp.subjects || []).map((s) => s.subjectName),
+      };
+    });
+    return map;
+  }, [blueprints]);
+
+  // 👇 NAYA: Level-1 tabs ke counts — All / Full / Mini
+  const mockTypeCounts = useMemo(() => {
+    const counts = { all: sortedHistory.length, Full: 0, Mini: 0 };
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType === "Full") counts.Full++;
+      else if (meta?.mockType === "Mini") counts.Mini++;
+    });
+    return counts;
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Mini Mock attempts mein jitne bhi alag subjects aaye — dynamically nikalte hain
+  // (Hindi/GK/GS/Maths/Reasoning jo bhi asal blueprint data mein ho, hardcode nahi kiya)
+  const miniSubjects = useMemo(() => {
+    const set = new Set();
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType === "Mini") {
+        (meta.subjectNames || []).forEach((s) => set.add(s));
+      }
+    });
+    return Array.from(set).sort();
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Level-2 (Mini ke andar subject) tabs ke counts
+  const miniSubjectCounts = useMemo(() => {
+    const counts = { all: 0 };
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType !== "Mini") return;
+      counts.all++;
+      (meta.subjectNames || []).forEach((s) => {
+        counts[s] = (counts[s] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Dono filters ke hisaab se final list
+  const filteredHistory = useMemo(() => {
+    return sortedHistory.filter((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (mockTypeFilter === "all") return true;
+      if (meta?.mockType !== mockTypeFilter) return false;
+      if (mockTypeFilter === "Mini" && miniSubjectFilter !== "all") {
+        return (meta.subjectNames || []).includes(miniSubjectFilter);
+      }
+      return true;
+    });
+  }, [sortedHistory, blueprintMetaMap, mockTypeFilter, miniSubjectFilter]);
+
+  // 👇 NAYA: Level-1 tab badalte hi subject filter reset — stale combo na bache
+  const selectMockType = (type) => {
+    setMockTypeFilter(type);
+    setMiniSubjectFilter("all");
+  };
 
   if (loading) {
     return <AnalysisPageSkeleton />;
@@ -7736,7 +8304,6 @@ const UserAllAnalysis = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {overview.subjectAnalysis?.map((s, i) => {
-                    // 👇 NAYA: averageTimePerQuestion × us subject ke total questions = poora subject attempt karne ka time
                     const qCount = subjectQuestionCounts[s.subjectName];
                     const totalTimeSeconds =
                       qCount != null ? s.averageTimePerQuestion * qCount : null;
@@ -7774,49 +8341,107 @@ const UserAllAnalysis = () => {
           )}
         </div>
 
-        {/* Mock History — latest-first, date+time ke sath, clickable */}
+        {/* Mock History — Mini/Full + subject filters ke sath, latest-first, clickable */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Test History</h3>
             <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par click karke uska poora result dekhein</p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-medium">Date &amp; Time</th>
-                  <th className="px-6 py-4 font-medium">Score</th>
-                  <th className="px-6 py-4 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {sortedHistory.map((g, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => setViewingMockId(g.performanceId)}
-                    className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
+          {/* 👇 NAYA: Level-1 filter — All / Full Mock / Mini Mock */}
+          <div className="px-6 pt-5 pb-4 border-b border-gray-800 space-y-3">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {MOCK_TYPE_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => selectMockType(f.key)}
+                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                    mockTypeFilter === f.key
+                      ? "bg-[#7C3AED] text-white"
+                      : "bg-[#1F2937] border border-gray-800 text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {f.label} ({mockTypeCounts[f.key]})
+                </button>
+              ))}
+            </div>
+
+            {/* 👇 NAYA: Level-2 filter — sirf Mini Mock ke andar, subject-wise */}
+            {mockTypeFilter === "Mini" && miniSubjects.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setMiniSubjectFilter("all")}
+                  className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                    miniSubjectFilter === "all"
+                      ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
+                      : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  Sabhi Subjects ({miniSubjectCounts.all || 0})
+                </button>
+                {miniSubjects.map((subj) => (
+                  <button
+                    key={subj}
+                    onClick={() => setMiniSubjectFilter(subj)}
+                    className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                      miniSubjectFilter === subj
+                        ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
+                        : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
+                    }`}
                   >
-                    <td className="px-6 py-4 text-sm text-gray-300">
-                      {new Date(g.date).toLocaleString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
-                        View Result &rarr;
-                      </span>
-                    </td>
-                  </tr>
+                    {subj} ({miniSubjectCounts[subj] || 0})
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
+
+          {filteredHistory.length === 0 ? (
+            <p className="px-6 py-10 text-sm text-gray-400 text-center">
+              Is category mein koi mock nahi mila.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-medium">Date &amp; Time</th>
+                    <th className="px-6 py-4 font-medium">Mock</th>
+                    <th className="px-6 py-4 font-medium">Score</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {filteredHistory.map((g) => (
+                    <tr
+                      key={g.performanceId}
+                      onClick={() => setViewingMockId(g.performanceId)}
+                      className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4 text-sm text-gray-300">
+                        {new Date(g.date).toLocaleString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-400 max-w-[180px] truncate">
+                        {g.blueprintName || "—"}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
+                          View Result &rarr;
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
       </div>
@@ -7825,7 +8450,7 @@ const UserAllAnalysis = () => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 Ek specific mock ka poora result + question review
+// Ek specific mock ka poora result + question review
 // ──────────────────────────────────────────────
 
 const Stat = ({ label, value }) => (
@@ -8054,7 +8679,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 Single question detail card (options + explanation)
+// Single question detail card (options + explanation)
 // ──────────────────────────────────────────────
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =
@@ -8123,101 +8748,6 @@ const QuestionDetailCard = ({ q }) => {
 };
 
 export default UserAllAnalysis;
-</file>
-
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js";
-
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
-import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
-
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-import { getMyChallenges } from "../controllers/getMyChallenges.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-router.post("/create-challenge", userInfo, createChallenge);
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-// 👇 NAYA: Frontend ko batata hai current user admin hai ya nahi —
-// isse HomePage pe "Question Review" button sirf admin ko dikhega
-router.get("/is-admin", userInfo, (req, res) => {
-    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
-    res.status(200).json({ success: true, isAdmin: isAdminUser });
-});
-
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-router.get("/my-challenges", userInfo, getMyChallenges);
-
-export default router;
 </file>
 
 <file path="frontend/src/pages/HomePage.jsx">
@@ -8548,6 +9078,10 @@ const formatTime = (totalSeconds) => {
 // localStorage key — har user ka apna alag saved "created challenge"
 const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
 
+// 👇 NAYA: localStorage key — user ke current in-progress test attempt ke liye
+// (alag hai getChallengeStorageKey se, jo sirf "created but not started" ko track karta hai)
+const getChallengeAttemptStorageKey = (userId) => `activeChallengeAttempt_${userId}`;
+
 // ──────────────────────────────────────────────
 // Skeleton loading building blocks (spinner ki jagah)
 // ──────────────────────────────────────────────
@@ -8612,9 +9146,6 @@ const SubmittingSkeleton = () => (
 
 // ──────────────────────────────────────────────
 // Reusable Leaderboard list component
-// FIX: naam se compare karne ki jagah ab userId se compare
-// hoga — taaki same naam wale do alag accounts galti se
-// dono "(Aap)" na ban jaayein
 // ──────────────────────────────────────────────
 const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
@@ -8688,13 +9219,17 @@ const Challenge = () => {
   const [answers, setAnswers] = useState({});
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const [endTimestamp, setEndTimestamp] = useState(null);
+  // 👇 UPDATED: endTimestamp (wall-clock) hata diya — ab tab-visibility se
+  // timer freeze hota hai
+  const [isVisible, setIsVisible] = useState(true);
   const [resultData, setResultData] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
   const questionStartRef = useRef(Date.now());
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
+  // 👇 NAYA: remainingSeconds ka latest value ref mein — localStorage save ke liye
+  const remainingSecondsRef = useRef(0);
 
   const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
 
@@ -8722,6 +9257,7 @@ const Challenge = () => {
     setPhase("loading-create");
     try {
       localStorage.removeItem(getChallengeStorageKey(userId));
+      localStorage.removeItem(getChallengeAttemptStorageKey(userId));
       await generateNewChallenge(userExam, userId);
       setPhase("created");
     } catch (err) {
@@ -8741,6 +9277,43 @@ const Challenge = () => {
         setUserName(user.name);
         setUserId(user._id);
         setUserExam(user.exam);
+
+        // ─────────────────────────────────────────────
+        // 👇 NAYA STEP 0: Check karo koi in-progress test attempt saved to nahi hai
+        // (matlab test beech mein tha jab tab band/minimize hua tha)
+        // ─────────────────────────────────────────────
+        const attemptRaw = localStorage.getItem(getChallengeAttemptStorageKey(user._id));
+        if (attemptRaw) {
+          try {
+            const attempt = JSON.parse(attemptRaw);
+            const matchesRoute = codeParam
+              ? attempt.challengeCode === codeParam
+              : attempt.isOwn;
+
+            if (matchesRoute && attempt.challengeMeta) {
+              setChallengeMeta(attempt.challengeMeta);
+              if (attempt.isOwn && attempt.createdChallenge) {
+                setCreatedChallenge(attempt.createdChallenge);
+              }
+              setAnswers(attempt.answers || {});
+              setTimeSpent(attempt.timeSpent || {});
+              setActiveSubjectIdx(attempt.activeSubjectIdx || 0);
+              setActiveQIdx(attempt.activeQIdx || 0);
+              setRemainingSeconds(Math.max(0, attempt.remainingSeconds ?? 0));
+
+              const subj = attempt.challengeMeta.subjects[attempt.activeSubjectIdx || 0];
+              const q = subj ? subj.questions[attempt.activeQIdx || 0] : null;
+              currentQIdRef.current = q ? q._id : null;
+              questionStartRef.current = Date.now();
+              submittingRef.current = false;
+
+              setPhase("test");
+              return;
+            }
+          } catch {
+            localStorage.removeItem(getChallengeAttemptStorageKey(user._id));
+          }
+        }
 
         if (codeParam) {
           const chRes = await api.get(`/challenge/${codeParam}`);
@@ -8830,7 +9403,7 @@ const Challenge = () => {
     questionStartRef.current = Date.now();
 
     const totalSeconds = challengeMeta.durationMinutes * 60;
-    setEndTimestamp(Date.now() + totalSeconds * 1000);
+    // 👇 UPDATED: sirf remainingSeconds set karo, koi endTimestamp nahi
     setRemainingSeconds(totalSeconds);
     setPhase("test");
   };
@@ -8907,6 +9480,8 @@ const Challenge = () => {
       const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
       setResultData(res.data.data);
 
+      // 👇 NAYA: attempt submit ho gaya — in-progress attempt data hata do
+      localStorage.removeItem(getChallengeAttemptStorageKey(userId));
       if (isOwnChallenge) {
         localStorage.removeItem(getChallengeStorageKey(userId));
       }
@@ -8915,6 +9490,7 @@ const Challenge = () => {
       setPhase("result");
     } catch (err) {
       if (err.response?.status === 409) {
+        localStorage.removeItem(getChallengeAttemptStorageKey(userId));
         if (isOwnChallenge) {
           localStorage.removeItem(getChallengeStorageKey(userId));
         }
@@ -8927,22 +9503,120 @@ const Challenge = () => {
     }
   };
 
+  // 👇 NAYA: remainingSeconds ko ref mein sync rakho — localStorage save ke liye
   useEffect(() => {
-    if (phase !== "test") return;
+    remainingSecondsRef.current = remainingSeconds;
+  }, [remainingSeconds]);
+
+  // 👇 NAYA: Test ke dauraan answers/navigation/time change hone par
+  // poora attempt state localStorage mein checkpoint karte raho
+  useEffect(() => {
+    if (phase !== "test" || !challengeMeta || !userId || !effectiveCode) return;
+
+    const toSave = {
+      challengeCode: effectiveCode,
+      isOwn: isOwnChallenge,
+      createdChallenge: isOwnChallenge ? createdChallenge : null,
+      challengeMeta,
+      answers,
+      timeSpent,
+      activeSubjectIdx,
+      activeQIdx,
+      remainingSeconds: remainingSecondsRef.current,
+    };
+
+    try {
+      localStorage.setItem(getChallengeAttemptStorageKey(userId), JSON.stringify(toSave));
+    } catch (err) {
+      console.error("Challenge attempt state save nahi ho paayi:", err);
+    }
+  }, [
+    phase,
+    challengeMeta,
+    answers,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    userId,
+    effectiveCode,
+    isOwnChallenge,
+    createdChallenge,
+  ]);
+
+  // 👇 NAYA: Tab hide/minimize/band hote hi time turant freeze karke save karo.
+  // Wapas visible hone par timer wahi se resume hoga.
+  useEffect(() => {
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setIsVisible(visible);
+
+      if (!visible && phase === "test" && challengeMeta && userId && effectiveCode) {
+        const qId = currentQIdRef.current;
+        let updatedTimeSpent = timeSpent;
+        if (qId) {
+          const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+          if (elapsed > 0) {
+            updatedTimeSpent = { ...timeSpent, [qId]: (timeSpent[qId] || 0) + elapsed };
+            setTimeSpent(updatedTimeSpent);
+          }
+          questionStartRef.current = Date.now();
+        }
+
+        const toSave = {
+          challengeCode: effectiveCode,
+          isOwn: isOwnChallenge,
+          createdChallenge: isOwnChallenge ? createdChallenge : null,
+          challengeMeta,
+          answers,
+          timeSpent: updatedTimeSpent,
+          activeSubjectIdx,
+          activeQIdx,
+          remainingSeconds: remainingSecondsRef.current,
+        };
+        try {
+          localStorage.setItem(getChallengeAttemptStorageKey(userId), JSON.stringify(toSave));
+        } catch (err) {
+          console.error("Hide-time save fail:", err);
+        }
+      } else if (visible && phase === "test") {
+        questionStartRef.current = Date.now();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    phase,
+    challengeMeta,
+    userId,
+    effectiveCode,
+    answers,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    isOwnChallenge,
+    createdChallenge,
+  ]);
+
+  // 👇 UPDATED: Timer sirf tab visible hone par tick karta hai — hidden
+  // hote hi freeze ho jata hai
+  useEffect(() => {
+    if (phase !== "test" || !isVisible) return;
     if (remainingSeconds <= 0) {
       const t = setTimeout(() => handleSubmit(), 0);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => {
-      if (endTimestamp) {
-        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
+      setRemainingSeconds((s) => Math.max(0, s - 1));
     }, 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
+  }, [phase, remainingSeconds, isVisible]);
 
   const copyLink = () => {
     const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
