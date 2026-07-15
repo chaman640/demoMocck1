@@ -2102,293 +2102,6 @@ export const getUserMockTests = async (req, res) => {
 <svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
 </file>
 
-<file path="frontend/src/pages/MyChallenges.jsx">
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../api/api";
-
-const SkeletonBlock = ({ className = "" }) => (
-  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
-);
-
-const ListSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-    <div className="max-w-2xl mx-auto">
-      <SkeletonBlock className="w-32 h-4 mb-6" />
-      <SkeletonBlock className="w-56 h-7 mb-8" />
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
-            <SkeletonBlock className="w-40 h-5 mb-2" />
-            <SkeletonBlock className="w-32 h-3 mb-1" />
-            <SkeletonBlock className="w-28 h-3" />
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const LeaderboardSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-    <div className="max-w-xl mx-auto">
-      <SkeletonBlock className="w-32 h-4 mb-6" />
-      <SkeletonBlock className="w-48 h-6 mb-2" />
-      <SkeletonBlock className="w-40 h-4 mb-8" />
-      <div className="space-y-2.5">
-        {[1, 2, 3, 4].map((i) => (
-          <SkeletonBlock key={i} className="w-full h-16 rounded-xl" />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-// ── Rank list — Challenge.jsx wale LeaderboardList jaisa hi pattern ──
-const LeaderboardList = ({ leaderboard, currentUserName }) => {
-  if (!leaderboard || leaderboard.leaderboard.length === 0) {
-    return <p className="text-gray-400 text-sm text-center py-6">Abhi tak koi attempt nahi hua.</p>;
-  }
-  return (
-    <div className="space-y-2.5">
-      {leaderboard.leaderboard.map((entry) => {
-        const isMe = entry.userName === currentUserName;
-        return (
-          <div
-            key={entry.userId}
-            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
-              isMe ? "border-[#7C3AED] bg-[#7C3AED]/10" : "border-gray-800 bg-[#1F2937]/60"
-            }`}
-          >
-            <div className="flex items-center gap-3.5 min-w-0">
-              <span
-                className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
-                  entry.rank === 1
-                    ? "bg-yellow-500/20 text-yellow-400"
-                    : entry.rank === 2
-                    ? "bg-gray-400/20 text-gray-300"
-                    : entry.rank === 3
-                    ? "bg-orange-500/20 text-orange-400"
-                    : "bg-gray-800 text-gray-500"
-                }`}
-              >
-                {entry.rank}
-              </span>
-              <div className="min-w-0">
-                <p className="font-medium text-sm truncate">
-                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
-                </p>
-                <p className="text-[11px] text-gray-500 mt-0.5">
-                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
-                </p>
-              </div>
-            </div>
-            <span className="font-bold text-[#A78BFA] flex-shrink-0 ml-2">{entry.totalScore}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
-const MyChallenges = () => {
-  const navigate = useNavigate();
-
-  // phase: "loading-list" | "list" | "loading-leaderboard" | "leaderboard" | "error"
-  const [phase, setPhase] = useState("loading-list");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const [challenges, setChallenges] = useState([]);
-  const [userName, setUserName] = useState("");
-
-  const [selectedChallenge, setSelectedChallenge] = useState(null);
-  const [leaderboard, setLeaderboard] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      setPhase("loading-list");
-      try {
-        const [meRes, listRes] = await Promise.all([api.get("/me"), api.get("/my-challenges")]);
-        if (cancelled) return;
-        setUserName(meRes.data.data.name);
-        setChallenges(listRes.data.data || []);
-        setPhase("list");
-      } catch (err) {
-        if (cancelled) return;
-        if (err.response?.status === 401) {
-          navigate("/Singup");
-          return;
-        }
-        setErrorMsg(err.response?.data?.message || "Challenges load nahi ho paaye.");
-        setPhase("error");
-      }
-    };
-    load();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const openChallenge = async (challenge) => {
-    setSelectedChallenge(challenge);
-    setPhase("loading-leaderboard");
-    try {
-      const res = await api.get(`/challenge/${challenge.challengeCode}/leaderboard`);
-      setLeaderboard(res.data.data);
-      setPhase("leaderboard");
-    } catch (err) {
-      // 7 din baad Challenge document apne aap delete ho jaata hai (TTL) — tab ye 404 dega
-      setErrorMsg(
-        err.response?.status === 404
-          ? "Ye challenge expire ho chuka hai, ab iska data available nahi hai."
-          : err.response?.data?.message || "Leaderboard load nahi ho paaya."
-      );
-      setPhase("error");
-    }
-  };
-
-  const backToList = () => {
-    setSelectedChallenge(null);
-    setLeaderboard(null);
-    setPhase("list");
-  };
-
-  const goToPerformance = () => {
-    if (!selectedChallenge) return;
-    navigate(`/Challenge/${selectedChallenge.challengeCode}/review`);
-  };
-
-  if (phase === "loading-list") return <ListSkeleton />;
-  if (phase === "loading-leaderboard") return <LeaderboardSkeleton />;
-
-  if (phase === "error") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{errorMsg}</p>
-          <div className="flex gap-3 justify-center">
-            {selectedChallenge && (
-              <button
-                onClick={backToList}
-                className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500"
-              >
-                List Par Wapas
-              </button>
-            )}
-            <button
-              onClick={() => navigate("/HomePage")}
-              className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-            >
-              Home Jaayein
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "list") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-          >
-            &larr; Home
-          </button>
-
-          <h1 className="text-2xl font-bold mb-1">Aapke Challenges</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            {challenges.length === 0
-              ? "Aapne abhi tak koi challenge attempt nahi kiya hai."
-              : `Aapne ab tak ${challenges.length} challenge${challenges.length > 1 ? "s" : ""} diye hain`}
-          </p>
-
-          {challenges.length === 0 ? (
-            <button
-              onClick={() => navigate("/Challenge")}
-              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
-            >
-              Ek Challenge Shuru Karein
-            </button>
-          ) : (
-            <div className="space-y-3">
-              {challenges.map((c) => (
-                <button
-                  key={c.challengeCode}
-                  onClick={() => openChallenge(c)}
-                  className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 transition-colors"
-                >
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <h3 className="font-semibold text-base truncate">{c.blueprintName}</h3>
-                    <span className="text-sm font-bold text-[#A78BFA] flex-shrink-0">{c.totalScore}</span>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    {c.examName} &middot; Banaya: {c.createdByName}
-                    {c.createdByName === userName ? " (Aap)" : ""}
-                  </p>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {new Date(c.attemptedAt).toLocaleString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </p>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "leaderboard" && selectedChallenge && leaderboard) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto">
-          <button
-            onClick={backToList}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-          >
-            &larr; Sabhi Challenges
-          </button>
-
-          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            {leaderboard.challenge?.blueprintName} &middot; {leaderboard.totalParticipants} participants
-          </p>
-
-          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
-
-          <div className="space-y-3 mt-8">
-            <button
-              onClick={goToPerformance}
-              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
-            >
-              See Your Performance
-            </button>
-            <button
-              onClick={() => navigate("/HomePage")}
-              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-            >
-              Home Jaayein
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-};
-
-export default MyChallenges;
-</file>
-
 <file path="frontend/src/pages/ProfilePage.jsx">
 const ProfilePage = () => { 
   return (
@@ -3443,6 +3156,296 @@ const api = axios.create({
 });
 
 export default api;
+</file>
+
+<file path="frontend/src/pages/MyChallenges.jsx">
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../api/api";
+
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ListSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-56 h-7 mb-8" />
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+            <SkeletonBlock className="w-40 h-5 mb-2" />
+            <SkeletonBlock className="w-32 h-3 mb-1" />
+            <SkeletonBlock className="w-28 h-3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const LeaderboardSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-48 h-6 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-8" />
+      <div className="space-y-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-full h-16 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ── Rank list — Challenge.jsx wale LeaderboardList jaisa hi pattern ──
+// FIX: naam se compare karne ki jagah ab userId se compare hoga
+const LeaderboardList = ({ leaderboard, currentUserId }) => {
+  if (!leaderboard || leaderboard.leaderboard.length === 0) {
+    return <p className="text-gray-400 text-sm text-center py-6">Abhi tak koi attempt nahi hua.</p>;
+  }
+  return (
+    <div className="space-y-2.5">
+      {leaderboard.leaderboard.map((entry) => {
+        const isMe = String(entry.userId) === String(currentUserId);
+        return (
+          <div
+            key={entry.userId}
+            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+              isMe ? "border-[#7C3AED] bg-[#7C3AED]/10" : "border-gray-800 bg-[#1F2937]/60"
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span
+                className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                  entry.rank === 1
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : entry.rank === 2
+                    ? "bg-gray-400/20 text-gray-300"
+                    : entry.rank === 3
+                    ? "bg-orange-500/20 text-orange-400"
+                    : "bg-gray-800 text-gray-500"
+                }`}
+              >
+                {entry.rank}
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                </p>
+              </div>
+            </div>
+            <span className="font-bold text-[#A78BFA] flex-shrink-0 ml-2">{entry.totalScore}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const MyChallenges = () => {
+  const navigate = useNavigate();
+
+  // phase: "loading-list" | "list" | "loading-leaderboard" | "leaderboard" | "error"
+  const [phase, setPhase] = useState("loading-list");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [challenges, setChallenges] = useState([]);
+  const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
+
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setPhase("loading-list");
+      try {
+        const [meRes, listRes] = await Promise.all([api.get("/me"), api.get("/my-challenges")]);
+        if (cancelled) return;
+        setUserName(meRes.data.data.name);
+        setUserId(meRes.data.data._id);
+        setChallenges(listRes.data.data || []);
+        setPhase("list");
+      } catch (err) {
+        if (cancelled) return;
+        if (err.response?.status === 401) {
+          navigate("/Singup");
+          return;
+        }
+        setErrorMsg(err.response?.data?.message || "Challenges load nahi ho paaye.");
+        setPhase("error");
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openChallenge = async (challenge) => {
+    setSelectedChallenge(challenge);
+    setPhase("loading-leaderboard");
+    try {
+      const res = await api.get(`/challenge/${challenge.challengeCode}/leaderboard`);
+      setLeaderboard(res.data.data);
+      setPhase("leaderboard");
+    } catch (err) {
+      // 7 din baad Challenge document apne aap delete ho jaata hai (TTL) — tab ye 404 dega
+      setErrorMsg(
+        err.response?.status === 404
+          ? "Ye challenge expire ho chuka hai, ab iska data available nahi hai."
+          : err.response?.data?.message || "Leaderboard load nahi ho paaya."
+      );
+      setPhase("error");
+    }
+  };
+
+  const backToList = () => {
+    setSelectedChallenge(null);
+    setLeaderboard(null);
+    setPhase("list");
+  };
+
+  const goToPerformance = () => {
+    if (!selectedChallenge) return;
+    navigate(`/Challenge/${selectedChallenge.challengeCode}/review`);
+  };
+
+  if (phase === "loading-list") return <ListSkeleton />;
+  if (phase === "loading-leaderboard") return <LeaderboardSkeleton />;
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <div className="flex gap-3 justify-center">
+            {selectedChallenge && (
+              <button
+                onClick={backToList}
+                className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500"
+              >
+                List Par Wapas
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "list") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Home
+          </button>
+
+          <h1 className="text-2xl font-bold mb-1">Aapke Challenges</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {challenges.length === 0
+              ? "Aapne abhi tak koi challenge attempt nahi kiya hai."
+              : `Aapne ab tak ${challenges.length} challenge${challenges.length > 1 ? "s" : ""} diye hain`}
+          </p>
+
+          {challenges.length === 0 ? (
+            <button
+              onClick={() => navigate("/Challenge")}
+              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+            >
+              Ek Challenge Shuru Karein
+            </button>
+          ) : (
+            <div className="space-y-3">
+              {challenges.map((c) => (
+                <button
+                  key={c.challengeCode}
+                  onClick={() => openChallenge(c)}
+                  className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <h3 className="font-semibold text-base truncate">{c.blueprintName}</h3>
+                    <span className="text-sm font-bold text-[#A78BFA] flex-shrink-0">{c.totalScore}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {c.examName} &middot; Banaya: {c.createdByName}
+                    {c.createdByName === userName ? " (Aap)" : ""}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {new Date(c.attemptedAt).toLocaleString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "leaderboard" && selectedChallenge && leaderboard) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <button
+            onClick={backToList}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Sabhi Challenges
+          </button>
+
+          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {leaderboard.challenge?.blueprintName} &middot; {leaderboard.totalParticipants} participants
+          </p>
+
+          <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
+
+          <div className="space-y-3 mt-8">
+            <button
+              onClick={goToPerformance}
+              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+            >
+              See Your Performance
+            </button>
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default MyChallenges;
 </file>
 
 <file path="frontend/src/pages/Singup.jsx">
@@ -8474,6 +8477,61 @@ const HomePage = () => {
 export default HomePage;
 </file>
 
+<file path="frontend/src/App.jsx">
+// App.jsx
+import { HashRouter, Routes, Route } from 'react-router-dom'; 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MockTest from './pages/MockTest';
+import UserAllAnalysis from './pages/UserAllAnalysis';
+import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
+import UserTopicAnalysis from './pages/UserTopicAnalysis';
+import Login from './pages/Login';
+import Singup from './pages/Singup';
+import HomePage from './pages/HomePage';
+import ProfilePage from './pages/ProfilePage';
+import Challenge from './pages/Challenge';
+import ChallengeReview from './pages/ChallengeReview';
+import MyChallenges from './pages/MyChallenges';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+const App = () => { 
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <div>
+          <Routes>
+            <Route path="/" element={<HomePage/>} />
+            <Route path="/MockTest" element={<MockTest/>} />
+            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
+            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
+            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
+            <Route path="/Login" element={<Login/>} />
+            <Route path="/Singup" element={<Singup/>} />
+            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
+            <Route path="/HomePage" element={<HomePage/>} />
+            <Route path="/ProfilePage" element={<ProfilePage/>} />
+            <Route path="/Challenge" element={<Challenge/>} />
+            <Route path="/Challenge/:code" element={<Challenge/>} />
+            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
+            <Route path="/MyChallenges" element={<MyChallenges/>} />
+          </Routes>
+        </div>
+      </HashRouter>
+    </QueryClientProvider>
+  )
+}
+
+export default App;
+</file>
+
 <file path="frontend/src/pages/Challenge.jsx">
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8554,8 +8612,11 @@ const SubmittingSkeleton = () => (
 
 // ──────────────────────────────────────────────
 // Reusable Leaderboard list component
+// FIX: naam se compare karne ki jagah ab userId se compare
+// hoga — taaki same naam wale do alag accounts galti se
+// dono "(Aap)" na ban jaayein
 // ──────────────────────────────────────────────
-const LeaderboardList = ({ leaderboard, currentUserName }) => {
+const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
     return (
       <p className="text-gray-400 text-sm text-center py-6">
@@ -8567,7 +8628,7 @@ const LeaderboardList = ({ leaderboard, currentUserName }) => {
   return (
     <div className="space-y-2.5">
       {leaderboard.leaderboard.map((entry) => {
-        const isMe = entry.userName === currentUserName;
+        const isMe = String(entry.userId) === String(currentUserId);
         return (
           <div
             key={entry.userId}
@@ -9081,12 +9142,6 @@ const Challenge = () => {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // RESULT SCREEN — submit karne ke turant baad ye dikhta hai.
-  // 👇 FIX: "Detailed Analysis Dekho" button yahan add kiya —
-  // pehle ye sirf "leaderboard" phase mein tha, jo submit ke
-  // baad kabhi trigger hi nahi hota tha.
-  // ─────────────────────────────────────────────
   if (phase === "result" && resultData) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -9132,11 +9187,10 @@ const Challenge = () => {
                 {leaderboard?.totalParticipants || 0} participants
               </span>
             </div>
-            <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+            <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
           </div>
 
           <div className="space-y-3">
-            {/* 👇 FIX: Ye button ab yahan hai — submit ke baad turant dikhega */}
             <button
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
               className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
@@ -9164,10 +9218,6 @@ const Challenge = () => {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // STANDALONE LEADERBOARD SCREEN — ye tab dikhta hai jab user
-  // direct link khol ke aaya ho aur pehle se attempt kar chuka ho
-  // ─────────────────────────────────────────────
   if (phase === "leaderboard") {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -9179,9 +9229,8 @@ const Challenge = () => {
             </p>
           </div>
 
-          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+          <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
 
-          {/* 👇 FIX: "..." ki jagah asli Tailwind classes lagayi */}
           <div className="space-y-3 mt-8">
             <button
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
@@ -9214,61 +9263,6 @@ const Challenge = () => {
 };
 
 export default Challenge;
-</file>
-
-<file path="frontend/src/App.jsx">
-// App.jsx
-import { HashRouter, Routes, Route } from 'react-router-dom'; 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import MockTest from './pages/MockTest';
-import UserAllAnalysis from './pages/UserAllAnalysis';
-import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
-import UserTopicAnalysis from './pages/UserTopicAnalysis';
-import Login from './pages/Login';
-import Singup from './pages/Singup';
-import HomePage from './pages/HomePage';
-import ProfilePage from './pages/ProfilePage';
-import Challenge from './pages/Challenge';
-import ChallengeReview from './pages/ChallengeReview';
-import MyChallenges from './pages/MyChallenges';
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30 * 1000,
-      retry: 1,
-    },
-  },
-});
-
-const App = () => { 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <div>
-          <Routes>
-            <Route path="/" element={<HomePage/>} />
-            <Route path="/MockTest" element={<MockTest/>} />
-            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
-            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
-            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
-            <Route path="/Login" element={<Login/>} />
-            <Route path="/Singup" element={<Singup/>} />
-            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
-            <Route path="/HomePage" element={<HomePage/>} />
-            <Route path="/ProfilePage" element={<ProfilePage/>} />
-            <Route path="/Challenge" element={<Challenge/>} />
-            <Route path="/Challenge/:code" element={<Challenge/>} />
-            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
-            <Route path="/MyChallenges" element={<MyChallenges/>} />
-          </Routes>
-        </div>
-      </HashRouter>
-    </QueryClientProvider>
-  )
-}
-
-export default App;
 </file>
 
 </files>
