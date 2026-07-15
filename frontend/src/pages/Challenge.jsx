@@ -77,8 +77,11 @@ const SubmittingSkeleton = () => (
 
 // ──────────────────────────────────────────────
 // Reusable Leaderboard list component
+// FIX: naam se compare karne ki jagah ab userId se compare
+// hoga — taaki same naam wale do alag accounts galti se
+// dono "(Aap)" na ban jaayein
 // ──────────────────────────────────────────────
-const LeaderboardList = ({ leaderboard, currentUserName }) => {
+const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
     return (
       <p className="text-gray-400 text-sm text-center py-6">
@@ -90,7 +93,7 @@ const LeaderboardList = ({ leaderboard, currentUserName }) => {
   return (
     <div className="space-y-2.5">
       {leaderboard.leaderboard.map((entry) => {
-        const isMe = entry.userName === currentUserName;
+        const isMe = String(entry.userId) === String(currentUserId);
         return (
           <div
             key={entry.userId}
@@ -604,12 +607,6 @@ const Challenge = () => {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // RESULT SCREEN — submit karne ke turant baad ye dikhta hai.
-  // 👇 FIX: "Detailed Analysis Dekho" button yahan add kiya —
-  // pehle ye sirf "leaderboard" phase mein tha, jo submit ke
-  // baad kabhi trigger hi nahi hota tha.
-  // ─────────────────────────────────────────────
   if (phase === "result" && resultData) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -655,11 +652,10 @@ const Challenge = () => {
                 {leaderboard?.totalParticipants || 0} participants
               </span>
             </div>
-            <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+            <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
           </div>
 
           <div className="space-y-3">
-            {/* 👇 FIX: Ye button ab yahan hai — submit ke baad turant dikhega */}
             <button
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
               className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
@@ -687,10 +683,6 @@ const Challenge = () => {
     );
   }
 
-  // ─────────────────────────────────────────────
-  // STANDALONE LEADERBOARD SCREEN — ye tab dikhta hai jab user
-  // direct link khol ke aaya ho aur pehle se attempt kar chuka ho
-  // ─────────────────────────────────────────────
   if (phase === "leaderboard") {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -702,9 +694,8 @@ const Challenge = () => {
             </p>
           </div>
 
-          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+          <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
 
-          {/* 👇 FIX: "..." ki jagah asli Tailwind classes lagayi */}
           <div className="space-y-3 mt-8">
             <button
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}

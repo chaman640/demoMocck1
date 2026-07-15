@@ -40,14 +40,15 @@ const LeaderboardSkeleton = () => (
 );
 
 // ── Rank list — Challenge.jsx wale LeaderboardList jaisa hi pattern ──
-const LeaderboardList = ({ leaderboard, currentUserName }) => {
+// FIX: naam se compare karne ki jagah ab userId se compare hoga
+const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
     return <p className="text-gray-400 text-sm text-center py-6">Abhi tak koi attempt nahi hua.</p>;
   }
   return (
     <div className="space-y-2.5">
       {leaderboard.leaderboard.map((entry) => {
-        const isMe = entry.userName === currentUserName;
+        const isMe = String(entry.userId) === String(currentUserId);
         return (
           <div
             key={entry.userId}
@@ -95,6 +96,7 @@ const MyChallenges = () => {
 
   const [challenges, setChallenges] = useState([]);
   const [userName, setUserName] = useState("");
+  const [userId, setUserId] = useState("");
 
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
@@ -107,6 +109,7 @@ const MyChallenges = () => {
         const [meRes, listRes] = await Promise.all([api.get("/me"), api.get("/my-challenges")]);
         if (cancelled) return;
         setUserName(meRes.data.data.name);
+        setUserId(meRes.data.data._id);
         setChallenges(listRes.data.data || []);
         setPhase("list");
       } catch (err) {
@@ -257,7 +260,7 @@ const MyChallenges = () => {
             {leaderboard.challenge?.blueprintName} &middot; {leaderboard.totalParticipants} participants
           </p>
 
-          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+          <LeaderboardList leaderboard={leaderboard} currentUserId={userId} />
 
           <div className="space-y-3 mt-8">
             <button

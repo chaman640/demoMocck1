@@ -55,12 +55,10 @@ backend/
     getChallenge.js
     getChallengeAttemptDetail.js
     getChallengeLeaderboard.js
-    getQuestionList.js
-    getQuestionMeta.js
+    getMyChallenges.js
     submitChallenge.js
     updateSutf.js
   middlewares/
-    isAdmin.js
     processQuestion.js
     userInfo.js
   models/
@@ -92,14 +90,13 @@ frontend/
       react.svg
       vite.svg
     pages/
-      AnalysisPage.jsx
       Challenge.jsx
       ChallengeReview.jsx
       HomePage.jsx
       Login.jsx
       MockTest.jsx
+      MyChallenges.jsx
       ProfilePage.jsx
-      QuestionBankReview.jsx
       Singup.jsx
       UserAllAnalysis.jsx
       UserSubjectAnallysis.jsx
@@ -960,301 +957,37 @@ export const getChallengeLeaderboard = async (req, res) => {
 };
 </file>
 
-<file path="backend/controllers/getQuestionList.js">
-// controllers/getQuestionList.js
-import { Question } from "../models/rowQuestionSchema.js";
-
-// Ek exam + subject (+ optional topic) ke saare questions — poora detail,
-// review karne ke liye (correctOption bhi shamil hai — isliye ye route admin-only hai)
-export const getQuestionList = async (req, res) => {
-  try {
-    const { examName, subjectName, topicName } = req.params;
-
-    if (!examName || !subjectName) {
-      return res.status(400).json({
-        success: false,
-        message: "examName aur subjectName zaroori hain!",
-      });
-    }
-
-    const filter = {
-      examName: { $in: [examName] },
-      subjectName,
-    };
-
-    // "all" ka matlab — topic se filter mat karo, poora subject dikhao
-    if (topicName && topicName !== "all") {
-      filter.topicName = topicName;
-    }
-
-    const questions = await Question.find(filter).sort({ topicName: 1, questionNumber: 1 });
-
-    return res.status(200).json({
-      success: true,
-      totalQuestions: questions.length,
-      data: questions,
-    });
-  } catch (error) {
-    console.error("getQuestionList error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Questions fetch karte waqt error aaya.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
-<file path="backend/controllers/getQuestionMeta.js">
-// controllers/getQuestionMeta.js
-import { Question } from "../models/rowQuestionSchema.js";
-
-// Exam ke andar kaunse subjects hain, aur har subject mein kaunse topics —
-// Question Review page pe filter pills banane ke liye (ek hi call mein sab mil jaata hai)
-export const getQuestionMeta = async (req, res) => {
-  try {
-    const { examName } = req.params;
-
-    if (!examName) {
-      return res.status(400).json({ success: false, message: "examName zaroori hai!" });
-    }
-
-    const docs = await Question.find({ examName: { $in: [examName] } }).select(
-      "subjectName topicName"
-    );
-
-    if (docs.length === 0) {
-      return res.status(200).json({ success: true, data: { subjects: [] } });
-    }
-
-    const subjectMap = {};
-    for (const doc of docs) {
-      const subj = doc.subjectName;
-      if (!subjectMap[subj]) {
-        subjectMap[subj] = { topics: new Set(), count: 0 };
-      }
-      subjectMap[subj].topics.add(doc.topicName);
-      subjectMap[subj].count++;
-    }
-
-    const subjects = Object.keys(subjectMap)
-      .sort()
-      .map((subjectName) => ({
-        subjectName,
-        totalQuestions: subjectMap[subjectName].count,
-        topics: Array.from(subjectMap[subjectName].topics).sort(),
-      }));
-
-    return res.status(200).json({ success: true, data: { subjects } });
-  } catch (error) {
-    console.error("getQuestionMeta error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Question meta fetch karte waqt error aaya.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
-<file path="backend/controllers/submitChallenge.js">
-// controllers/submitChallenge.js
-import Challenge from "../models/Challenge.js";
+<file path="backend/controllers/getMyChallenges.js">
 import ChallengeAttempt from "../models/ChallengeAttempt.js";
 
-export const submitChallenge = async (req, res) => {
+export const getMyChallenges = async (req, res) => {
   try {
-    // ─────────────────────────────────────────────
-    // STEP 0: Validation
-    // req.user middleware se aayega (userInfo middleware required hai route pe)
-    // ─────────────────────────────────────────────
     const userId = req.user._id;
-    const userName = req.user.name;
-    const { challengeCode } = req.params;
-    const { attemptedQuestions } = req.body;
 
-    if (!challengeCode) {
-      return res.status(400).json({
-        success: false,
-        message: "Challenge code zaroori hai!",
-      });
-    }
+    const attempts = await ChallengeAttempt.find({ userId })
+      .select(
+        "challengeCode examName blueprintName createdByName totalScore correctCount wrongCount unattemptedCount createdAt"
+      )
+      .sort({ createdAt: -1 });
 
-    if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
-      });
-    }
+    const data = attempts.map((a) => ({
+      challengeCode: a.challengeCode,
+      examName: a.examName,
+      blueprintName: a.blueprintName,
+      createdByName: a.createdByName,
+      totalScore: a.totalScore,
+      correctCount: a.correctCount,
+      wrongCount: a.wrongCount,
+      unattemptedCount: a.unattemptedCount,
+      attemptedAt: a.createdAt,
+    }));
 
-    // ─────────────────────────────────────────────
-    // STEP 1: Challenge dhundo
-    // ─────────────────────────────────────────────
-    const challenge = await Challenge.findOne({ challengeCode });
-
-    if (!challenge) {
-      return res.status(404).json({
-        success: false,
-        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
-      });
-    }
-
-    // Expiry check (TTL index MongoDB mein thoda delay se chalta hai,
-    // isliye application-level pe bhi check karna safe hai)
-    if (challenge.expiresAt && challenge.expiresAt < new Date()) {
-      return res.status(410).json({
-        success: false,
-        message: "Ye challenge expire ho chuka hai.",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 2: Duplicate attempt check
-    // Ek user ek challenge sirf ek baar de sakta hai
-    // ─────────────────────────────────────────────
-    const existingAttempt = await ChallengeAttempt.findOne({
-      challengeId: challenge._id,
-      userId,
-    });
-
-    if (existingAttempt) {
-      return res.status(409).json({
-        success: false,
-        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 3: Frozen challenge questions ka lookup map banao
-    // (validation ke liye — taaki koi galat isCorrect frontend se
-    // bhej ke score manipulate na kar sake, hum khud recalculate karenge)
-    // ─────────────────────────────────────────────
-    const questionMap = {};
-    for (const subj of challenge.subjects) {
-      for (const q of subj.questions) {
-        questionMap[q.questionId.toString()] = q;
-      }
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 4: Har attempted question ko validate + score calculate karo
-    // BUG-PRONE AREA: Kabhi bhi frontend ke bheje "isCorrect" pe bharosa
-    // mat karo — hamesha server-side khud correctOption se compare karo.
-    // ─────────────────────────────────────────────
-    let correctCount = 0;
-    let wrongCount = 0;
-    let unattemptedCount = 0;
-    let totalTimeTakenInSeconds = 0;
-
-    const finalAttemptedQuestions = [];
-
-    for (const aq of attemptedQuestions) {
-      const qId = aq.questionId ? aq.questionId.toString() : null;
-      const frozenQ = qId ? questionMap[qId] : null;
-
-      // Agar ye question is challenge ka hai hi nahi, skip karo (galat/tampered data)
-      if (!frozenQ) continue;
-
-      const userAnswer =
-        aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
-          ? String(aq.userAnswer)
-          : null;
-
-      const isCorrect =
-        userAnswer === null ? null : userAnswer === String(frozenQ.correctOption);
-
-      const timeTaken =
-        typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0
-          ? aq.timeTakenInSeconds
-          : 0;
-
-      if (isCorrect === true) correctCount++;
-      else if (isCorrect === false) wrongCount++;
-      else unattemptedCount++;
-
-      totalTimeTakenInSeconds += timeTaken;
-
-      finalAttemptedQuestions.push({
-        questionId: frozenQ.questionId,
-        userAnswer,
-        isCorrect,
-        timeTakenInSeconds: timeTaken,
-      });
-    }
-
-    // Agar koi bhi valid question match nahi hua
-    if (finalAttemptedQuestions.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Koi valid question match nahi hua is challenge ke sath.",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 5: Score calculate karo (frozen marksPerQuestion/negativeMarking se)
-    // ─────────────────────────────────────────────
-    const totalScore =
-      correctCount * challenge.marksPerQuestion -
-      wrongCount * challenge.negativeMarking;
-
-    // ─────────────────────────────────────────────
-    // STEP 6: ChallengeAttempt save karo
-    // ─────────────────────────────────────────────
-    const newAttempt = new ChallengeAttempt({
-      challengeId: challenge._id,
-      userId,
-      userName,
-      attemptedQuestions: finalAttemptedQuestions,
-      totalScore,
-      correctCount,
-      wrongCount,
-      unattemptedCount,
-      totalTimeTakenInSeconds,
-    });
-
-    await newAttempt.save();
-
-    // ─────────────────────────────────────────────
-    // STEP 7: Response — score ke sath-sath current rank bhi bhej do
-    // taaki frontend turant "Aap 2nd number pe ho" dikha sake
-    // ─────────────────────────────────────────────
-    const betterAttemptsCount = await ChallengeAttempt.countDocuments({
-      challengeId: challenge._id,
-      totalScore: { $gt: totalScore },
-    });
-
-    const totalParticipants = await ChallengeAttempt.countDocuments({
-      challengeId: challenge._id,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Challenge submit ho gaya!",
-      data: {
-        attemptId: newAttempt._id,
-        totalScore,
-        correctCount,
-        wrongCount,
-        unattemptedCount,
-        totalTimeTakenInSeconds,
-        currentRank: betterAttemptsCount + 1,
-        totalParticipants,
-      },
-    });
+    return res.status(200).json({ success: true, totalChallenges: data.length, data });
   } catch (error) {
-    // Agar duplicate-key error aaya (compound unique index se),
-    // to matlab race-condition mein dobara submit ho gaya
-    if (error.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
-      });
-    }
-
-    console.error("submitChallenge error:", error);
+    console.error("getMyChallenges error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya challenge submit karte waqt.",
+      message: "Challenges list fetch karte waqt error aaya.",
       error: error.message,
     });
   }
@@ -1321,33 +1054,6 @@ export const updateUserInfo = async (req, res) => {
         console.error("Update Error:", error);
         res.status(500).json({ success: false, message: "Internal Server Error" });
     }
-};
-</file>
-
-<file path="backend/middlewares/isAdmin.js">
-// middlewares/isAdmin.js
-// Question Review jaise routes sirf admin (tumhare) ke liye hain —
-// warna koi bhi normal signed-up student correctOption dekh sakta tha
-// aur exam ka poora answer-key leak ho jaata!
-export const isAdmin = (req, res, next) => {
-  const adminEmail = process.env.ADMIN_EMAIL;
-
-  if (!adminEmail) {
-    console.error("ADMIN_EMAIL .env mein set nahi hai — admin routes block ho rahe hain.");
-    return res.status(500).json({
-      success: false,
-      message: "Admin access configure nahi hai. Server .env mein ADMIN_EMAIL set karein.",
-    });
-  }
-
-  if (!req.user || req.user.email !== adminEmail) {
-    return res.status(403).json({
-      success: false,
-      message: "Ye route sirf admin ke liye hai.",
-    });
-  }
-
-  next();
 };
 </file>
 
@@ -1516,94 +1222,6 @@ export const userInfo = async (req, res, next) => {
         });
     }
 };
-</file>
-
-<file path="backend/models/ChallengeAttempt.js">
-// models/ChallengeAttempt.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const challengeAttemptSchema = new mongoose.Schema(
-  {
-    // Kis challenge ka attempt hai — Challenge document ki reference
-    challengeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Challenge",
-      required: [true, "Challenge ID zaroori hai"],
-      index: true, // leaderboard fetch karte waqt is field pe query hogi baar-baar
-    },
-
-    // Kisne attempt diya
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-    },
-
-    // Leaderboard mein naam dikhane ke liye — har baar User collection
-    // populate karne ki jagah yahin bhi save kar rahe hain (denormalized).
-    // Isse leaderboard query fast rahegi aur agar user apna naam badal
-    // le baad mein, purana attempt ka naam consistent rahega.
-    userName: {
-      type: String,
-      required: [true, "User ka naam zaroori hai"],
-    },
-
-    attemptedQuestions: [
-      {
-        questionId: {
-          type: mongoose.Schema.Types.ObjectId,
-          required: true,
-        },
-        userAnswer: {
-          type: String,
-          default: null, // unattempted questions ke liye null
-        },
-        isCorrect: {
-          type: Boolean,
-          default: null, // true/false/null (null = unattempted)
-        },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-      },
-    ],
-
-    // Score summary — Performance.js jaisa hi pattern
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-
-    // Total time liya poore challenge mein (leaderboard pe "fastest" 
-    // dikhane ke liye future mein kaam aa sakta hai — same score par
-    // kam time lene wala upar aa sakta hai)
-    totalTimeTakenInSeconds: {
-      type: Number,
-      default: 0,
-    },
-  },
-  {
-    timestamps: true, // submittedAt ke liye createdAt hi use karenge
-  }
-);
-
-// ─────────────────────────────────────────────
-// COMPOUND UNIQUE INDEX — Ek user ek challenge ko
-// sirf EK BAAR attempt kar sake. Agar dobara submit
-// karne ki koshish kare, DB level pe hi block ho jayega
-// (application-level check ke sath-sath ye extra safety hai).
-// ─────────────────────────────────────────────
-challengeAttemptSchema.index({ challengeId: 1, userId: 1 }, { unique: true });
-
-const ChallengeAttempt = rowQuestionConnection.model(
-  "ChallengeAttempt",
-  challengeAttemptSchema
-);
-
-export default ChallengeAttempt;
 </file>
 
 <file path="backend/models/Performance.js">
@@ -2484,16 +2102,291 @@ export const getUserMockTests = async (req, res) => {
 <svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
 </file>
 
-<file path="frontend/src/pages/AnalysisPage.jsx">
-const AnalysisPage = () => { 
-  return (
-    <h1 className="text-6xl font-bold underline text-red-500 bg-yellow-200 p-4">
-  analysis
-</h1>
-  )
-}
+<file path="frontend/src/pages/MyChallenges.jsx">
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import api from "../api/api";
 
-export default AnalysisPage
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ListSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-56 h-7 mb-8" />
+      <div className="space-y-3">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+            <SkeletonBlock className="w-40 h-5 mb-2" />
+            <SkeletonBlock className="w-32 h-3 mb-1" />
+            <SkeletonBlock className="w-28 h-3" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+const LeaderboardSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-48 h-6 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-8" />
+      <div className="space-y-2.5">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-full h-16 rounded-xl" />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ── Rank list — Challenge.jsx wale LeaderboardList jaisa hi pattern ──
+const LeaderboardList = ({ leaderboard, currentUserName }) => {
+  if (!leaderboard || leaderboard.leaderboard.length === 0) {
+    return <p className="text-gray-400 text-sm text-center py-6">Abhi tak koi attempt nahi hua.</p>;
+  }
+  return (
+    <div className="space-y-2.5">
+      {leaderboard.leaderboard.map((entry) => {
+        const isMe = entry.userName === currentUserName;
+        return (
+          <div
+            key={entry.userId}
+            className={`flex items-center justify-between px-4 py-3.5 rounded-xl border transition-colors ${
+              isMe ? "border-[#7C3AED] bg-[#7C3AED]/10" : "border-gray-800 bg-[#1F2937]/60"
+            }`}
+          >
+            <div className="flex items-center gap-3.5 min-w-0">
+              <span
+                className={`w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center text-xs font-bold ${
+                  entry.rank === 1
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : entry.rank === 2
+                    ? "bg-gray-400/20 text-gray-300"
+                    : entry.rank === 3
+                    ? "bg-orange-500/20 text-orange-400"
+                    : "bg-gray-800 text-gray-500"
+                }`}
+              >
+                {entry.rank}
+              </span>
+              <div className="min-w-0">
+                <p className="font-medium text-sm truncate">
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                </p>
+              </div>
+            </div>
+            <span className="font-bold text-[#A78BFA] flex-shrink-0 ml-2">{entry.totalScore}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const MyChallenges = () => {
+  const navigate = useNavigate();
+
+  // phase: "loading-list" | "list" | "loading-leaderboard" | "leaderboard" | "error"
+  const [phase, setPhase] = useState("loading-list");
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const [challenges, setChallenges] = useState([]);
+  const [userName, setUserName] = useState("");
+
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
+  const [leaderboard, setLeaderboard] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setPhase("loading-list");
+      try {
+        const [meRes, listRes] = await Promise.all([api.get("/me"), api.get("/my-challenges")]);
+        if (cancelled) return;
+        setUserName(meRes.data.data.name);
+        setChallenges(listRes.data.data || []);
+        setPhase("list");
+      } catch (err) {
+        if (cancelled) return;
+        if (err.response?.status === 401) {
+          navigate("/Singup");
+          return;
+        }
+        setErrorMsg(err.response?.data?.message || "Challenges load nahi ho paaye.");
+        setPhase("error");
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const openChallenge = async (challenge) => {
+    setSelectedChallenge(challenge);
+    setPhase("loading-leaderboard");
+    try {
+      const res = await api.get(`/challenge/${challenge.challengeCode}/leaderboard`);
+      setLeaderboard(res.data.data);
+      setPhase("leaderboard");
+    } catch (err) {
+      // 7 din baad Challenge document apne aap delete ho jaata hai (TTL) — tab ye 404 dega
+      setErrorMsg(
+        err.response?.status === 404
+          ? "Ye challenge expire ho chuka hai, ab iska data available nahi hai."
+          : err.response?.data?.message || "Leaderboard load nahi ho paaya."
+      );
+      setPhase("error");
+    }
+  };
+
+  const backToList = () => {
+    setSelectedChallenge(null);
+    setLeaderboard(null);
+    setPhase("list");
+  };
+
+  const goToPerformance = () => {
+    if (!selectedChallenge) return;
+    navigate(`/Challenge/${selectedChallenge.challengeCode}/review`);
+  };
+
+  if (phase === "loading-list") return <ListSkeleton />;
+  if (phase === "loading-leaderboard") return <LeaderboardSkeleton />;
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <div className="flex gap-3 justify-center">
+            {selectedChallenge && (
+              <button
+                onClick={backToList}
+                className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500"
+              >
+                List Par Wapas
+              </button>
+            )}
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "list") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Home
+          </button>
+
+          <h1 className="text-2xl font-bold mb-1">Aapke Challenges</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {challenges.length === 0
+              ? "Aapne abhi tak koi challenge attempt nahi kiya hai."
+              : `Aapne ab tak ${challenges.length} challenge${challenges.length > 1 ? "s" : ""} diye hain`}
+          </p>
+
+          {challenges.length === 0 ? (
+            <button
+              onClick={() => navigate("/Challenge")}
+              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+            >
+              Ek Challenge Shuru Karein
+            </button>
+          ) : (
+            <div className="space-y-3">
+              {challenges.map((c) => (
+                <button
+                  key={c.challengeCode}
+                  onClick={() => openChallenge(c)}
+                  className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-3 mb-2">
+                    <h3 className="font-semibold text-base truncate">{c.blueprintName}</h3>
+                    <span className="text-sm font-bold text-[#A78BFA] flex-shrink-0">{c.totalScore}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {c.examName} &middot; Banaya: {c.createdByName}
+                    {c.createdByName === userName ? " (Aap)" : ""}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    {new Date(c.attemptedAt).toLocaleString("en-IN", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "leaderboard" && selectedChallenge && leaderboard) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto">
+          <button
+            onClick={backToList}
+            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          >
+            &larr; Sabhi Challenges
+          </button>
+
+          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {leaderboard.challenge?.blueprintName} &middot; {leaderboard.totalParticipants} participants
+          </p>
+
+          <LeaderboardList leaderboard={leaderboard} currentUserName={userName} />
+
+          <div className="space-y-3 mt-8">
+            <button
+              onClick={goToPerformance}
+              className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
+            >
+              See Your Performance
+            </button>
+            <button
+              onClick={() => navigate("/HomePage")}
+              className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
+            >
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default MyChallenges;
 </file>
 
 <file path="frontend/src/pages/ProfilePage.jsx">
@@ -2506,393 +2399,6 @@ const ProfilePage = () => {
 }
 
 export default ProfilePage
-</file>
-
-<file path="frontend/src/pages/QuestionBankReview.jsx">
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import api from "../api/api";
-
-// ──────────────────────────────────────────────
-// Skeleton building blocks — pehle se established pattern
-// ──────────────────────────────────────────────
-const SkeletonBlock = ({ className = "" }) => (
-  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
-);
-
-const PillsSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-    <div className="max-w-2xl mx-auto">
-      <SkeletonBlock className="w-56 h-7 mb-2" />
-      <SkeletonBlock className="w-72 h-4 mb-8" />
-      <div className="flex flex-wrap gap-3">
-        {[1, 2, 3, 4].map((i) => (
-          <SkeletonBlock key={i} className="w-32 h-11 rounded-xl" />
-        ))}
-      </div>
-    </div>
-  </div>
-);
-
-const QuestionBrowseSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
-    <div className="max-w-3xl mx-auto">
-      <SkeletonBlock className="w-32 h-4 mb-6" />
-      <SkeletonBlock className="w-44 h-3 mb-3" />
-      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4 gap-3">
-          <SkeletonBlock className="w-20 h-3" />
-          <SkeletonBlock className="w-16 h-5 rounded-full" />
-        </div>
-        <SkeletonBlock className="w-full h-5 mb-2" />
-        <SkeletonBlock className="w-3/4 h-5 mb-6" />
-        <div className="space-y-2.5 mb-6">
-          {[1, 2, 3, 4].map((i) => (
-            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
-          ))}
-        </div>
-        <SkeletonBlock className="w-full h-20 rounded-lg" />
-      </div>
-      <div className="flex justify-between items-center mt-6">
-        <SkeletonBlock className="w-28 h-10 rounded-lg" />
-        <SkeletonBlock className="w-24 h-10 rounded-lg" />
-      </div>
-    </div>
-  </div>
-);
-
-// ── Ek question ka detail card — correct option green mein highlight ──
-// (userAnswer/wrong ka concept nahi hai yahan — sirf raw review hai)
-const QuestionCard = ({ q, index, total }) => (
-  <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-    <div className="flex items-center justify-between mb-4 gap-3">
-      <span className="text-xs text-gray-500">
-        {q.topicName} {q.questionNumber != null && <>&middot; #{q.questionNumber}</>}
-      </span>
-      <span className="text-xs px-2.5 py-1 rounded-full border border-gray-700 text-gray-400 font-medium">
-        {index + 1} / {total}
-      </span>
-    </div>
-
-    <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
-
-    <div className="space-y-2.5 mb-6">
-      {[1, 2, 3, 4].map((n) => {
-        const optText = q[`option${n}`];
-        const isCorrectOpt = q.correctOption === n;
-        const style = isCorrectOpt
-          ? "border-green-500/40 bg-green-500/10 text-green-300"
-          : "border-gray-800 bg-[#1F2937] text-gray-300";
-
-        return (
-          <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
-            <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
-              {n}
-            </span>
-            <span className="flex-1">{optText}</span>
-            {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
-          </div>
-        );
-      })}
-    </div>
-
-    {q.answerExplain && (
-      <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
-        <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
-          Explanation
-        </p>
-        <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
-      </div>
-    )}
-  </div>
-);
-
-const QuestionBankReview = () => {
-  const navigate = useNavigate();
-
-  // loading-exams | pick-exam | loading-meta | pick-subject | pick-topic |
-  // loading-questions | browsing | error | forbidden
-  const [phase, setPhase] = useState("loading-exams");
-  const [errorMsg, setErrorMsg] = useState("");
-
-  const [examList, setExamList] = useState([]);
-  const [selectedExam, setSelectedExam] = useState(null);
-
-  const [subjectsMeta, setSubjectsMeta] = useState([]);
-  const [selectedSubject, setSelectedSubject] = useState(null);
-
-  const [questions, setQuestions] = useState([]);
-  const [index, setIndex] = useState(0);
-  const [breadcrumb, setBreadcrumb] = useState({ exam: "", subject: "", topic: "" });
-
-  const handleApiError = (err) => {
-    if (err.response?.status === 403) {
-      setPhase("forbidden");
-      return;
-    }
-    setErrorMsg(err.response?.data?.message || err.message || "Kuch galat ho gaya.");
-    setPhase("error");
-  };
-
-  // ── Step 1: Exam list load karo ──
-  useEffect(() => {
-    let cancelled = false;
-    const loadExams = async () => {
-      setPhase("loading-exams");
-      try {
-        const res = await api.get("/allExamName");
-        if (cancelled) return;
-        setExamList(res.data.data || []);
-        setPhase("pick-exam");
-      } catch (err) {
-        if (!cancelled) handleApiError(err);
-      }
-    };
-    loadExams();
-    return () => { cancelled = true; };
-  }, []);
-
-  // ── Step 2: Exam select karne pe subject/topic meta lao ──
-  const pickExam = async (exam) => {
-    setSelectedExam(exam);
-    setPhase("loading-meta");
-    try {
-      const res = await api.get(`/questions/meta/${encodeURIComponent(exam)}`);
-      setSubjectsMeta(res.data.data.subjects || []);
-      setPhase("pick-subject");
-    } catch (err) {
-      handleApiError(err);
-    }
-  };
-
-  // ── Step 3: Subject select karne pe topic list dikhao ──
-  const pickSubject = (subj) => {
-    setSelectedSubject(subj);
-    setPhase("pick-topic");
-  };
-
-  // ── Step 4: Topic (ya "All Topics") select karne pe questions lao ──
-  const pickTopic = async (topicName) => {
-    setPhase("loading-questions");
-    try {
-      const res = await api.get(
-        `/questions/list/${encodeURIComponent(selectedExam)}/${encodeURIComponent(
-          selectedSubject.subjectName
-        )}/${encodeURIComponent(topicName)}`
-      );
-      const list = res.data.data || [];
-      if (list.length === 0) {
-        setErrorMsg("Is topic mein koi question nahi mila.");
-        setPhase("error");
-        return;
-      }
-      setQuestions(list);
-      setIndex(0);
-      setBreadcrumb({
-        exam: selectedExam,
-        subject: selectedSubject.subjectName,
-        topic: topicName === "all" ? "Sabhi Topics" : topicName,
-      });
-      setPhase("browsing");
-    } catch (err) {
-      handleApiError(err);
-    }
-  };
-
-  const backToExams = () => {
-    setSelectedExam(null);
-    setSubjectsMeta([]);
-    setPhase("pick-exam");
-  };
-
-  const backToSubjects = () => {
-    setSelectedSubject(null);
-    setPhase("pick-subject");
-  };
-
-  const backToTopics = () => {
-    setQuestions([]);
-    setPhase("pick-topic");
-  };
-
-  const currentQ = questions[index];
-
-  // ────────────────────────────── RENDER ──────────────────────────────
-
-  if (phase === "loading-exams" || phase === "loading-meta") return <PillsSkeleton />;
-  if (phase === "loading-questions") return <QuestionBrowseSkeleton />;
-
-  if (phase === "forbidden") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">Ye page sirf admin ke liye hai.</p>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "error") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{errorMsg}</p>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "pick-exam") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Question Bank Review</h1>
-          <p className="text-gray-400 text-sm mb-8">Exam chuniye jiske questions review karne hain</p>
-          <div className="flex flex-wrap gap-3">
-            {examList.map((exam) => (
-              <button
-                key={exam}
-                onClick={() => pickExam(exam)}
-                className="px-5 py-2.5 rounded-xl bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 text-sm font-medium transition-colors"
-              >
-                {exam}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "pick-subject") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={backToExams}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-          >
-            &larr; Exam Badlein
-          </button>
-          <h1 className="text-2xl font-bold mb-1">{selectedExam}</h1>
-          <p className="text-gray-400 text-sm mb-8">Subject chuniye</p>
-
-          {subjectsMeta.length === 0 ? (
-            <p className="text-gray-400 text-sm">Is exam ke liye koi question nahi mila.</p>
-          ) : (
-            <div className="space-y-3">
-              {subjectsMeta.map((s) => (
-                <button
-                  key={s.subjectName}
-                  onClick={() => pickSubject(s)}
-                  className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 transition-colors flex items-center justify-between"
-                >
-                  <div>
-                    <h3 className="font-semibold text-base">{s.subjectName}</h3>
-                    <p className="text-xs text-gray-500 mt-1">{s.topics.length} topics</p>
-                  </div>
-                  <span className="text-sm px-2.5 py-1 rounded-full bg-[#7C3AED]/20 text-[#A78BFA] flex-shrink-0">
-                    {s.totalQuestions} sawaal
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "pick-topic" && selectedSubject) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto">
-          <button
-            onClick={backToSubjects}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-          >
-            &larr; Subject Badlein
-          </button>
-          <h1 className="text-2xl font-bold mb-1">{selectedSubject.subjectName}</h1>
-          <p className="text-gray-400 text-sm mb-8">Topic chuniye (ya sabhi ek sath dekhein)</p>
-
-          <div className="flex flex-wrap gap-3">
-            <button
-              onClick={() => pickTopic("all")}
-              className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-            >
-              Sabhi Topics ({selectedSubject.totalQuestions})
-            </button>
-            {selectedSubject.topics.map((t) => (
-              <button
-                key={t}
-                onClick={() => pickTopic(t)}
-                className="px-5 py-2.5 rounded-xl bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 text-sm font-medium transition-colors"
-              >
-                {t}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "browsing" && currentQ) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
-        <div className="max-w-3xl mx-auto">
-          <button
-            onClick={backToTopics}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-          >
-            &larr; Topic Badlein
-          </button>
-
-          <h1 className="text-xl sm:text-2xl font-bold mb-1">{breadcrumb.subject}</h1>
-          <p className="text-gray-400 text-sm mb-6">
-            {breadcrumb.exam} &middot; {breadcrumb.topic}
-          </p>
-
-          <QuestionCard q={currentQ} index={index} total={questions.length} />
-
-          <div className="flex justify-between items-center mt-6">
-            <button
-              onClick={() => setIndex((i) => Math.max(0, i - 1))}
-              disabled={index === 0}
-              className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              &larr; Previous
-            </button>
-            <button
-              onClick={() => setIndex((i) => Math.min(questions.length - 1, i + 1))}
-              disabled={index >= questions.length - 1}
-              className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Next &rarr;
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
-};
-
-export default QuestionBankReview;
 </file>
 
 <file path="frontend/src/App.css">
@@ -3552,198 +3058,208 @@ export const addPerformence = async (req, res) => {
 };
 </file>
 
-<file path="backend/controllers/createChallenge.js">
-// controllers/createChallenge.js
-import mongoose from "mongoose";
-import Blueprint from "../models/bluePrint.js";
+<file path="backend/controllers/submitChallenge.js">
+// controllers/submitChallenge.js
 import Challenge from "../models/Challenge.js";
-import { Question } from "../models/rowQuestionSchema.js";
+import ChallengeAttempt from "../models/ChallengeAttempt.js";
 
-// ─────────────────────────────────────────────
-// HELPER 1: Fisher-Yates Shuffle (unbiased)
-// addMockTest.js jaisa hi — random questions select karne ke liye
-// ─────────────────────────────────────────────
-const fisherYatesShuffle = (arr) => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// ─────────────────────────────────────────────
-// HELPER 2: Unique 6-character challenge code generate karo
-// (uppercase letters + digits — link mein short aur readable rahega)
-// ─────────────────────────────────────────────
-const generateChallengeCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0,O,1,I) hataye
-  let code = "";
-  for (let i = 0; i < 6; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-};
-
-export const createChallenge = async (req, res) => {
+export const submitChallenge = async (req, res) => {
   try {
     // ─────────────────────────────────────────────
     // STEP 0: Validation
     // req.user middleware se aayega (userInfo middleware required hai route pe)
     // ─────────────────────────────────────────────
     const userId = req.user._id;
-    const { examName, blueprintName } = req.body;
+    const userName = req.user.name;
+    const { challengeCode } = req.params;
+    const { attemptedQuestions } = req.body;
 
-    if (!examName || !blueprintName) {
+    if (!challengeCode) {
       return res.status(400).json({
         success: false,
-        message: "examName aur blueprintName dono zaroori hain!",
+        message: "Challenge code zaroori hai!",
+      });
+    }
+
+    if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
       });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1: Blueprint dhundo
+    // STEP 1: Challenge dhundo
     // ─────────────────────────────────────────────
-    const blueprint = await Blueprint.findOne({ examName, blueprintName });
+    const challenge = await Challenge.findOne({ challengeCode });
 
-    if (!blueprint) {
+    if (!challenge) {
       return res.status(404).json({
         success: false,
-        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
       });
     }
 
-    // ─────────────────────────────────────────────
-    // STEP 2: Har subject ke liye RANDOM questions select karo
-    //
-    // Note: Ye jaanbujh kar addMockTest.js ke adaptive-weakness
-    // logic se SIMPLE rakha gaya hai — kyunki challenge sabke
-    // liye FAIR/SAME hona chahiye. Agar personalization laga
-    // di to har dost ko alag questions milenge aur comparison
-    // hi meaningless ho jayega.
-    // ─────────────────────────────────────────────
-    const finalSubjects = [];
-    let totalActualQuestions = 0;
-
-    for (const subjectConfig of blueprint.subjects) {
-      const { subjectName, questionCount } = subjectConfig;
-
-      // Is subject ke saare questions DB se lao
-      // 👇 NAYA: answerExplain bhi select kar rahe hain — taaki baad mein
-      // "Detailed Analysis" screen pe user ko explanation dikhaya ja sake
-      const allQuestions = await Question.find({
-        examName: { $in: [examName] },
-        subjectName: subjectName,
-      }).select(
-        "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName questionNumber"
-      );
-
-      if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
-
-      // Shuffle karke jitne chahiye utne le lo
-      const shuffled = fisherYatesShuffle(allQuestions);
-      const picked = shuffled.slice(0, Math.min(questionCount, shuffled.length));
-
-      const questionsForFreeze = picked.map((q) => ({
-        questionId: q._id,
-        question: q.question,
-        option1: q.option1,
-        option2: q.option2,
-        option3: q.option3,
-        option4: q.option4,
-        correctOption: q.correctOption,
-        answerExplain: q.answerExplain, // 👈 NAYA — frozen question ke sath explanation bhi save
-        topicName: q.topicName,
-        subjectName: q.subjectName,
-        questionNumber: q.questionNumber,
-      }));
-
-      finalSubjects.push({
-        subjectName,
-        questions: questionsForFreeze,
-      });
-
-      totalActualQuestions += questionsForFreeze.length;
-    }
-
-    if (totalActualQuestions === 0) {
-      return res.status(404).json({
+    // Expiry check (TTL index MongoDB mein thoda delay se chalta hai,
+    // isliye application-level pe bhi check karna safe hai)
+    if (challenge.expiresAt && challenge.expiresAt < new Date()) {
+      return res.status(410).json({
         success: false,
-        message: "Is blueprint ke liye koi questions available nahi hain!",
+        message: "Ye challenge expire ho chuka hai.",
       });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 3: Unique challenge code generate karo
-    // (collision chance bahut kam hai but phir bhi retry-loop laga rahe hain safety ke liye)
+    // STEP 2: Duplicate attempt check
+    // Ek user ek challenge sirf ek baar de sakta hai
     // ─────────────────────────────────────────────
-    let challengeCode;
-    let isUnique = false;
-    let attempts = 0;
-
-    while (!isUnique && attempts < 5) {
-      challengeCode = generateChallengeCode();
-      const existing = await Challenge.findOne({ challengeCode });
-      if (!existing) isUnique = true;
-      attempts++;
-    }
-
-    if (!isUnique) {
-      return res.status(500).json({
-        success: false,
-        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 4: Duration + expiry calculate karo
-    // ─────────────────────────────────────────────
-    const durationMinutes =
-      blueprint.durationMinutes && blueprint.durationMinutes > 0
-        ? blueprint.durationMinutes
-        : Math.max(10, Math.round(totalActualQuestions * 0.8));
-
-    // Challenge 7 din baad expire ho jayega — TTL index isse apne aap delete kar dega
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    // ─────────────────────────────────────────────
-    // STEP 5: Challenge document save karo
-    // ─────────────────────────────────────────────
-    const newChallenge = new Challenge({
-      createdBy: userId,
-      examName,
-      blueprintName,
-      challengeCode,
-      subjects: finalSubjects,
-      marksPerQuestion: blueprint.marksPerQuestion,
-      negativeMarking: blueprint.negativeMarking,
-      durationMinutes,
-      totalQuestions: totalActualQuestions,
-      expiresAt,
+    const existingAttempt = await ChallengeAttempt.findOne({
+      challengeId: challenge._id,
+      userId,
     });
 
-    await newChallenge.save();
+    if (existingAttempt) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+      });
+    }
 
     // ─────────────────────────────────────────────
-    // STEP 6: Response — shareable code/link ke sath
+    // STEP 3: Frozen challenge questions ka lookup map banao
+    // (validation ke liye — taaki koi galat isCorrect frontend se
+    // bhej ke score manipulate na kar sake, hum khud recalculate karenge)
     // ─────────────────────────────────────────────
+    const questionMap = {};
+    for (const subj of challenge.subjects) {
+      for (const q of subj.questions) {
+        questionMap[q.questionId.toString()] = q;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Har attempted question ko validate + score calculate karo
+    // BUG-PRONE AREA: Kabhi bhi frontend ke bheje "isCorrect" pe bharosa
+    // mat karo — hamesha server-side khud correctOption se compare karo.
+    // ─────────────────────────────────────────────
+    let correctCount = 0;
+    let wrongCount = 0;
+    let unattemptedCount = 0;
+    let totalTimeTakenInSeconds = 0;
+
+    const finalAttemptedQuestions = [];
+
+    for (const aq of attemptedQuestions) {
+      const qId = aq.questionId ? aq.questionId.toString() : null;
+      const frozenQ = qId ? questionMap[qId] : null;
+
+      // Agar ye question is challenge ka hai hi nahi, skip karo (galat/tampered data)
+      if (!frozenQ) continue;
+
+      const userAnswer =
+        aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
+          ? String(aq.userAnswer)
+          : null;
+
+      const isCorrect =
+        userAnswer === null ? null : userAnswer === String(frozenQ.correctOption);
+
+      const timeTaken =
+        typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0
+          ? aq.timeTakenInSeconds
+          : 0;
+
+      if (isCorrect === true) correctCount++;
+      else if (isCorrect === false) wrongCount++;
+      else unattemptedCount++;
+
+      totalTimeTakenInSeconds += timeTaken;
+
+      finalAttemptedQuestions.push({
+        questionId: frozenQ.questionId,
+        userAnswer,
+        isCorrect,
+        timeTakenInSeconds: timeTaken,
+      });
+    }
+
+    // Agar koi bhi valid question match nahi hua
+    if (finalAttemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Koi valid question match nahi hua is challenge ke sath.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Score calculate karo (frozen marksPerQuestion/negativeMarking se)
+    // ─────────────────────────────────────────────
+    const totalScore =
+      correctCount * challenge.marksPerQuestion -
+      wrongCount * challenge.negativeMarking;
+
+    // ─────────────────────────────────────────────
+    // STEP 6: ChallengeAttempt save karo
+    // ─────────────────────────────────────────────
+    const newAttempt = new ChallengeAttempt({
+  challengeId: challenge._id,
+  challengeCode: challenge.challengeCode,     // 👈 naya
+  examName: challenge.examName,               // 👈 naya
+  blueprintName: challenge.blueprintName,     // 👈 naya
+  createdByName: challenge.createdByName,     // 👈 naya
+  userId,
+  userName,
+      attemptedQuestions: finalAttemptedQuestions,
+      totalScore,
+      correctCount,
+      wrongCount,
+      unattemptedCount,
+      totalTimeTakenInSeconds,
+    });
+
+    await newAttempt.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 7: Response — score ke sath-sath current rank bhi bhej do
+    // taaki frontend turant "Aap 2nd number pe ho" dikha sake
+    // ─────────────────────────────────────────────
+    const betterAttemptsCount = await ChallengeAttempt.countDocuments({
+      challengeId: challenge._id,
+      totalScore: { $gt: totalScore },
+    });
+
+    const totalParticipants = await ChallengeAttempt.countDocuments({
+      challengeId: challenge._id,
+    });
+
     return res.status(201).json({
       success: true,
-      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
+      message: "Challenge submit ho gaya!",
       data: {
-        challengeCode: newChallenge.challengeCode,
-        examName: newChallenge.examName,
-        blueprintName: newChallenge.blueprintName,
-        totalQuestions: newChallenge.totalQuestions,
-        durationMinutes: newChallenge.durationMinutes,
-        expiresAt: newChallenge.expiresAt,
+        attemptId: newAttempt._id,
+        totalScore,
+        correctCount,
+        wrongCount,
+        unattemptedCount,
+        totalTimeTakenInSeconds,
+        currentRank: betterAttemptsCount + 1,
+        totalParticipants,
       },
     });
   } catch (error) {
-    console.error("createChallenge error:", error);
+    // Agar duplicate-key error aaya (compound unique index se),
+    // to matlab race-condition mein dobara submit ho gaya
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+      });
+    }
+
+    console.error("submitChallenge error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya challenge banate waqt.",
+      message: "Server mein error aa gaya challenge submit karte waqt.",
       error: error.message,
     });
   }
@@ -3826,123 +3342,96 @@ const Blueprint = rowQuestionConnection.model("Blueprint", blueprintSchema);
 export default Blueprint;
 </file>
 
-<file path="backend/models/Challenge.js">
-// models/Challenge.js
+<file path="backend/models/ChallengeAttempt.js">
+// models/ChallengeAttempt.js
 import mongoose from "mongoose";
 import { rowQuestionConnection } from "../config/rowQuestion.js";
 
-const challengeSchema = new mongoose.Schema(
+const challengeAttemptSchema = new mongoose.Schema(
   {
-    // Challenge kisne banaya — dost ko challenge bhejne wala user
-    createdBy: {
+    // Kis challenge ka attempt hai — Challenge document ki reference
+    challengeId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Challenge banane wale user ki ID zaroori hai"],
+      ref: "Challenge",
+      required: [true, "Challenge ID zaroori hai"],
+      index: true, // leaderboard fetch karte waqt is field pe query hogi baar-baar
     },
 
-    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
-    examName: {
+    // Kisne attempt diya
+    userId: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "User",
+  required: [true, "User ID zaroori hai"],
+  index: true,   // 👈 naya
+},
+
+    // Leaderboard mein naam dikhane ke liye — har baar User collection
+    // populate karne ki jagah yahin bhi save kar rahe hain (denormalized).
+    // Isse leaderboard query fast rahegi aur agar user apna naam badal
+    // le baad mein, purana attempt ka naam consistent rahega.
+    userName: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-    },
-    blueprintName: {
-      type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
-      trim: true,
+      required: [true, "User ka naam zaroori hai"],
     },
 
-    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
-    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
-    challengeCode: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
-    },
-
-    // ─────────────────────────────────────────────
-    // FROZEN QUESTIONS — Ye sabse important part hai.
-    // Jab challenge banta hai, tab ek baar mock-jaisa
-    // question set generate karke yahan PERMANENTLY save
-    // kar diya jata hai. Isse fark nahi padta ki 5 log
-    // alag-alag din pe attempt karein — sabko EXACT same
-    // questions milenge, isliye comparison fair rahega.
-    //
-    // Note: Yahan hum poora question object store kar rahe
-    // hain (sirf ID nahi) — taaki agar original Question
-    // document baad mein edit/delete ho jaye, challenge
-    // fir bhi kaam kare aur data consistent rahe.
-    // ─────────────────────────────────────────────
-    subjects: [
+    attemptedQuestions: [
       {
-        subjectName: { type: String, required: true },
-        questions: [
-          {
-            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
-            questionId: {
-              type: mongoose.Schema.Types.ObjectId,
-              required: true,
-            },
-            question: { type: String, required: true },
-            option1: { type: String, required: true },
-            option2: { type: String, required: true },
-            option3: { type: String, required: true },
-            option4: { type: String, required: true },
-            correctOption: { type: Number, required: true },
-            answerExplain: { type: String },
-            topicName: { type: String },
-            subjectName: { type: String },
-            questionNumber: { type: Number },
-          },
-        ],
+        questionId: {
+          type: mongoose.Schema.Types.ObjectId,
+          required: true,
+        },
+        userAnswer: {
+          type: String,
+          default: null, // unattempted questions ke liye null
+        },
+        isCorrect: {
+          type: Boolean,
+          default: null, // true/false/null (null = unattempted)
+        },
+        timeTakenInSeconds: {
+          type: Number,
+          default: null,
+          min: [0, "Time negative nahi ho sakta"],
+        },
       },
     ],
+     challengeCode: { type: String, required: true },
+     examName: { type: String, required: true },
+     blueprintName: { type: String, required: true },
+     createdByName: { type: String, required: true },
+    // Score summary — Performance.js jaisa hi pattern
+    totalScore: { type: Number, default: 0 },
+    correctCount: { type: Number, default: 0 },
+    wrongCount: { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
 
-    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
-    // (agar baad mein blueprint ke marks/negative marking badal jaye,
-    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
-    marksPerQuestion: {
+    // Total time liya poore challenge mein (leaderboard pe "fastest" 
+    // dikhane ke liye future mein kaam aa sakta hai — same score par
+    // kam time lene wala upar aa sakta hai)
+    totalTimeTakenInSeconds: {
       type: Number,
-      required: true,
-    },
-    negativeMarking: {
-      type: Number,
-      required: true,
       default: 0,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-    },
-    totalQuestions: {
-      type: Number,
-      required: true,
-    },
-
-    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
-    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
-    expiresAt: {
-      type: Date,
-      required: true,
     },
   },
   {
-    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
+    timestamps: true, // submittedAt ke liye createdAt hi use karenge
   }
 );
 
 // ─────────────────────────────────────────────
-// TTL INDEX — MongoDB khud is document ko expiresAt ke
-// 0 seconds baad automatically delete kar dega.
-// Isse humein manual cron job nahi likhni padegi purane
-// challenges saaf karne ke liye.
+// COMPOUND UNIQUE INDEX — Ek user ek challenge ko
+// sirf EK BAAR attempt kar sake. Agar dobara submit
+// karne ki koshish kare, DB level pe hi block ho jayega
+// (application-level check ke sath-sath ye extra safety hai).
 // ─────────────────────────────────────────────
-challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+challengeAttemptSchema.index({ challengeId: 1, userId: 1 }, { unique: true });
 
-const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
+const ChallengeAttempt = rowQuestionConnection.model(
+  "ChallengeAttempt",
+  challengeAttemptSchema
+);
 
-export default Challenge;
+export default ChallengeAttempt;
 </file>
 
 <file path="frontend/src/api/api.js">
@@ -3954,341 +3443,6 @@ const api = axios.create({
 });
 
 export default api;
-</file>
-
-<file path="frontend/src/pages/ChallengeReview.jsx">
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import api from "../api/api";
-
-const STATUS_FILTERS = [
-  { key: "all", label: "All" },
-  { key: "correct", label: "Correct" },
-  { key: "wrong", label: "Wrong" },
-  { key: "unattempted", label: "Unattempted" },
-];
-
-// ──────────────────────────────────────────────
-// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
-// ──────────────────────────────────────────────
-const SkeletonBlock = ({ className = "" }) => (
-  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
-);
-
-const ChallengeReviewSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
-    <div className="max-w-3xl mx-auto">
-      <SkeletonBlock className="w-32 h-4 mb-6" />
-
-      <SkeletonBlock className="w-48 h-7 mb-2" />
-      <SkeletonBlock className="w-40 h-4 mb-6" />
-
-      {/* Overview stats skeleton */}
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <SkeletonBlock className="w-8 h-5 mx-auto mb-2" />
-            <SkeletonBlock className="w-14 h-3 mx-auto" />
-          </div>
-        ))}
-      </div>
-
-      {/* Subject filter pills skeleton */}
-      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-        {[1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
-        ))}
-      </div>
-
-      {/* Status filter pills skeleton */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-        {[1, 2, 3, 4].map((i) => (
-          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
-        ))}
-      </div>
-
-      <SkeletonBlock className="w-44 h-3 mb-3" />
-
-      {/* Question detail card skeleton */}
-      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4 gap-3">
-          <SkeletonBlock className="w-20 h-3" />
-          <SkeletonBlock className="w-16 h-5 rounded-full" />
-        </div>
-        <SkeletonBlock className="w-full h-5 mb-2" />
-        <SkeletonBlock className="w-3/4 h-5 mb-6" />
-        <div className="space-y-2.5 mb-6">
-          {[1, 2, 3, 4].map((i) => (
-            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
-          ))}
-        </div>
-        <SkeletonBlock className="w-full h-20 rounded-lg" />
-      </div>
-
-      {/* Prev/Next skeleton */}
-      <div className="flex justify-between items-center mt-6">
-        <SkeletonBlock className="w-28 h-10 rounded-lg" />
-        <SkeletonBlock className="w-24 h-10 rounded-lg" />
-      </div>
-    </div>
-  </div>
-);
-
-// ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
-const QuestionDetailCard = ({ q }) => {
-  const statusLabel =
-    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
-  const statusColor =
-    q.isCorrect === true
-      ? "text-green-400 bg-green-500/10 border-green-500/30"
-      : q.isCorrect === false
-      ? "text-red-400 bg-red-500/10 border-red-500/30"
-      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
-
-  return (
-    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <span className="text-xs text-gray-500">{q.topicName}</span>
-        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
-          {statusLabel}
-        </span>
-      </div>
-
-      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
-
-      <div className="space-y-2.5 mb-6">
-        {[1, 2, 3, 4].map((n) => {
-          const optText = q.options?.[`option${n}`];
-          const isCorrectOpt = q.correctOption === n;
-          const isUserPick = q.userAnswer === String(n);
-
-          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
-          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
-          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
-
-          return (
-            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
-              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
-                {n}
-              </span>
-              <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
-              {isUserPick && !isCorrectOpt && (
-                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {q.userAnswer == null && (
-        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
-      )}
-
-      {q.timeTakenInSeconds != null && (
-        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
-      )}
-
-      {q.answerExplain && (
-        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
-          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
-            Explanation
-          </p>
-          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
-const ChallengeReview = () => {
-  const navigate = useNavigate();
-  const { code } = useParams();
-
-  const [subjectFilter, setSubjectFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [index, setIndex] = useState(0);
-
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["challenge-attempt-detail", code],
-    queryFn: async () => {
-      const res = await api.get(`/challenge/${code}/my-attempt`);
-      return res.data.data;
-    },
-    enabled: !!code,
-  });
-
-  const allQuestions = data?.questionBreakdown || [];
-
-  const subjects = useMemo(() => {
-    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
-    return Array.from(set);
-  }, [allQuestions]);
-
-  const filteredQuestions = useMemo(() => {
-    return allQuestions.filter((q) => {
-      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
-      let statusMatch = true;
-      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
-      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
-      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
-      return subjMatch && statusMatch;
-    });
-  }, [allQuestions, subjectFilter, statusFilter]);
-
-  useEffect(() => {
-    setIndex(0);
-  }, [subjectFilter, statusFilter]);
-
-  const currentQ = filteredQuestions[index];
-
-  const counts = useMemo(() => {
-    const base = allQuestions.filter(
-      (q) => subjectFilter === "all" || q.subjectName === subjectFilter
-    );
-    return {
-      all: base.length,
-      correct: base.filter((q) => q.isCorrect === true).length,
-      wrong: base.filter((q) => q.isCorrect === false).length,
-      unattempted: base.filter((q) => q.isCorrect === null).length,
-    };
-  }, [allQuestions, subjectFilter]);
-
-  if (isLoading) {
-    return <ChallengeReviewSkeleton />;
-  }
-
-  if (isError) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">
-            {error?.response?.data?.message || "Data load nahi ho paaya."}
-          </p>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
-      <div className="max-w-3xl mx-auto">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
-        >
-          &larr; Wapas Jaayein
-        </button>
-
-        <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
-        <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
-
-        {/* Overview stats */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-green-400">{data?.overview?.correctCount}</p>
-            <p className="text-[11px] text-gray-500">Correct</p>
-          </div>
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-red-400">{data?.overview?.wrongCount}</p>
-            <p className="text-[11px] text-gray-500">Wrong</p>
-          </div>
-          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-            <p className="text-lg font-bold text-gray-300">{data?.overview?.unattemptedCount}</p>
-            <p className="text-[11px] text-gray-500">Unattempted</p>
-          </div>
-        </div>
-
-        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject ho */}
-        {subjects.length > 1 && (
-          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-            <button
-              onClick={() => setSubjectFilter("all")}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                subjectFilter === "all"
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              Sabhi Subjects
-            </button>
-            {subjects.map((s) => (
-              <button
-                key={s}
-                onClick={() => setSubjectFilter(s)}
-                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                  subjectFilter === s
-                    ? "bg-[#7C3AED] text-white"
-                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-                }`}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Status filter — All / Correct / Wrong / Unattempted */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {STATUS_FILTERS.map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key)}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
-                statusFilter === f.key
-                  ? "bg-[#7C3AED] text-white"
-                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
-              }`}
-            >
-              {f.label} ({counts[f.key]})
-            </button>
-          ))}
-        </div>
-
-        {filteredQuestions.length === 0 && (
-          <p className="text-gray-400 text-sm py-10 text-center">
-            Is category mein koi sawaal nahi hai.
-          </p>
-        )}
-
-        {currentQ && (
-          <>
-            <p className="text-xs text-gray-500 mb-3">
-              Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
-            </p>
-            <QuestionDetailCard q={currentQ} />
-
-            <div className="flex justify-between items-center mt-6">
-              <button
-                onClick={() => setIndex((i) => Math.max(0, i - 1))}
-                disabled={index === 0}
-                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                &larr; Previous
-              </button>
-              <button
-                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
-                disabled={index >= filteredQuestions.length - 1}
-                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                Next &rarr;
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export default ChallengeReview;
 </file>
 
 <file path="frontend/src/pages/Singup.jsx">
@@ -5464,6 +4618,673 @@ export const loginUser = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/createChallenge.js">
+// controllers/createChallenge.js
+import mongoose from "mongoose";
+import Blueprint from "../models/bluePrint.js";
+import Challenge from "../models/Challenge.js";
+import { Question } from "../models/rowQuestionSchema.js";
+
+// ─────────────────────────────────────────────
+// HELPER 1: Fisher-Yates Shuffle (unbiased)
+// addMockTest.js jaisa hi — random questions select karne ke liye
+// ─────────────────────────────────────────────
+const fisherYatesShuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// ─────────────────────────────────────────────
+// HELPER 2: Unique 6-character challenge code generate karo
+// (uppercase letters + digits — link mein short aur readable rahega)
+// ─────────────────────────────────────────────
+const generateChallengeCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // confusing chars (0,O,1,I) hataye
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+};
+
+export const createChallenge = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // req.user middleware se aayega (userInfo middleware required hai route pe)
+    // ─────────────────────────────────────────────
+    const userId = req.user._id;
+    const { examName, blueprintName } = req.body;
+
+    if (!examName || !blueprintName) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur blueprintName dono zaroori hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Blueprint dhundo
+    // ─────────────────────────────────────────────
+    const blueprint = await Blueprint.findOne({ examName, blueprintName });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Har subject ke liye RANDOM questions select karo
+    //
+    // Note: Ye jaanbujh kar addMockTest.js ke adaptive-weakness
+    // logic se SIMPLE rakha gaya hai — kyunki challenge sabke
+    // liye FAIR/SAME hona chahiye. Agar personalization laga
+    // di to har dost ko alag questions milenge aur comparison
+    // hi meaningless ho jayega.
+    // ─────────────────────────────────────────────
+    const finalSubjects = [];
+    let totalActualQuestions = 0;
+
+    for (const subjectConfig of blueprint.subjects) {
+      const { subjectName, questionCount } = subjectConfig;
+
+      // Is subject ke saare questions DB se lao
+      // 👇 NAYA: answerExplain bhi select kar rahe hain — taaki baad mein
+      // "Detailed Analysis" screen pe user ko explanation dikhaya ja sake
+      const allQuestions = await Question.find({
+        examName: { $in: [examName] },
+        subjectName: subjectName,
+      }).select(
+        "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName questionNumber"
+      );
+
+      if (allQuestions.length === 0) continue; // is subject ke questions hi nahi hain
+
+      // Shuffle karke jitne chahiye utne le lo
+      const shuffled = fisherYatesShuffle(allQuestions);
+      const picked = shuffled.slice(0, Math.min(questionCount, shuffled.length));
+
+      const questionsForFreeze = picked.map((q) => ({
+        questionId: q._id,
+        question: q.question,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correctOption: q.correctOption,
+        answerExplain: q.answerExplain, // 👈 NAYA — frozen question ke sath explanation bhi save
+        topicName: q.topicName,
+        subjectName: q.subjectName,
+        questionNumber: q.questionNumber,
+      }));
+
+      finalSubjects.push({
+        subjectName,
+        questions: questionsForFreeze,
+      });
+
+      totalActualQuestions += questionsForFreeze.length;
+    }
+
+    if (totalActualQuestions === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Is blueprint ke liye koi questions available nahi hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Unique challenge code generate karo
+    // (collision chance bahut kam hai but phir bhi retry-loop laga rahe hain safety ke liye)
+    // ─────────────────────────────────────────────
+    let challengeCode;
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+      challengeCode = generateChallengeCode();
+      const existing = await Challenge.findOne({ challengeCode });
+      if (!existing) isUnique = true;
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Duration + expiry calculate karo
+    // ─────────────────────────────────────────────
+    const durationMinutes =
+      blueprint.durationMinutes && blueprint.durationMinutes > 0
+        ? blueprint.durationMinutes
+        : Math.max(10, Math.round(totalActualQuestions * 0.8));
+
+    // Challenge 7 din baad expire ho jayega — TTL index isse apne aap delete kar dega
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Challenge document save karo
+    // ─────────────────────────────────────────────
+    const newChallenge = new Challenge({
+  createdBy: userId,
+  createdByName: req.user.name,   // 👈 naya — extra query nahi lagi, req.user mein pehle se hai
+  examName,
+      blueprintName,
+      challengeCode,
+      subjects: finalSubjects,
+      marksPerQuestion: blueprint.marksPerQuestion,
+      negativeMarking: blueprint.negativeMarking,
+      durationMinutes,
+      totalQuestions: totalActualQuestions,
+      expiresAt,
+    });
+
+    await newChallenge.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 6: Response — shareable code/link ke sath
+    // ─────────────────────────────────────────────
+    return res.status(201).json({
+      success: true,
+      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
+      data: {
+        challengeCode: newChallenge.challengeCode,
+        examName: newChallenge.examName,
+        blueprintName: newChallenge.blueprintName,
+        totalQuestions: newChallenge.totalQuestions,
+        durationMinutes: newChallenge.durationMinutes,
+        expiresAt: newChallenge.expiresAt,
+      },
+    });
+  } catch (error) {
+    console.error("createChallenge error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya challenge banate waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/models/Challenge.js">
+// models/Challenge.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const challengeSchema = new mongoose.Schema(
+  {
+    // Challenge kisne banaya — dost ko challenge bhejne wala user
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "Challenge banane wale user ki ID zaroori hai"],
+    },
+
+    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+    },
+    blueprintName: {
+      type: String,
+      required: [true, "Blueprint ka naam zaroori hai"],
+      trim: true,
+    },
+
+    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
+    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
+    challengeCode: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
+    },
+
+    // ─────────────────────────────────────────────
+    // FROZEN QUESTIONS — Ye sabse important part hai.
+    // Jab challenge banta hai, tab ek baar mock-jaisa
+    // question set generate karke yahan PERMANENTLY save
+    // kar diya jata hai. Isse fark nahi padta ki 5 log
+    // alag-alag din pe attempt karein — sabko EXACT same
+    // questions milenge, isliye comparison fair rahega.
+    //
+    // Note: Yahan hum poora question object store kar rahe
+    // hain (sirf ID nahi) — taaki agar original Question
+    // document baad mein edit/delete ho jaye, challenge
+    // fir bhi kaam kare aur data consistent rahe.
+    // ─────────────────────────────────────────────
+    subjects: [
+      {
+        subjectName: { type: String, required: true },
+        questions: [
+          {
+            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
+            questionId: {
+              type: mongoose.Schema.Types.ObjectId,
+              required: true,
+            },
+            question: { type: String, required: true },
+            option1: { type: String, required: true },
+            option2: { type: String, required: true },
+            option3: { type: String, required: true },
+            option4: { type: String, required: true },
+            correctOption: { type: Number, required: true },
+            answerExplain: { type: String },
+            topicName: { type: String },
+            subjectName: { type: String },
+            questionNumber: { type: Number },
+          },
+        ],
+      },
+    ],
+     createdByName: {
+      type: String,
+      required: [true, "Challenge banane wale ka naam zaroori hai"],
+      },
+    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
+    // (agar baad mein blueprint ke marks/negative marking badal jaye,
+    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
+    marksPerQuestion: {
+      type: Number,
+      required: true,
+    },
+    negativeMarking: {
+      type: Number,
+      required: true,
+      default: 0,
+    },
+    durationMinutes: {
+      type: Number,
+      required: true,
+    },
+    totalQuestions: {
+      type: Number,
+      required: true,
+    },
+
+    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
+    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
+    expiresAt: {
+      type: Date,
+      required: true,
+    },
+  },
+  {
+    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
+  }
+);
+
+// ─────────────────────────────────────────────
+// TTL INDEX — MongoDB khud is document ko expiresAt ke
+// 0 seconds baad automatically delete kar dega.
+// Isse humein manual cron job nahi likhni padegi purane
+// challenges saaf karne ke liye.
+// ─────────────────────────────────────────────
+challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
+const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
+
+export default Challenge;
+</file>
+
+<file path="frontend/src/pages/ChallengeReview.jsx">
+import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import api from "../api/api";
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
+// ──────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ChallengeReviewSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+    <div className="max-w-3xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+
+      <SkeletonBlock className="w-48 h-7 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-6" />
+
+      {/* Overview stats skeleton */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <SkeletonBlock className="w-8 h-5 mx-auto mb-2" />
+            <SkeletonBlock className="w-14 h-3 mx-auto" />
+          </div>
+        ))}
+      </div>
+
+      {/* Subject filter pills skeleton */}
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+        {[1, 2, 3].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      {/* Status filter pills skeleton */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {[1, 2, 3, 4].map((i) => (
+          <SkeletonBlock key={i} className="w-24 h-8 rounded-full flex-shrink-0" />
+        ))}
+      </div>
+
+      <SkeletonBlock className="w-44 h-3 mb-3" />
+
+      {/* Question detail card skeleton */}
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <SkeletonBlock className="w-20 h-3" />
+          <SkeletonBlock className="w-16 h-5 rounded-full" />
+        </div>
+        <SkeletonBlock className="w-full h-5 mb-2" />
+        <SkeletonBlock className="w-3/4 h-5 mb-6" />
+        <div className="space-y-2.5 mb-6">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="w-full h-11 rounded-xl" />
+          ))}
+        </div>
+        <SkeletonBlock className="w-full h-20 rounded-lg" />
+      </div>
+
+      {/* Prev/Next skeleton */}
+      <div className="flex justify-between items-center mt-6">
+        <SkeletonBlock className="w-28 h-10 rounded-lg" />
+        <SkeletonBlock className="w-24 h-10 rounded-lg" />
+      </div>
+    </div>
+  </div>
+);
+
+// ── Single question ka poora detail card — MockTest.jsx wale se same pattern ──
+const QuestionDetailCard = ({ q }) => {
+  const statusLabel =
+    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+  const statusColor =
+    q.isCorrect === true
+      ? "text-green-400 bg-green-500/10 border-green-500/30"
+      : q.isCorrect === false
+      ? "text-red-400 bg-red-500/10 border-red-500/30"
+      : "text-gray-400 bg-gray-500/10 border-gray-500/30";
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+      <div className="flex items-center justify-between mb-4 gap-3">
+        <span className="text-xs text-gray-500">{q.topicName}</span>
+        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
+          {statusLabel}
+        </span>
+      </div>
+
+      <p className="text-base sm:text-lg mb-6 leading-relaxed">{q.question}</p>
+
+      <div className="space-y-2.5 mb-6">
+        {[1, 2, 3, 4].map((n) => {
+          const optText = q.options?.[`option${n}`];
+          const isCorrectOpt = q.correctOption === n;
+          const isUserPick = q.userAnswer === String(n);
+
+          let style = "border-gray-800 bg-[#1F2937] text-gray-300";
+          if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
+          else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
+
+          return (
+            <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+              <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">
+                {n}
+              </span>
+              <span className="flex-1">{optText}</span>
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isUserPick && !isCorrectOpt && (
+                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {q.userAnswer == null && (
+        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+      )}
+
+      {q.timeTakenInSeconds != null && (
+        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
+      )}
+
+      {q.answerExplain && (
+        <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+          <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">
+            Explanation
+          </p>
+          <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ChallengeReview = () => {
+  const navigate = useNavigate();
+  const { code } = useParams();
+
+  const [subjectFilter, setSubjectFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [index, setIndex] = useState(0);
+
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["challenge-attempt-detail", code],
+    queryFn: async () => {
+      const res = await api.get(`/challenge/${code}/my-attempt`);
+      return res.data.data;
+    },
+    enabled: !!code,
+  });
+
+  const allQuestions = data?.questionBreakdown || [];
+
+  const subjects = useMemo(() => {
+    const set = new Set(allQuestions.map((q) => q.subjectName).filter(Boolean));
+    return Array.from(set);
+  }, [allQuestions]);
+
+  const filteredQuestions = useMemo(() => {
+    return allQuestions.filter((q) => {
+      const subjMatch = subjectFilter === "all" || q.subjectName === subjectFilter;
+      let statusMatch = true;
+      if (statusFilter === "correct") statusMatch = q.isCorrect === true;
+      else if (statusFilter === "wrong") statusMatch = q.isCorrect === false;
+      else if (statusFilter === "unattempted") statusMatch = q.isCorrect === null;
+      return subjMatch && statusMatch;
+    });
+  }, [allQuestions, subjectFilter, statusFilter]);
+
+  useEffect(() => {
+    setIndex(0);
+  }, [subjectFilter, statusFilter]);
+
+  const currentQ = filteredQuestions[index];
+
+  const counts = useMemo(() => {
+    const base = allQuestions.filter(
+      (q) => subjectFilter === "all" || q.subjectName === subjectFilter
+    );
+    return {
+      all: base.length,
+      correct: base.filter((q) => q.isCorrect === true).length,
+      wrong: base.filter((q) => q.isCorrect === false).length,
+      unattempted: base.filter((q) => q.isCorrect === null).length,
+    };
+  }, [allQuestions, subjectFilter]);
+
+  if (isLoading) {
+    return <ChallengeReviewSkeleton />;
+  }
+
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">
+            {error?.response?.data?.message || "Data load nahi ho paaya."}
+          </p>
+          <button
+            onClick={() => navigate("/HomePage")}
+            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+          >
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+        >
+          &larr; Wapas Jaayein
+        </button>
+
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
+        <p className="text-gray-400 text-sm mb-6">{data?.blueprintName}</p>
+{/* 👇 NAYA: Total score card — data pehle se aa raha tha, UI mein nahi tha */}
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-6">
+          <p className="text-5xl font-bold text-[#A78BFA]">{data?.overview?.totalScore}</p>
+          <p className="text-sm text-gray-500 mt-1">Total Score</p>
+        </div>
+        {/* Overview stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-green-400">{data?.overview?.correctCount}</p>
+            <p className="text-[11px] text-gray-500">Correct</p>
+          </div>
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-red-400">{data?.overview?.wrongCount}</p>
+            <p className="text-[11px] text-gray-500">Wrong</p>
+          </div>
+          <div className="bg-[#1F2937] rounded-xl p-4 text-center">
+            <p className="text-lg font-bold text-gray-300">{data?.overview?.unattemptedCount}</p>
+            <p className="text-[11px] text-gray-500">Unattempted</p>
+          </div>
+        </div>
+
+        {/* Subject filter — sirf tabhi dikhega jab 1 se zyada subject ho */}
+        {subjects.length > 1 && (
+          <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
+            <button
+              onClick={() => setSubjectFilter("all")}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                subjectFilter === "all"
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              Sabhi Subjects
+            </button>
+            {subjects.map((s) => (
+              <button
+                key={s}
+                onClick={() => setSubjectFilter(s)}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  subjectFilter === s
+                    ? "bg-[#7C3AED] text-white"
+                    : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Status filter — All / Correct / Wrong / Unattempted */}
+        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          {STATUS_FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setStatusFilter(f.key)}
+              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                statusFilter === f.key
+                  ? "bg-[#7C3AED] text-white"
+                  : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+              }`}
+            >
+              {f.label} ({counts[f.key]})
+            </button>
+          ))}
+        </div>
+
+        {filteredQuestions.length === 0 && (
+          <p className="text-gray-400 text-sm py-10 text-center">
+            Is category mein koi sawaal nahi hai.
+          </p>
+        )}
+
+        {currentQ && (
+          <>
+            <p className="text-xs text-gray-500 mb-3">
+              Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
+            </p>
+            <QuestionDetailCard q={currentQ} />
+
+            <div className="flex justify-between items-center mt-6">
+              <button
+                onClick={() => setIndex((i) => Math.max(0, i - 1))}
+                disabled={index === 0}
+                className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                &larr; Previous
+              </button>
+              <button
+                onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
+                disabled={index >= filteredQuestions.length - 1}
+                className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next &rarr;
+              </button>
+            </div>
+            {/* 👇 NAYA: Last button — home pe wapas */}
+        <button
+          onClick={() => navigate("/HomePage")}
+          className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500"
+        >
+          Home Jaayein
+        </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default ChallengeReview;
+</file>
+
 <file path="frontend/src/pages/Login.jsx">
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -6385,109 +6206,6 @@ const QuestionCard = ({ q, index }) => {
 };
 
 export default UserTopicAnalysis;
-</file>
-
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js";
-
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
-import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
-
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-
-// 👇 NAYA: Question Bank Review (admin-only) ke controllers
-import { getQuestionMeta } from "../controllers/getQuestionMeta.js";
-import { getQuestionList } from "../controllers/getQuestionList.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-import { isAdmin } from "../middlewares/isAdmin.js"; // 👈 NAYA
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-router.post("/create-challenge", userInfo, createChallenge);
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-// 👇 NAYA: Frontend ko batata hai current user admin hai ya nahi —
-// isse HomePage pe "Question Review" button sirf admin ko dikhega
-router.get("/is-admin", userInfo, (req, res) => {
-    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
-    res.status(200).json({ success: true, isAdmin: isAdminUser });
-});
-
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-
-// 👇 NAYA: Question Bank Review routes — dono admin-only hain (userInfo + isAdmin)
-// kyunki inmein correctOption bhi hota hai, jo normal students ko nahi dikhna chahiye
-router.get("/questions/meta/:examName", userInfo, isAdmin, getQuestionMeta);
-router.get("/questions/list/:examName/:subjectName/:topicName", userInfo, isAdmin, getQuestionList);
-
-export default router;
 </file>
 
 <file path="backend/server.js">
@@ -8404,6 +8122,101 @@ const QuestionDetailCard = ({ q }) => {
 export default UserAllAnalysis;
 </file>
 
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js";
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+import { getMyChallenges } from "../controllers/getMyChallenges.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+router.post("/create-challenge", userInfo, createChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+// 👇 NAYA: Frontend ko batata hai current user admin hai ya nahi —
+// isse HomePage pe "Question Review" button sirf admin ko dikhega
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+router.get("/my-challenges", userInfo, getMyChallenges);
+
+export default router;
+</file>
+
 <file path="frontend/src/pages/HomePage.jsx">
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -8472,6 +8285,21 @@ const HomePage = () => {
               </p>
             </div>
             <span className="text-2xl flex-shrink-0">&rarr;</span>
+          </button>
+          {/* 👇 NAYA: Apne diye hue challenges ki list */}
+          <button
+            onClick={() => navigate("/MyChallenges")}
+            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
+          >
+            <div className="text-left">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                Apne Challenges Dekho <span>📊</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Leaderboard aur apna performance dekhein
+              </p>
+            </div>
+            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
           </button>
         </section>
 
@@ -8644,61 +8472,6 @@ const HomePage = () => {
 };
 
 export default HomePage;
-</file>
-
-<file path="frontend/src/App.jsx">
-// App.jsx
-import { HashRouter, Routes, Route } from 'react-router-dom'; 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import MockTest from './pages/MockTest';
-import UserAllAnalysis from './pages/UserAllAnalysis';
-import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
-import UserTopicAnalysis from './pages/UserTopicAnalysis';
-import Login from './pages/Login';
-import Singup from './pages/Singup';
-import HomePage from './pages/HomePage';
-import ProfilePage from './pages/ProfilePage';
-import Challenge from './pages/Challenge';
-import ChallengeReview from './pages/ChallengeReview';
-import QuestionBankReview from './pages/QuestionBankReview'; // 👈 NAYA
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 30 * 1000,
-      retry: 1,
-    },
-  },
-});
-
-const App = () => { 
-  return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <div>
-          <Routes>
-            <Route path="/" element={<HomePage/>} />
-            <Route path="/MockTest" element={<MockTest/>} />
-            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
-            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
-            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
-            <Route path="/Login" element={<Login/>} />
-            <Route path="/Singup" element={<Singup/>} />
-            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
-            <Route path="/HomePage" element={<HomePage/>} />
-            <Route path="/ProfilePage" element={<ProfilePage/>} />
-            <Route path="/Challenge" element={<Challenge/>} />
-            <Route path="/Challenge/:code" element={<Challenge/>} />
-            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
-            <Route path="/QuestionBankReview" element={<QuestionBankReview/>} /> {/* 👈 NAYA */}
-          </Routes>
-        </div>
-      </HashRouter>
-    </QueryClientProvider>
-  )
-}
-
-export default App;
 </file>
 
 <file path="frontend/src/pages/Challenge.jsx">
@@ -9441,6 +9214,61 @@ const Challenge = () => {
 };
 
 export default Challenge;
+</file>
+
+<file path="frontend/src/App.jsx">
+// App.jsx
+import { HashRouter, Routes, Route } from 'react-router-dom'; 
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import MockTest from './pages/MockTest';
+import UserAllAnalysis from './pages/UserAllAnalysis';
+import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
+import UserTopicAnalysis from './pages/UserTopicAnalysis';
+import Login from './pages/Login';
+import Singup from './pages/Singup';
+import HomePage from './pages/HomePage';
+import ProfilePage from './pages/ProfilePage';
+import Challenge from './pages/Challenge';
+import ChallengeReview from './pages/ChallengeReview';
+import MyChallenges from './pages/MyChallenges';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30 * 1000,
+      retry: 1,
+    },
+  },
+});
+
+const App = () => { 
+  return (
+    <QueryClientProvider client={queryClient}>
+      <HashRouter>
+        <div>
+          <Routes>
+            <Route path="/" element={<HomePage/>} />
+            <Route path="/MockTest" element={<MockTest/>} />
+            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
+            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
+            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
+            <Route path="/Login" element={<Login/>} />
+            <Route path="/Singup" element={<Singup/>} />
+            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
+            <Route path="/HomePage" element={<HomePage/>} />
+            <Route path="/ProfilePage" element={<ProfilePage/>} />
+            <Route path="/Challenge" element={<Challenge/>} />
+            <Route path="/Challenge/:code" element={<Challenge/>} />
+            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
+            <Route path="/MyChallenges" element={<MyChallenges/>} />
+          </Routes>
+        </div>
+      </HashRouter>
+    </QueryClientProvider>
+  )
+}
+
+export default App;
 </file>
 
 </files>
