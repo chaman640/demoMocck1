@@ -13,6 +13,10 @@ const formatTime = (totalSeconds) => {
 // localStorage key — har user ka apna alag saved "created challenge"
 const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
 
+// 👇 NAYA: localStorage key — user ke current in-progress test attempt ke liye
+// (alag hai getChallengeStorageKey se, jo sirf "created but not started" ko track karta hai)
+const getChallengeAttemptStorageKey = (userId) => `activeChallengeAttempt_${userId}`;
+
 // ──────────────────────────────────────────────
 // Skeleton loading building blocks (spinner ki jagah)
 // ──────────────────────────────────────────────
@@ -77,9 +81,6 @@ const SubmittingSkeleton = () => (
 
 // ──────────────────────────────────────────────
 // Reusable Leaderboard list component
-// FIX: naam se compare karne ki jagah ab userId se compare
-// hoga — taaki same naam wale do alag accounts galti se
-// dono "(Aap)" na ban jaayein
 // ──────────────────────────────────────────────
 const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
@@ -153,13 +154,17 @@ const Challenge = () => {
   const [answers, setAnswers] = useState({});
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const [endTimestamp, setEndTimestamp] = useState(null);
+  // 👇 UPDATED: endTimestamp (wall-clock) hata diya — ab tab-visibility se
+  // timer freeze hota hai
+  const [isVisible, setIsVisible] = useState(true);
   const [resultData, setResultData] = useState(null);
   const [leaderboard, setLeaderboard] = useState(null);
 
   const questionStartRef = useRef(Date.now());
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
+  // 👇 NAYA: remainingSeconds ka latest value ref mein — localStorage save ke liye
+  const remainingSecondsRef = useRef(0);
 
   const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
 
@@ -187,6 +192,7 @@ const Challenge = () => {
     setPhase("loading-create");
     try {
       localStorage.removeItem(getChallengeStorageKey(userId));
+      localStorage.removeItem(getChallengeAttemptStorageKey(userId));
       await generateNewChallenge(userExam, userId);
       setPhase("created");
     } catch (err) {
@@ -206,6 +212,43 @@ const Challenge = () => {
         setUserName(user.name);
         setUserId(user._id);
         setUserExam(user.exam);
+
+        // ─────────────────────────────────────────────
+        // 👇 NAYA STEP 0: Check karo koi in-progress test attempt saved to nahi hai
+        // (matlab test beech mein tha jab tab band/minimize hua tha)
+        // ─────────────────────────────────────────────
+        const attemptRaw = localStorage.getItem(getChallengeAttemptStorageKey(user._id));
+        if (attemptRaw) {
+          try {
+            const attempt = JSON.parse(attemptRaw);
+            const matchesRoute = codeParam
+              ? attempt.challengeCode === codeParam
+              : attempt.isOwn;
+
+            if (matchesRoute && attempt.challengeMeta) {
+              setChallengeMeta(attempt.challengeMeta);
+              if (attempt.isOwn && attempt.createdChallenge) {
+                setCreatedChallenge(attempt.createdChallenge);
+              }
+              setAnswers(attempt.answers || {});
+              setTimeSpent(attempt.timeSpent || {});
+              setActiveSubjectIdx(attempt.activeSubjectIdx || 0);
+              setActiveQIdx(attempt.activeQIdx || 0);
+              setRemainingSeconds(Math.max(0, attempt.remainingSeconds ?? 0));
+
+              const subj = attempt.challengeMeta.subjects[attempt.activeSubjectIdx || 0];
+              const q = subj ? subj.questions[attempt.activeQIdx || 0] : null;
+              currentQIdRef.current = q ? q._id : null;
+              questionStartRef.current = Date.now();
+              submittingRef.current = false;
+
+              setPhase("test");
+              return;
+            }
+          } catch {
+            localStorage.removeItem(getChallengeAttemptStorageKey(user._id));
+          }
+        }
 
         if (codeParam) {
           const chRes = await api.get(`/challenge/${codeParam}`);
@@ -295,7 +338,7 @@ const Challenge = () => {
     questionStartRef.current = Date.now();
 
     const totalSeconds = challengeMeta.durationMinutes * 60;
-    setEndTimestamp(Date.now() + totalSeconds * 1000);
+    // 👇 UPDATED: sirf remainingSeconds set karo, koi endTimestamp nahi
     setRemainingSeconds(totalSeconds);
     setPhase("test");
   };
@@ -372,6 +415,8 @@ const Challenge = () => {
       const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
       setResultData(res.data.data);
 
+      // 👇 NAYA: attempt submit ho gaya — in-progress attempt data hata do
+      localStorage.removeItem(getChallengeAttemptStorageKey(userId));
       if (isOwnChallenge) {
         localStorage.removeItem(getChallengeStorageKey(userId));
       }
@@ -380,6 +425,7 @@ const Challenge = () => {
       setPhase("result");
     } catch (err) {
       if (err.response?.status === 409) {
+        localStorage.removeItem(getChallengeAttemptStorageKey(userId));
         if (isOwnChallenge) {
           localStorage.removeItem(getChallengeStorageKey(userId));
         }
@@ -392,22 +438,120 @@ const Challenge = () => {
     }
   };
 
+  // 👇 NAYA: remainingSeconds ko ref mein sync rakho — localStorage save ke liye
   useEffect(() => {
-    if (phase !== "test") return;
+    remainingSecondsRef.current = remainingSeconds;
+  }, [remainingSeconds]);
+
+  // 👇 NAYA: Test ke dauraan answers/navigation/time change hone par
+  // poora attempt state localStorage mein checkpoint karte raho
+  useEffect(() => {
+    if (phase !== "test" || !challengeMeta || !userId || !effectiveCode) return;
+
+    const toSave = {
+      challengeCode: effectiveCode,
+      isOwn: isOwnChallenge,
+      createdChallenge: isOwnChallenge ? createdChallenge : null,
+      challengeMeta,
+      answers,
+      timeSpent,
+      activeSubjectIdx,
+      activeQIdx,
+      remainingSeconds: remainingSecondsRef.current,
+    };
+
+    try {
+      localStorage.setItem(getChallengeAttemptStorageKey(userId), JSON.stringify(toSave));
+    } catch (err) {
+      console.error("Challenge attempt state save nahi ho paayi:", err);
+    }
+  }, [
+    phase,
+    challengeMeta,
+    answers,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    userId,
+    effectiveCode,
+    isOwnChallenge,
+    createdChallenge,
+  ]);
+
+  // 👇 NAYA: Tab hide/minimize/band hote hi time turant freeze karke save karo.
+  // Wapas visible hone par timer wahi se resume hoga.
+  useEffect(() => {
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setIsVisible(visible);
+
+      if (!visible && phase === "test" && challengeMeta && userId && effectiveCode) {
+        const qId = currentQIdRef.current;
+        let updatedTimeSpent = timeSpent;
+        if (qId) {
+          const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+          if (elapsed > 0) {
+            updatedTimeSpent = { ...timeSpent, [qId]: (timeSpent[qId] || 0) + elapsed };
+            setTimeSpent(updatedTimeSpent);
+          }
+          questionStartRef.current = Date.now();
+        }
+
+        const toSave = {
+          challengeCode: effectiveCode,
+          isOwn: isOwnChallenge,
+          createdChallenge: isOwnChallenge ? createdChallenge : null,
+          challengeMeta,
+          answers,
+          timeSpent: updatedTimeSpent,
+          activeSubjectIdx,
+          activeQIdx,
+          remainingSeconds: remainingSecondsRef.current,
+        };
+        try {
+          localStorage.setItem(getChallengeAttemptStorageKey(userId), JSON.stringify(toSave));
+        } catch (err) {
+          console.error("Hide-time save fail:", err);
+        }
+      } else if (visible && phase === "test") {
+        questionStartRef.current = Date.now();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    phase,
+    challengeMeta,
+    userId,
+    effectiveCode,
+    answers,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
+    isOwnChallenge,
+    createdChallenge,
+  ]);
+
+  // 👇 UPDATED: Timer sirf tab visible hone par tick karta hai — hidden
+  // hote hi freeze ho jata hai
+  useEffect(() => {
+    if (phase !== "test" || !isVisible) return;
     if (remainingSeconds <= 0) {
       const t = setTimeout(() => handleSubmit(), 0);
       return () => clearTimeout(t);
     }
     const t = setTimeout(() => {
-      if (endTimestamp) {
-        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
+      setRemainingSeconds((s) => Math.max(0, s - 1));
     }, 1000);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
+  }, [phase, remainingSeconds, isVisible]);
 
   const copyLink = () => {
     const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;

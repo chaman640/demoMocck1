@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import api from "../api/api"; // 👈 api instance import kiya
+import api from "../api/api";
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -28,7 +28,7 @@ const formatTime = (totalSeconds) => {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 };
 
-// 👇 NAYA: localStorage key banane ka helper — har user ka apna alag saved test
+// localStorage key banane ka helper — har user ka apna alag saved test
 const getStorageKey = (userId) => `activeMockTest_${userId}`;
 
 const MockTest = () => {
@@ -50,19 +50,21 @@ const MockTest = () => {
   const [visited, setVisited] = useState(() => new Set());
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
-  // 👇 NAYA: Test kab khatam hoga uska absolute (wall-clock) timestamp
-  // Isse reload ke baad bhi timer sahi se calculate ho payega
-  const [endTimestamp, setEndTimestamp] = useState(null);
+  // 👇 UPDATED: endTimestamp (wall-clock) hata diya — ab tab-visibility se
+  // timer freeze hota hai, taaki website band/minimize karne par time bhi ruk jaye
+  const [isVisible, setIsVisible] = useState(true);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [resultData, setResultData] = useState(null);
 
-  // 👇 NAYA: Question Review screen ke liye state
-  // reviewConfig batata hai ki kaunse subject/status ke sath review khola gaya
+  // Question Review screen ke liye state
   const [reviewConfig, setReviewConfig] = useState({ subjectName: null, filter: "all" });
 
   const questionStartRef = useRef(Date.now());
   const currentQIdRef = useRef(null);
   const submittingRef = useRef(false);
+  // 👇 NAYA: remainingSeconds ka latest value ref mein — localStorage save ke liye
+  // (isse har second re-render/write nahi hota, sirf jab zaroorat ho tab latest milta hai)
+  const remainingSecondsRef = useRef(0);
 
   // ── Step 1: Init Data ──
   useEffect(() => {
@@ -78,16 +80,14 @@ const MockTest = () => {
         setExamName(exam);
 
         // ─────────────────────────────────────────────
-        // 👇 NAYA: Sabse pehle check karo ki koi in-progress
-        // test localStorage mein saved to nahi hai. Agar hai
-        // aur time bacha hua hai, to usko RESUME karo —
-        // naya mock generate mat karo.
+        // Sabse pehle check karo ki koi in-progress test
+        // localStorage mein saved to nahi hai. Agar hai,
+        // to usko RESUME karo — naya mock generate mat karo.
         // ─────────────────────────────────────────────
         const savedRaw = localStorage.getItem(getStorageKey(uid));
         if (savedRaw) {
           try {
             const saved = JSON.parse(savedRaw);
-            const remaining = Math.round((saved.endTimestamp - Date.now()) / 1000);
 
             if (saved.mockData && saved.selectedBlueprint) {
               // State restore karo
@@ -99,8 +99,9 @@ const MockTest = () => {
               setTimeSpent(saved.timeSpent || {});
               setActiveSubjectIdx(saved.activeSubjectIdx || 0);
               setActiveQIdx(saved.activeQIdx || 0);
-              setEndTimestamp(saved.endTimestamp);
-              setRemainingSeconds(Math.max(0, remaining));
+              // 👇 UPDATED: seedha saved remainingSeconds restore karo —
+              // koi wall-clock gap calculate nahi karna, jitna time chhoda tha utna hi milega
+              setRemainingSeconds(Math.max(0, saved.remainingSeconds ?? 0));
 
               const subj = saved.mockData.subjects[saved.activeSubjectIdx || 0];
               const q = subj ? subj.questions[saved.activeQIdx || 0] : null;
@@ -184,9 +185,8 @@ const MockTest = () => {
 
       const durMin = selectedBlueprint.durationMinutes || Math.max(10, Math.round(selectedBlueprint.totalQuestions * 0.8));
       const totalSeconds = durMin * 60;
-      const newEndTimestamp = Date.now() + totalSeconds * 1000;
 
-      setEndTimestamp(newEndTimestamp);
+      // 👇 UPDATED: sirf remainingSeconds set karo, koi endTimestamp nahi
       setRemainingSeconds(totalSeconds);
       setPhase("test");
     } catch (err) {
@@ -306,15 +306,12 @@ const MockTest = () => {
   }, [answers, marked, visited, mockData]);
 
   // ─────────────────────────────────────────────
-  // 👇 NAYA: Jab bhi test ka koi bhi zaroori part change ho
+  // Jab bhi test ka koi bhi zaroori part change ho
   // (answer, mark, navigation, time), poora state localStorage
   // mein save kar do — taaki reload pe wahi se resume ho sake.
-  // Note: remainingSeconds ko dependency mein NAHI rakha — 
-  // warna har second localStorage write hota rahega (perf hit).
-  // Uski jagah fixed endTimestamp store hota hai.
   // ─────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== "test" || !mockData || !userId || !endTimestamp) return;
+    if (phase !== "test" || !mockData || !userId) return;
 
     const toSave = {
       selectedBlueprint,
@@ -325,7 +322,7 @@ const MockTest = () => {
       timeSpent,
       activeSubjectIdx,
       activeQIdx,
-      endTimestamp,
+      remainingSeconds: remainingSecondsRef.current,
     };
 
     try {
@@ -342,8 +339,76 @@ const MockTest = () => {
     timeSpent,
     activeSubjectIdx,
     activeQIdx,
-    endTimestamp,
     userId,
+    selectedBlueprint,
+  ]);
+
+  // 👇 NAYA: remainingSeconds ko ref mein sync rakho — taaki har second
+  // localStorage write na ho (perf), lekin jab bhi save ho, latest time mile
+  useEffect(() => {
+    remainingSecondsRef.current = remainingSeconds;
+  }, [remainingSeconds]);
+
+  // 👇 NAYA: Jab tab hide/minimize/band ho, turant time freeze karke save karo.
+  // Wapas visible hone par timer wahi se resume hoga, wall-clock gap se nahi.
+  useEffect(() => {
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      setIsVisible(visible);
+
+      if (!visible && phase === "test" && mockData && userId) {
+        // Current question ka time turant (synchronously) flush karo
+        const qId = currentQIdRef.current;
+        let updatedTimeSpent = timeSpent;
+        if (qId) {
+          const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
+          if (elapsed > 0) {
+            updatedTimeSpent = { ...timeSpent, [qId]: (timeSpent[qId] || 0) + elapsed };
+            setTimeSpent(updatedTimeSpent);
+          }
+          questionStartRef.current = Date.now();
+        }
+
+        const toSave = {
+          selectedBlueprint,
+          mockData,
+          answers,
+          marked: [...marked],
+          visited: [...visited],
+          timeSpent: updatedTimeSpent,
+          activeSubjectIdx,
+          activeQIdx,
+          remainingSeconds: remainingSecondsRef.current,
+        };
+        try {
+          localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave));
+        } catch (err) {
+          console.error("Hide-time save fail:", err);
+        }
+      } else if (visible && phase === "test") {
+        // Wapas aane par question timer reset — hidden duration
+        // is question ke time mein galti se add na ho
+        questionStartRef.current = Date.now();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handleVisibility);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    phase,
+    mockData,
+    userId,
+    answers,
+    marked,
+    visited,
+    timeSpent,
+    activeSubjectIdx,
+    activeQIdx,
     selectedBlueprint,
   ]);
 
@@ -366,8 +431,7 @@ const MockTest = () => {
         userId, examName, blueprintName: selectedBlueprint.blueprintName, attemptedQuestions
       });
 
-      // 👇 NAYA: Submit successful hone ke baad saved in-progress test hata do
-      // warna agli baar dobara yahi purana test resume ho jayega
+      // Submit successful hone ke baad saved in-progress test hata do
       localStorage.removeItem(getStorageKey(userId));
 
       setResultData(res.data.data);
@@ -379,12 +443,12 @@ const MockTest = () => {
     }
   };
 
-  // ── Countdown timer — endTimestamp ke basis pe accurate rehta hai ──
+  // 👇 UPDATED: Timer sirf tab visible hone par hi tick karta hai.
+  // Tab hidden hote hi ye effect kuch nahi karta — time freeze ho jata hai.
   useEffect(() => {
-    if (phase !== "test") return;
+    if (phase !== "test" || !isVisible) return;
 
     if (remainingSeconds <= 0) {
-      // Direct call karne ki jagah setTimeout ka use karein
       const timer = setTimeout(() => {
         handleSubmit();
       }, 0);
@@ -392,21 +456,14 @@ const MockTest = () => {
     }
 
     const timer = setTimeout(() => {
-      // 👇 NAYA: endTimestamp se hi recalculate karo, sirf -1 mat karo
-      // Isse background tab throttling ya thoda drift bhi self-correct ho jata hai
-      if (endTimestamp) {
-        const newRemaining = Math.max(0, Math.round((endTimestamp - Date.now()) / 1000));
-        setRemainingSeconds(newRemaining);
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
+      setRemainingSeconds((s) => Math.max(0, s - 1));
     }, 1000);
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
+  }, [phase, remainingSeconds, isVisible]);
 
-  // 👇 NAYA: Review screen kholne/band karne ke functions
+  // Review screen kholne/band karne ke functions
   const openReview = (subjectName = null, filter = "all") => {
     setReviewConfig({ subjectName, filter });
     setPhase("review");
@@ -541,7 +598,7 @@ const MockTest = () => {
     );
   }
 
-  // 👇 NAYA: Question Review screen
+  // Question Review screen
   if (phase === "review" && resultData) {
     return (
       <QuestionReviewScreen
@@ -846,7 +903,7 @@ const TestScreen = ({
   );
 };
 
-// 👇 Results screen — categories aur "Deep Analysis" clickable hain
+// Results screen — categories aur "Deep Analysis" clickable hain
 const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
   const { scoreDetails, subjectAnalysis } = resultData;
   return (
