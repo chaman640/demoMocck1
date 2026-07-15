@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Seconds ko readable "Xm Ys" format me convert karta hai
+// Seconds ko readable "Xm Ys" format me convert karta hai
 // ──────────────────────────────────────────────
 const formatDuration = (totalSeconds) => {
   if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
@@ -16,7 +16,7 @@ const formatDuration = (totalSeconds) => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Skeleton loading building blocks
+// Skeleton loading building blocks
 // ──────────────────────────────────────────────
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -98,6 +98,15 @@ const MockDetailSkeleton = () => (
   </div>
 );
 
+// ──────────────────────────────────────────────
+// 👇 NAYA: Test History ke Level-1 filter tabs
+// ──────────────────────────────────────────────
+const MOCK_TYPE_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "Full", label: "Full Mock" },
+  { key: "Mini", label: "Mini Mock" },
+];
+
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
   const [overview, setOverview] = useState(null);
@@ -105,8 +114,15 @@ const UserAllAnalysis = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // 👇 NAYA: Subject-wise question count, blueprint se aata hai
+  // Subject-wise question count, blueprint se aata hai
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({});
+
+  // 👇 NAYA: Poori blueprint list — Test History ko Mini/Full + subject se filter karne ke liye
+  const [blueprints, setBlueprints] = useState([]);
+
+  // 👇 NAYA: Test History ke filter states
+  const [mockTypeFilter, setMockTypeFilter] = useState("all"); // "all" | "Full" | "Mini"
+  const [miniSubjectFilter, setMiniSubjectFilter] = useState("all"); // "all" | subjectName
 
   const [viewingMockId, setViewingMockId] = useState(null);
 
@@ -130,9 +146,12 @@ const UserAllAnalysis = () => {
 
         setOverview(overviewRes.data.data);
 
-        // 👇 NAYA: Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
+        const blueprintList = blueprintsRes.data.data || [];
+        setBlueprints(blueprintList); // 👈 NAYA
+
+        // Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
         const countMap = {};
-        (blueprintsRes.data.data || []).forEach((bp) => {
+        blueprintList.forEach((bp) => {
           (bp.subjects || []).forEach((s) => {
             if (!(s.subjectName in countMap)) {
               countMap[s.subjectName] = s.questionCount;
@@ -154,6 +173,75 @@ const UserAllAnalysis = () => {
     if (!overview?.graphData) return [];
     return [...overview.graphData].reverse();
   }, [overview]);
+
+  // 👇 NAYA: blueprintName → { mockType, subjectNames } lookup map
+  const blueprintMetaMap = useMemo(() => {
+    const map = {};
+    blueprints.forEach((bp) => {
+      map[bp.blueprintName] = {
+        mockType: bp.mockType,
+        subjectNames: (bp.subjects || []).map((s) => s.subjectName),
+      };
+    });
+    return map;
+  }, [blueprints]);
+
+  // 👇 NAYA: Level-1 tabs ke counts — All / Full / Mini
+  const mockTypeCounts = useMemo(() => {
+    const counts = { all: sortedHistory.length, Full: 0, Mini: 0 };
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType === "Full") counts.Full++;
+      else if (meta?.mockType === "Mini") counts.Mini++;
+    });
+    return counts;
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Mini Mock attempts mein jitne bhi alag subjects aaye — dynamically nikalte hain
+  // (Hindi/GK/GS/Maths/Reasoning jo bhi asal blueprint data mein ho, hardcode nahi kiya)
+  const miniSubjects = useMemo(() => {
+    const set = new Set();
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType === "Mini") {
+        (meta.subjectNames || []).forEach((s) => set.add(s));
+      }
+    });
+    return Array.from(set).sort();
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Level-2 (Mini ke andar subject) tabs ke counts
+  const miniSubjectCounts = useMemo(() => {
+    const counts = { all: 0 };
+    sortedHistory.forEach((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (meta?.mockType !== "Mini") return;
+      counts.all++;
+      (meta.subjectNames || []).forEach((s) => {
+        counts[s] = (counts[s] || 0) + 1;
+      });
+    });
+    return counts;
+  }, [sortedHistory, blueprintMetaMap]);
+
+  // 👇 NAYA: Dono filters ke hisaab se final list
+  const filteredHistory = useMemo(() => {
+    return sortedHistory.filter((g) => {
+      const meta = blueprintMetaMap[g.blueprintName];
+      if (mockTypeFilter === "all") return true;
+      if (meta?.mockType !== mockTypeFilter) return false;
+      if (mockTypeFilter === "Mini" && miniSubjectFilter !== "all") {
+        return (meta.subjectNames || []).includes(miniSubjectFilter);
+      }
+      return true;
+    });
+  }, [sortedHistory, blueprintMetaMap, mockTypeFilter, miniSubjectFilter]);
+
+  // 👇 NAYA: Level-1 tab badalte hi subject filter reset — stale combo na bache
+  const selectMockType = (type) => {
+    setMockTypeFilter(type);
+    setMiniSubjectFilter("all");
+  };
 
   if (loading) {
     return <AnalysisPageSkeleton />;
@@ -272,7 +360,6 @@ const UserAllAnalysis = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-800">
                   {overview.subjectAnalysis?.map((s, i) => {
-                    // 👇 NAYA: averageTimePerQuestion × us subject ke total questions = poora subject attempt karne ka time
                     const qCount = subjectQuestionCounts[s.subjectName];
                     const totalTimeSeconds =
                       qCount != null ? s.averageTimePerQuestion * qCount : null;
@@ -310,49 +397,107 @@ const UserAllAnalysis = () => {
           )}
         </div>
 
-        {/* Mock History — latest-first, date+time ke sath, clickable */}
+        {/* Mock History — Mini/Full + subject filters ke sath, latest-first, clickable */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-lg">Test History</h3>
             <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par click karke uska poora result dekhein</p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="px-6 py-4 font-medium">Date &amp; Time</th>
-                  <th className="px-6 py-4 font-medium">Score</th>
-                  <th className="px-6 py-4 font-medium text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-800">
-                {sortedHistory.map((g, i) => (
-                  <tr
-                    key={i}
-                    onClick={() => setViewingMockId(g.performanceId)}
-                    className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
+          {/* 👇 NAYA: Level-1 filter — All / Full Mock / Mini Mock */}
+          <div className="px-6 pt-5 pb-4 border-b border-gray-800 space-y-3">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {MOCK_TYPE_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => selectMockType(f.key)}
+                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                    mockTypeFilter === f.key
+                      ? "bg-[#7C3AED] text-white"
+                      : "bg-[#1F2937] border border-gray-800 text-gray-400 hover:text-gray-200"
+                  }`}
+                >
+                  {f.label} ({mockTypeCounts[f.key]})
+                </button>
+              ))}
+            </div>
+
+            {/* 👇 NAYA: Level-2 filter — sirf Mini Mock ke andar, subject-wise */}
+            {mockTypeFilter === "Mini" && miniSubjects.length > 0 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                <button
+                  onClick={() => setMiniSubjectFilter("all")}
+                  className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                    miniSubjectFilter === "all"
+                      ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
+                      : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
+                  }`}
+                >
+                  Sabhi Subjects ({miniSubjectCounts.all || 0})
+                </button>
+                {miniSubjects.map((subj) => (
+                  <button
+                    key={subj}
+                    onClick={() => setMiniSubjectFilter(subj)}
+                    className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                      miniSubjectFilter === subj
+                        ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
+                        : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
+                    }`}
                   >
-                    <td className="px-6 py-4 text-sm text-gray-300">
-                      {new Date(g.date).toLocaleString("en-IN", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
-                    <td className="px-6 py-4 text-sm text-right">
-                      <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
-                        View Result &rarr;
-                      </span>
-                    </td>
-                  </tr>
+                    {subj} ({miniSubjectCounts[subj] || 0})
+                  </button>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            )}
           </div>
+
+          {filteredHistory.length === 0 ? (
+            <p className="px-6 py-10 text-sm text-gray-400 text-center">
+              Is category mein koi mock nahi mila.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
+                    <th className="px-6 py-4 font-medium">Date &amp; Time</th>
+                    <th className="px-6 py-4 font-medium">Mock</th>
+                    <th className="px-6 py-4 font-medium">Score</th>
+                    <th className="px-6 py-4 font-medium text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-800">
+                  {filteredHistory.map((g) => (
+                    <tr
+                      key={g.performanceId}
+                      onClick={() => setViewingMockId(g.performanceId)}
+                      className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
+                    >
+                      <td className="px-6 py-4 text-sm text-gray-300">
+                        {new Date(g.date).toLocaleString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-400 max-w-[180px] truncate">
+                        {g.blueprintName || "—"}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
+                      <td className="px-6 py-4 text-sm text-right">
+                        <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
+                          View Result &rarr;
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
       </div>
@@ -361,7 +506,7 @@ const UserAllAnalysis = () => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 Ek specific mock ka poora result + question review
+// Ek specific mock ka poora result + question review
 // ──────────────────────────────────────────────
 
 const Stat = ({ label, value }) => (
@@ -590,7 +735,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 Single question detail card (options + explanation)
+// Single question detail card (options + explanation)
 // ──────────────────────────────────────────────
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =

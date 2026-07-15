@@ -42,12 +42,13 @@ export const getAllAnalysis1stPage = async (req, res) => {
     // 3. Graph Data — LIFETIME ke saare mocks
     // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
     const graphData = allTests
-      .map((test) => ({
-        performanceId: test._id,
-        score: test.totalScore,
-        date: test.createdAt,
-      }))
-      .reverse(); // chronological order (purana → naya)
+  .map((test) => ({
+    performanceId: test._id,
+    score: test.totalScore,
+    date: test.createdAt,
+    blueprintName: test.blueprintName, // 👈 NAYA — Mini/Full + subject filter ke liye
+  }))
+  .reverse(); // chronological order (purana → naya)
 
     // 4. Subject-wise accuracy + time — last 3 mocks se
     // BUG FIX: || 0 ki jagah ?? 0 use kiya —
