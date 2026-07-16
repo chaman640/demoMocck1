@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -85,8 +85,8 @@ const HomePage = () => {
     : [];
 
   // ─────────────────────────────────────────────
-  // 👇 NAYA: Automatic Expected Rank — user ke apne
-  // average score se, bina kuch type kiye
+  // 👇 Automatic Expected Rank — user ke apne average
+  // score se, koi manual input nahi chahiye
   // ─────────────────────────────────────────────
   const {
     data: autoRankPrediction,
@@ -103,42 +103,6 @@ const HomePage = () => {
     enabled: !!examName && averageScore !== null && !!rankData,
     retry: false,
   });
-
-  // ─────────────────────────────────────────────
-  // Manual "Apna Score Check Karo" tool (waisa hi hai)
-  // ─────────────────────────────────────────────
-  const [scoreInput, setScoreInput] = useState("");
-  const [rankPrediction, setRankPrediction] = useState(null);
-  const [predictLoading, setPredictLoading] = useState(false);
-  const [predictError, setPredictError] = useState("");
-
-  const checkMyRank = async () => {
-    if (scoreInput === "" || isNaN(Number(scoreInput))) {
-      setPredictError("Kripya sahi score darj karein.");
-      setRankPrediction(null);
-      return;
-    }
-    setPredictLoading(true);
-    setPredictError("");
-    try {
-      const encodedExamName = encodeURIComponent(examName);
-      const res = await api.get(
-        `/rank-predictor/${encodedExamName}?score=${scoreInput}`
-      );
-      setRankPrediction(res.data.data);
-    } catch (err) {
-      setPredictError(
-        err.response?.data?.message || "Rank predict nahi ho paaya."
-      );
-      setRankPrediction(null);
-    } finally {
-      setPredictLoading(false);
-    }
-  };
-
-  const handleScoreKeyDown = (e) => {
-    if (e.key === "Enter") checkMyRank();
-  };
 
   const isLoading = userLoading || overviewLoading;
   const isError = userError || overviewIsError;
@@ -300,7 +264,7 @@ const HomePage = () => {
         </section>
 
         {/* ───────────────────────────────────────────── */}
-        {/* Rank Predictor Section */}
+        {/* Rank Predictor Section — poori tarah automatic */}
         {/* ───────────────────────────────────────────── */}
         {!rankLoading && rankData && chartData.length >= 2 && (
           <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
@@ -312,77 +276,20 @@ const HomePage = () => {
             </div>
             <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
 
-            {/* Apna score check karo (manual) */}
-            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6">
-              <p className="text-xs text-gray-500 mb-3">Apna Score Dalke Apni Rank Check Karo</p>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  step="0.01"
-                  inputMode="decimal"
-                  value={scoreInput}
-                  onChange={(e) => setScoreInput(e.target.value)}
-                  onKeyDown={handleScoreKeyDown}
-                  placeholder="e.g. 140"
-                  className="flex-1 min-w-0 bg-[#111827] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[#7C3AED]"
-                />
-                <button
-                  onClick={checkMyRank}
-                  disabled={predictLoading}
-                  className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-50 flex-shrink-0"
-                >
-                  {predictLoading ? "..." : "Check Karo"}
-                </button>
-              </div>
-
-              {predictError && (
-                <p className="text-xs text-red-400 mt-3">{predictError}</p>
-              )}
-
-              {rankPrediction && (
-                <div className="mt-4 pt-4 border-t border-gray-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-gray-500">
-                      Score {rankPrediction.userScore} ke liye Estimated Rank
-                    </p>
-                    <span
-                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2 ${confidenceBadgeClass(
-                        rankPrediction.confidence
-                      )}`}
-                    >
-                      {rankPrediction.confidence} confidence
-                    </span>
-                  </div>
-                  <p className="text-2xl font-bold text-[#A78BFA] mb-1">
-                    {rankPrediction.rankRangeLow.toLocaleString("en-IN")} – {rankPrediction.rankRangeHigh.toLocaleString("en-IN")}
-                  </p>
-                  {rankPrediction.selectionChance && (
-                    <p
-                      className={`text-xs mt-2 font-medium ${
-                        selectionChanceClass[rankPrediction.selectionChance] || "text-gray-400"
-                      }`}
-                    >
-                      Selection Chance: {selectionChanceLabel[rankPrediction.selectionChance] || rankPrediction.selectionChance}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* 👇 NAYA: Automatic "Expected Rank" — user ke apne average score se */}
-            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6">
-              <p className="text-xs text-gray-500 mb-1">Aapki Expected Rank</p>
+            {/* Automatic Expected Rank — koi input nahi, seedha average score se */}
+            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-5 mb-6">
+              <p className="text-xs text-gray-500 mb-2">Aapki Expected Rank</p>
 
               {averageScore === null ? (
                 <p className="text-sm text-gray-400 mt-2">
                   Apni expected rank dekhne ke liye pehle kam se kam ek mock test dein.
                 </p>
               ) : autoRankLoading ? (
-                <div className="h-8 w-40 bg-gray-800/70 rounded animate-pulse mt-2" />
+                <div className="h-9 w-48 bg-gray-800/70 rounded animate-pulse mt-2" />
               ) : autoRankPrediction ? (
                 <>
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-2xl font-bold text-[#A78BFA]">
+                    <p className="text-3xl font-bold text-[#A78BFA]">
                       {autoRankPrediction.rankRangeLow.toLocaleString("en-IN")} – {autoRankPrediction.rankRangeHigh.toLocaleString("en-IN")}
                     </p>
                     <span
@@ -393,7 +300,7 @@ const HomePage = () => {
                       {autoRankPrediction.confidence} confidence
                     </span>
                   </div>
-                  <p className="text-[11px] text-gray-500 mt-1">
+                  <p className="text-[11px] text-gray-500 mt-1.5">
                     Aapke average score ({averageScore}) ke aadhar par
                   </p>
                   {autoRankPrediction.selectionChance && (
