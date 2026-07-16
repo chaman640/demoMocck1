@@ -20,6 +20,13 @@ import { createChallenge } from "../controllers/createChallenge.js";
 import { submitChallenge } from "../controllers/submitChallenge.js";
 import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
 import { getMyChallenges } from "../controllers/getMyChallenges.js";
+import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
+import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
+import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
+import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
+import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
+import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
+
 
 // 👇 NAYA: Rank Predictor ke controllers
 import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
@@ -57,6 +64,8 @@ router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 
 // 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
 router.post("/add-rank-predictor-data", addRankPredictorData);
+router.post("/add-current-affair", addCurrentAffair);
+router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -100,5 +109,11 @@ router.get("/my-challenges", userInfo, getMyChallenges);
 router.get("/rank-predictor/:examName", userInfo, predictRank);
 // Data availability check karne ke liye (frontend button dikhana/chupana)
 router.get("/rank-predictor-data/:examName", getRankPredictorData);
+router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
+router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
+router.get("/current-affair/:examName", userInfo, getCurrentAffair);
 
+router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
+router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
+router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
 export default router;

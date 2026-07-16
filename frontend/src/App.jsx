@@ -12,6 +12,7 @@ import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
 import MyChallenges from './pages/MyChallenges';
+import CurrentAffairs from './pages/CurrentAffairs';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -42,6 +43,8 @@ const App = () => {
             <Route path="/Challenge/:code" element={<Challenge/>} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
             <Route path="/MyChallenges" element={<MyChallenges/>} />
+            <Route path="/CurrentAffairs" element={<CurrentAffairs/>} />
+<Route path="/CurrentAffairs/:date" element={<CurrentAffairs/>} />
           </Routes>
         </div>
       </HashRouter>
