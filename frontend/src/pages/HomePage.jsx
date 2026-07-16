@@ -41,7 +41,7 @@ const HomePage = () => {
   const examName = user?.exam;
 
   // ─────────────────────────────────────────────
-  // Overview
+  // Overview — averageScore yahin se milta hai
   // ─────────────────────────────────────────────
   const {
     data: overview,
@@ -58,8 +58,10 @@ const HomePage = () => {
     retry: false,
   });
 
+  const averageScore = overview?.averageScore ?? null;
+
   // ─────────────────────────────────────────────
-  // Rank Predictor data (expected cutoff + graph)
+  // Rank Predictor data (dataPoints, totalVacancies etc.)
   // ─────────────────────────────────────────────
   const {
     data: rankPredictor,
@@ -75,8 +77,35 @@ const HomePage = () => {
     retry: false,
   });
 
+  const rankData = rankPredictor?.available ? rankPredictor.data : null;
+  const chartData = rankData?.dataPoints
+    ? [...rankData.dataPoints]
+        .sort((a, b) => a.rank - b.rank)
+        .map((p) => ({ rank: p.rank, score: p.score }))
+    : [];
+
   // ─────────────────────────────────────────────
-  // 👇 NAYA: "Apna Score Check Karo" — score input se rank predict
+  // 👇 NAYA: Automatic Expected Rank — user ke apne
+  // average score se, bina kuch type kiye
+  // ─────────────────────────────────────────────
+  const {
+    data: autoRankPrediction,
+    isLoading: autoRankLoading,
+  } = useQuery({
+    queryKey: ["rank-predictor-auto", examName, averageScore],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(
+        `/rank-predictor/${encodedExamName}?score=${averageScore}`
+      );
+      return res.data.data;
+    },
+    enabled: !!examName && averageScore !== null && !!rankData,
+    retry: false,
+  });
+
+  // ─────────────────────────────────────────────
+  // Manual "Apna Score Check Karo" tool (waisa hi hai)
   // ─────────────────────────────────────────────
   const [scoreInput, setScoreInput] = useState("");
   const [rankPrediction, setRankPrediction] = useState(null);
@@ -111,7 +140,6 @@ const HomePage = () => {
     if (e.key === "Enter") checkMyRank();
   };
 
-  const averageScore = overview?.averageScore ?? null;
   const isLoading = userLoading || overviewLoading;
   const isError = userError || overviewIsError;
   const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
@@ -119,14 +147,6 @@ const HomePage = () => {
 
   const navBtnClass =
     "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
-
-  const rankData = rankPredictor?.available ? rankPredictor.data : null;
-  const chartData = rankData?.dataPoints
-    ? [...rankData.dataPoints]
-        .sort((a, b) => a.rank - b.rank)
-        .map((p) => ({ rank: p.rank, score: p.score }))
-    : [];
-  const expectedCutoff = rankData?.expectedCutoff || null;
 
   const confidenceBadgeClass = (confidence) =>
     confidence === "high"
@@ -292,7 +312,7 @@ const HomePage = () => {
             </div>
             <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
 
-            {/* 👇 NAYA: Apna score check karo */}
+            {/* Apna score check karo (manual) */}
             <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6">
               <p className="text-xs text-gray-500 mb-3">Apna Score Dalke Apni Rank Check Karo</p>
               <div className="flex gap-2">
@@ -323,7 +343,7 @@ const HomePage = () => {
                 <div className="mt-4 pt-4 border-t border-gray-800">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-xs text-gray-500">
-                      Score {rankPrediction.userScore} ke liye Aapki Estimated Rank
+                      Score {rankPrediction.userScore} ke liye Estimated Rank
                     </p>
                     <span
                       className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2 ${confidenceBadgeClass(
@@ -349,27 +369,47 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Expected Cutoff Card */}
-            {expectedCutoff && (
-              <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Expected Cutoff Score</p>
-                  <p className="text-2xl font-bold text-[#A78BFA]">
-                    {expectedCutoff.expectedScore}
-                  </p>
+            {/* 👇 NAYA: Automatic "Expected Rank" — user ke apne average score se */}
+            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6">
+              <p className="text-xs text-gray-500 mb-1">Aapki Expected Rank</p>
+
+              {averageScore === null ? (
+                <p className="text-sm text-gray-400 mt-2">
+                  Apni expected rank dekhne ke liye pehle kam se kam ek mock test dein.
+                </p>
+              ) : autoRankLoading ? (
+                <div className="h-8 w-40 bg-gray-800/70 rounded animate-pulse mt-2" />
+              ) : autoRankPrediction ? (
+                <>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-2xl font-bold text-[#A78BFA]">
+                      {autoRankPrediction.rankRangeLow.toLocaleString("en-IN")} – {autoRankPrediction.rankRangeHigh.toLocaleString("en-IN")}
+                    </p>
+                    <span
+                      className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${confidenceBadgeClass(
+                        autoRankPrediction.confidence
+                      )}`}
+                    >
+                      {autoRankPrediction.confidence} confidence
+                    </span>
+                  </div>
                   <p className="text-[11px] text-gray-500 mt-1">
-                    Rank ~{expectedCutoff.targetRank.toLocaleString("en-IN")} ke liye
+                    Aapke average score ({averageScore}) ke aadhar par
                   </p>
-                </div>
-                <span
-                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${confidenceBadgeClass(
-                    expectedCutoff.confidence
-                  )}`}
-                >
-                  {expectedCutoff.confidence} confidence
-                </span>
-              </div>
-            )}
+                  {autoRankPrediction.selectionChance && (
+                    <p
+                      className={`text-xs mt-2 font-medium ${
+                        selectionChanceClass[autoRankPrediction.selectionChance] || "text-gray-400"
+                      }`}
+                    >
+                      Selection Chance: {selectionChanceLabel[autoRankPrediction.selectionChance] || autoRankPrediction.selectionChance}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 mt-2">Data abhi available nahi hai.</p>
+              )}
+            </div>
 
             {/* Score vs Rank Chart */}
             <h4 className="text-xs text-gray-500 mb-3">Score vs Rank Trend</h4>
