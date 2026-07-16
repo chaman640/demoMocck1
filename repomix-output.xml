@@ -2089,87 +2089,6 @@ const CurrentAffairQuiz = rowQuestionConnection.model("CurrentAffairQuiz", curre
 export default CurrentAffairQuiz;
 </file>
 
-<file path="backend/models/Performance.js">
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const performanceSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-    },
-
-    attemptedQuestions: [
-      {
-        questionId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Question",
-          required: true,
-        },
-        userAnswer: {
-          type: String,
-          default: null,
-        },
-        isCorrect: {
-          type: Boolean,
-          default: null,
-        },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-        // 👇 NAYA: Test ke dauraan "Mark for Review" kiya tha ya nahi
-        isMarkedForReview: {
-          type: Boolean,
-          default: false,
-        },
-      },
-    ],
-
-    examName: {
-      type: String,
-      required: [true, "Main exam ka naam zaroori hai (e.g., UP Constable)"],
-      trim: true,
-    },
-    blueprintName: {
-      type: String,
-      required: [true, "Specific test ka naam zaroori hai (e.g., UP Constable Full Mock 1)"],
-      trim: true,
-    },
-
-    totalScore:       { type: Number, default: 0 },
-    correctCount:     { type: Number, default: 0 },
-    wrongCount:       { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-
-    subjectAnalysis: [
-      {
-        subjectName:    String,
-        accuracy:       Number,
-        correctCount:   Number,
-        wrongCount:       { type: Number, default: 0 },
-        unattemptedCount: { type: Number, default: 0 },
-        totalQuestions:   Number,
-        totalTimeTaken:          { type: Number, default: 0 },
-        averageTimePerQuestion:  { type: Number, default: 0 },
-        // 👇 NAYA: Is subject mein kitne questions mark-for-review kiye the
-        markedForReviewCount:    { type: Number, default: 0 },
-      },
-    ],
-  },
-  {
-    timestamps: true,
-  }
-);
-
-const Performance = rowQuestionConnection.model("Performance", performanceSchema);
-
-export default Performance;
-</file>
-
 <file path="backend/models/RankPredictorData.js">
 // models/RankPredictorData.js
 import mongoose from "mongoose";
@@ -3449,7 +3368,6 @@ export const addPerformence = async (req, res) => {
           total: 0,
           totalTime: 0,
           timedCount: 0,
-          markedForReview: 0,
         };
       }
 
@@ -3470,9 +3388,6 @@ export const addPerformence = async (req, res) => {
       ) {
         subjectGroups[subjectName].totalTime += q.timeTakenInSeconds;
         subjectGroups[subjectName].timedCount++;
-      }
-      if (q.isMarkedForReview === true) {
-        subjectGroups[subjectName].markedForReview++;
       }
     }
 
@@ -3498,7 +3413,6 @@ export const addPerformence = async (req, res) => {
         totalQuestions: total,
         totalTimeTaken: totalTime,
         averageTimePerQuestion,
-        markedForReviewCount: markedForReview,
       };
     });
 
@@ -3533,7 +3447,6 @@ export const addPerformence = async (req, res) => {
           wrong: wrongCount,
           unattempted: unattemptedCount,
           totalScore: calculatedScore,
-          markedForReview: attemptedQuestions.filter((q) => q.isMarkedForReview === true).length,
         },
         subjectAnalysis,
       },
@@ -3953,6 +3866,96 @@ const ChallengeAttempt = rowQuestionConnection.model(
 export default ChallengeAttempt;
 </file>
 
+<file path="backend/models/Performance.js">
+// models/Performance.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const performanceSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID zaroori hai"],
+    },
+
+    attemptedQuestions: [
+      {
+        questionId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Question",
+          required: true,
+        },
+        userAnswer: {
+          type: String,
+          // BUG FIX: required: true hata diya —
+          // unattempted questions mein userAnswer null/empty hoga
+          // required: true se puri performance save fail ho jaati thi
+          default: null,
+        },
+        isCorrect: {
+          type: Boolean,
+          default: null,
+        },
+        // Frontend se aayega — student ne kitne seconds mein answer diya
+        // null allowed hai — agar frontend ne nahi bheja (unattempted questions)
+        timeTakenInSeconds: {
+          type: Number,
+          default: null,
+          min: [0, "Time negative nahi ho sakta"],
+        },
+        isMarkedForReview: {
+          type: Boolean,
+          default: false,
+        },
+      },
+    ],
+
+    examName: {
+      type: String,
+      required: [true, "Main exam ka naam zaroori hai (e.g., UP Constable)"],
+      trim: true,
+    },
+    blueprintName: {
+      type: String,
+      required: [true, "Specific test ka naam zaroori hai (e.g., UP Constable Full Mock 1)"],
+      trim: true,
+    },
+
+    // Analytics fields (backend calculate karta hai)
+    totalScore:       { type: Number, default: 0 },
+    correctCount:     { type: Number, default: 0 },
+    wrongCount:       { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
+
+    subjectAnalysis: [
+      {
+        subjectName:    String,
+        accuracy:       Number,
+        correctCount:   Number,
+        // BUG FIX: ye dono fields schema mein missing the —
+        // addPerformence.js save karta tha but Mongoose silently drop kar deta tha
+        // Ab schema mein add kiya — ab sahi se save honge
+        wrongCount:       { type: Number, default: 0 },
+        unattemptedCount: { type: Number, default: 0 },
+        totalQuestions:   Number,
+        // Subject-wise time tracking ke liye
+        totalTimeTaken:          { type: Number, default: 0 },
+        averageTimePerQuestion:  { type: Number, default: 0 },
+        
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const Performance = rowQuestionConnection.model("Performance", performanceSchema);
+
+export default Performance;
+</file>
+
 <file path="backend/pages/user/analysicUser.js">
 import mongoose from "mongoose";
 import Performance from "../../models/Performance.js";
@@ -3960,17 +3963,25 @@ import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
 
 
+// ─────────────────────────────────────────────
+// PAGE 1 — FUNCTION 1
+// Overview: average score, lifetime graph, subject list (last 3)
+// Route: GET /analysis/overview/:userId/:examName
+// ─────────────────────────────────────────────
 export const getAllAnalysis1stPage = async (req, res) => {
   try {
     let { userId, examName } = req.params;
 
+    // 👇 YEH LOGIC MISSING HAI TUMHARI FILE MEIN
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
-      userId = req.user._id;
+      userId = req.user._id; // 'active_user' text ko real ID se replace kar dega
     }
+    // 👆 YEH LOGIC ADD KARO
 
+    // 1. Sare mocks fetch karo
     const allTests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 });
       
@@ -3982,19 +3993,26 @@ export const getAllAnalysis1stPage = async (req, res) => {
       });
     }
 
+    // 2. Average Score — sirf last 3 mocks ka
     const last3Tests = allTests.slice(0, 3);
     const totalScoreSum = last3Tests.reduce((acc, test) => acc + test.totalScore, 0);
     const averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
 
+    // 3. Graph Data — LIFETIME ke saare mocks
+    // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
     const graphData = allTests
-      .map((test) => ({
-        performanceId: test._id,
-        score: test.totalScore,
-        date: test.createdAt,
-        blueprintName: test.blueprintName,
-      }))
-      .reverse();
+  .map((test) => ({
+    performanceId: test._id,
+    score: test.totalScore,
+    date: test.createdAt,
+    blueprintName: test.blueprintName, // 👈 NAYA — Mini/Full + subject filter ke liye
+  }))
+  .reverse(); // chronological order (purana → naya)
 
+    // 4. Subject-wise accuracy + time — last 3 mocks se
+    // BUG FIX: || 0 ki jagah ?? 0 use kiya —
+    // agar averageTimePerQuestion exactly 0 ho tab || 0 bhi 0 deta tha
+    // lekin ?? 0 sirf null/undefined pe fallback karta hai, 0 pe nahi
     const subjectMap = {};
     last3Tests.forEach((test) => {
       if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
@@ -4007,7 +4025,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
             };
           }
           subjectMap[sub.subjectName].totalAcc += sub.accuracy;
-          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
+          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0; // ✅ FIX
           subjectMap[sub.subjectName].count += 1;
         });
       }
@@ -4038,6 +4056,12 @@ export const getAllAnalysis1stPage = async (req, res) => {
 };
 
 
+// ─────────────────────────────────────────────
+// PAGE 1 — FUNCTION 2
+// Graph click → ek specific mock ka pura breakdown
+// (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
+// Route: GET /analysis/mock-detail/:performanceId
+// ─────────────────────────────────────────────
 export const getPerformanceAnalysis = async (req, res) => {
   try {
     const { performanceId } = req.params;
@@ -4084,6 +4108,7 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number(((correct / totalQuestions) * 100).toFixed(2));
 
+    // Total time: sirf jinka time data hai unka sum
     let totalTimeTaken = 0;
     for (const aq of performance.attemptedQuestions) {
       totalTimeTaken += aq.timeTakenInSeconds ?? 0;
@@ -4094,13 +4119,10 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number((totalTimeTaken / totalQuestions).toFixed(2));
 
-    // 👇 NAYA: markedForReview count calculate karo
-    const markedForReviewCount = performance.attemptedQuestions.filter(
-      (aq) => aq.isMarkedForReview === true
-    ).length;
-
+    // Sawaal-by-sawaal breakdown
+    // Null-safe: agar koi question DB se delete ho gaya ho to crash nahi hoga
     const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId;
+      const q = aq.questionId; // populate ho gaya hai upar
 
       return {
         questionId: q ? q._id : aq.questionId,
@@ -4116,7 +4138,6 @@ export const getPerformanceAnalysis = async (req, res) => {
         correctOption: q ? q.correctOption : null,
         userAnswer: aq.userAnswer,
         isCorrect: aq.isCorrect,
-        isMarkedForReview: aq.isMarkedForReview === true, // 👈 NAYA
         answerExplain: q ? q.answerExplain : null,
         answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
         topicName: q ? q.topicName : null,
@@ -4138,7 +4159,6 @@ export const getPerformanceAnalysis = async (req, res) => {
         accuracy,
         totalTimeTaken,
         averageTimePerQuestion,
-        markedForReviewCount, // 👈 NAYA
       },
       questionBreakdown,
     });
@@ -4148,17 +4168,25 @@ export const getPerformanceAnalysis = async (req, res) => {
 };
 
 
+// ─────────────────────────────────────────────
+// PAGE 2: Subject-wise Analysis
+// Route: GET /analysis/subject/:userId/:examName/:subjectName
+// ─────────────────────────────────────────────
 export const getSubjectAnalysis = async (req, res) => {
   try {
+    // FIX: 'const' ki jagah 'let' use kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName } = req.params;
 
+    // 👇 YEH LOGIC ADD KIYA HAI TAAKI "active_user" CRASH NA KARE
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
       userId = req.user._id;
     }
+    // 👆 YAHAN TAK
 
+    // 1. Last 3 mocks fetch karo
     const last3Tests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 })
       .limit(3);
@@ -4171,6 +4199,7 @@ export const getSubjectAnalysis = async (req, res) => {
       });
     }
 
+    // 2. Subject ka average accuracy + time (last 3 mocks)
     let totalAccuracy = 0;
     let totalTime = 0;
     let subjectFoundCount = 0;
@@ -4194,7 +4223,7 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
-    graphData.reverse();
+    graphData.reverse(); // chronological order
 
     const averageAccuracy =
       subjectFoundCount === 0
@@ -4206,20 +4235,27 @@ export const getSubjectAnalysis = async (req, res) => {
         ? 0
         : Number((totalTime / subjectFoundCount).toFixed(2));
 
+    // 3. Topic-wise data (last 3 mocks se, runtime calculate)
+    // Topic data Performance mein store nahi — Question model se nikalna padega
+
+    // 3a. Sare questionIds (teen mocks ke)
     const allQuestionIds = last3Tests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
+    // 3b. Sirf is subject ke questions ka topicName fetch karo — ek query
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
     }).select("_id topicName");
 
+    // 3c. Lookup map: questionId → topicName
     const topicNameMap = {};
     for (const doc of questionDocs) {
       topicNameMap[doc._id.toString()] = doc.topicName;
     }
 
+    // 3d. Topic-wise group karo
     const topicGroups = {};
 
     for (const test of last3Tests) {
@@ -4227,7 +4263,7 @@ export const getSubjectAnalysis = async (req, res) => {
         if (!aq.questionId) continue;
 
         const topicName = topicNameMap[aq.questionId.toString()];
-        if (!topicName) continue;
+        if (!topicName) continue; // is subject ka question nahi — skip
 
         if (!topicGroups[topicName]) {
           topicGroups[topicName] = {
@@ -4237,7 +4273,6 @@ export const getSubjectAnalysis = async (req, res) => {
             total: 0,
             totalTime: 0,
             timedCount: 0,
-            markedForReview: 0, // 👈 NAYA
           };
         }
 
@@ -4251,11 +4286,6 @@ export const getSubjectAnalysis = async (req, res) => {
           topicGroups[topicName].unattempted++; 
         }
 
-        // 👇 NAYA
-        if (aq.isMarkedForReview === true) {
-          topicGroups[topicName].markedForReview++;
-        }
-
         if (
           typeof aq.timeTakenInSeconds === "number" &&
           aq.timeTakenInSeconds >= 0
@@ -4266,8 +4296,9 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
+    // 3e. Topic list banao
     const topicList = Object.keys(topicGroups).map((topicName) => {
-      const { correct, wrong, unattempted, total, totalTime, timedCount, markedForReview } =
+      const { correct, wrong, unattempted, total, totalTime, timedCount } =
         topicGroups[topicName];
 
       const efficiency =
@@ -4286,10 +4317,10 @@ export const getSubjectAnalysis = async (req, res) => {
         wrongCount: wrong,         
         unattemptedCount: unattempted, 
         averageTimePerQuestion: avgTime,
-        markedForReviewCount: markedForReview, // 👈 NAYA
       };
     });
 
+    // 4. Top 5 weak topics
     const weakTopics = [...topicList]
       .filter((t) => t.totalAttempted > 0)
       .sort((a, b) => {
@@ -4333,20 +4364,35 @@ export const getSubjectAnalysis = async (req, res) => {
 };
 
 
+// ─────────────────────────────────────────────
+// PAGE 3: Topic-wise Analysis
+// Page 2 mein topic pe click karne pe ye page khulega
+// Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
+// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+// PAGE 3: Topic-wise Analysis
+// ─────────────────────────────────────────────
 export const getTopicAnalysis = async (req, res) => {
   try {
+    // 👇 Const ko let kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName, topicName } = req.params;
 
+    // 👇 YEH LOGIC ADD KARNA ZAROORI HAI
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
       userId = req.user._id; 
     }
+    // 👆 YEH LOGIC ADD KARNE KE BAAD HI MONGODB ERROR BAND HOGA
 
+    // ─────────────────────────────────────────────
+    // 1. LIFETIME ke saare mocks fetch karo
+    // ─────────────────────────────────────────────
     const allTests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 });
     
+    // ... baaki ka purana code waisa hi rahega ...
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
@@ -4355,10 +4401,17 @@ export const getTopicAnalysis = async (req, res) => {
       });
     }
 
+    // ─────────────────────────────────────────────
+    // 2. Sare mocks ke questionIds nikalo ek saath
+    // ─────────────────────────────────────────────
     const allQuestionIds = allTests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
+    // ─────────────────────────────────────────────
+    // 3. Sirf is topic + subject ke questions fetch karo — ek query
+    //    Pura question detail chahiye (sawaal, options, explanation)
+    // ─────────────────────────────────────────────
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
@@ -4367,22 +4420,28 @@ export const getTopicAnalysis = async (req, res) => {
       "_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName"
     );
 
+    // Lookup map: questionId → full question document
     const questionMap = {};
     for (const doc of questionDocs) {
       questionMap[doc._id.toString()] = doc;
     }
 
-    const goodAtQuestions = [];
-    const wrongQuestions = [];
-    const unattemptedQuestions = [];
+    // ─────────────────────────────────────────────
+    // 4. Har mock ke har attempted question ko check karo
+    //    Agar wo is topic ka hai to uski entry banao
+    //    Same question multiple mocks mein aaya to teeno baar aayega (deduplicate nahi)
+    // ─────────────────────────────────────────────
+    const goodAtQuestions = [];    // isCorrect === true
+    const wrongQuestions = [];     // isCorrect === false
+    const unattemptedQuestions = []; // isCorrect === null
 
+    // Topic-level stats ke liye counters
     let totalAttempted = 0;
     let totalCorrect = 0;
     let totalWrong = 0;
     let totalUnattempted = 0;
     let totalTime = 0;
     let timedCount = 0;
-    let totalMarkedForReview = 0; // 👈 NAYA
 
     for (const test of allTests) {
       for (const aq of test.attemptedQuestions) {
@@ -4391,10 +4450,12 @@ export const getTopicAnalysis = async (req, res) => {
         const qId = aq.questionId.toString();
         const qDoc = questionMap[qId];
 
+        // Sirf is topic ke questions process karo
         if (!qDoc) continue;
 
         totalAttempted++;
 
+        // Time tracking
         if (
           typeof aq.timeTakenInSeconds === "number" &&
           aq.timeTakenInSeconds >= 0
@@ -4403,11 +4464,8 @@ export const getTopicAnalysis = async (req, res) => {
           timedCount++;
         }
 
-        // 👇 NAYA
-        if (aq.isMarkedForReview === true) {
-          totalMarkedForReview++;
-        }
-
+        // Har entry mein performanceId bhi rakho taaki
+        // frontend track kar sake ye kaunse mock se hai
         const entry = {
           performanceId: test._id,
           mockDate: test.createdAt,
@@ -4421,7 +4479,6 @@ export const getTopicAnalysis = async (req, res) => {
           },
           correctOption: qDoc.correctOption,
           userAnswer: aq.userAnswer,
-          isMarkedForReview: aq.isMarkedForReview === true, // 👈 NAYA
           answerExplain: qDoc.answerExplain,
           answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
           timeTakenInSeconds: aq.timeTakenInSeconds,
@@ -4440,6 +4497,9 @@ export const getTopicAnalysis = async (req, res) => {
       }
     }
 
+    // ─────────────────────────────────────────────
+    // 5. Topic-level summary calculate karo
+    // ─────────────────────────────────────────────
     const efficiency =
       totalAttempted === 0
         ? 0
@@ -4450,21 +4510,25 @@ export const getTopicAnalysis = async (req, res) => {
         ? 0
         : Number((totalTime / timedCount).toFixed(2));
 
+    // ─────────────────────────────────────────────
+    // 6. Response
+    // ─────────────────────────────────────────────
     return res.status(200).json({
       success: true,
       data: {
         topicName,
         subjectName,
+        // Upar dikhayi jaane wali summary
         summary: {
-          efficiency,
-          averageTimePerQuestion,
+          efficiency,              // % sahi (correct / total * 100)
+          averageTimePerQuestion,  // sirf timed questions ka average
           totalAttempted,
           totalCorrect,
           totalWrong,
           totalUnattempted,
-          totalMarkedForReview, // 👈 NAYA
           totalMocksConsidered: allTests.length,
         },
+        // Teen sections — har ek mein pura sawaal + explanation
         goodAt: goodAtQuestions,
         wrong: wrongQuestions,
         unattempted: unattemptedQuestions,
@@ -4480,6 +4544,10 @@ export const getTopicAnalysis = async (req, res) => {
 };
 
 
+// ─────────────────────────────────────────────
+// Mock test list — user ke sare mocks
+// Route: GET /analysis/mock-list/:userId/:examName
+// ─────────────────────────────────────────────
 export const getUserMockTests = async (req, res) => {
   try {
     const { userId, examName } = req.params;

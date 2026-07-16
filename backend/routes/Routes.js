@@ -20,18 +20,18 @@ import { createChallenge } from "../controllers/createChallenge.js";
 import { submitChallenge } from "../controllers/submitChallenge.js";
 import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
 import { getMyChallenges } from "../controllers/getMyChallenges.js";
-import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
-import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
-import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
-import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
-import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
-import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
 
-
-// 👇 NAYA: Rank Predictor ke controllers
+// Rank Predictor ke controllers
 import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
 import { predictRank } from "../controllers/predictRank.js";
 import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
+
+// 👇 NAYA: Previous Year Test ke controllers
+import { addPreviousYearTest } from "../controllers/addPreviousYearTest.js";
+import { getAllPreviousYearTests } from "../controllers/getAllPreviousYearTests.js";
+import { getPreviousYearTest } from "../controllers/getPreviousYearTest.js";
+import { submitPreviousYearTest } from "../controllers/submitPreviousYearTest.js";
+import { getPreviousYearAttemptDetail } from "../controllers/getPreviousYearAttemptDetail.js";
 
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
@@ -62,10 +62,12 @@ router.post("/user-update",  userInfo, updateUserInfo);
 router.post("/create-challenge", userInfo, createChallenge);
 router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 
-// 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
+// Admin is route se rank-predictor ka reference data feed karega
 router.post("/add-rank-predictor-data", addRankPredictorData);
-router.post("/add-current-affair", addCurrentAffair);
-router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
+
+// 👇 NAYA: Admin is route se poora Previous Year Test (paper + sab questions) add karega
+router.post("/add-previous-year-test", addPreviousYearTest);
+router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTest);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -104,16 +106,13 @@ router.get("/challenge/:challengeCode", userInfo, getChallenge);
 router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
 router.get("/my-challenges", userInfo, getMyChallenges);
 
-// 👇 NAYA: Rank Predictor ke GET routes
-// Score query param se aayega: /rank-predictor/UP%20Police%20Constable?score=145
+// Rank Predictor ke GET routes
 router.get("/rank-predictor/:examName", userInfo, predictRank);
-// Data availability check karne ke liye (frontend button dikhana/chupana)
 router.get("/rank-predictor-data/:examName", getRankPredictorData);
-router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
-router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
-router.get("/current-affair/:examName", userInfo, getCurrentAffair);
 
-router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
-router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
-router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
+// 👇 NAYA: Previous Year Test ke GET routes
+router.get("/previous-year-tests/:examName", userInfo, getAllPreviousYearTests);
+router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
+router.get("/previous-year-attempt/:attemptId", userInfo, getPreviousYearAttemptDetail);
+
 export default router;
