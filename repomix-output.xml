@@ -123,317 +123,6 @@ analysise.txt
 <files>
 This section contains the contents of the repository's files.
 
-<file path="backend/controllers/addRankPredictorData.js">
-// controllers/addRankPredictorData.js
-import RankPredictorData from "../models/RankPredictorData.js";
-
-export const addRankPredictorData = async (req, res) => {
-  try {
-    const { examName, year, dataPoints, totalCandidates, totalVacancies } = req.body;
-
-    if (!examName || !year || !Array.isArray(dataPoints) || dataPoints.length < 2) {
-      return res.status(400).json({
-        success: false,
-        message: "examName, year, aur kam se kam 2 dataPoints zaroori hain!",
-      });
-    }
-
-    // Validate: har point mein score aur rank dono ho
-    for (const point of dataPoints) {
-      if (typeof point.score !== "number" || typeof point.rank !== "number") {
-        return res.status(400).json({
-          success: false,
-          message: "Har dataPoint mein numeric score aur rank hona zaroori hai!",
-        });
-      }
-    }
-
-    // Score ke hisaab se descending sort kar do (high score = low rank)
-    // taaki interpolation logic simple rahe
-    const sortedPoints = [...dataPoints].sort((a, b) => b.score - a.score);
-
-    // Naya data active banayenge — isliye purana active data (agar hai) inactive kar do
-    await RankPredictorData.updateMany(
-      { examName, isActive: true },
-      { $set: { isActive: false } }
-    );
-
-    const newData = new RankPredictorData({
-      examName,
-      year,
-      dataPoints: sortedPoints,
-      totalCandidates,
-      totalVacancies,
-      isActive: true,
-    });
-
-    await newData.save();
-
-    return res.status(201).json({
-      success: true,
-      message: "Rank predictor data successfully save ho gaya!",
-      data: newData,
-    });
-  } catch (error) {
-    console.error("addRankPredictorData error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server mein error aa gaya data save karte waqt.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
-<file path="backend/controllers/getRankPredictorData.js">
-// controllers/getRankPredictorData.js
-import RankPredictorData from "../models/RankPredictorData.js";
-
-export const getRankPredictorData = async (req, res) => {
-  try {
-    const { examName } = req.params;
-
-    const rankData = await RankPredictorData.findOne({
-      examName,
-      isActive: true,
-    });
-
-    // ─────────────────────────────────────────────
-    // Note: Yahan 404 nahi bheja — jaanbujh kar 200 status
-    // ke sath "available: false" bheja hai. Isse frontend
-    // ko har baar try/catch se error handle nahi karna padega
-    // sirf "data hai ya nahi" check karne ke liye — simple
-    // if-else se kaam chal jayega.
-    // ─────────────────────────────────────────────
-    if (!rankData) {
-      return res.status(200).json({
-        success: true,
-        available: false,
-        data: null,
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      available: true,
-      data: {
-        examName: rankData.examName,
-        year: rankData.year,
-        dataPoints: rankData.dataPoints,
-        totalCandidates: rankData.totalCandidates,
-        totalVacancies: rankData.totalVacancies,
-        updatedAt: rankData.updatedAt,
-      },
-    });
-  } catch (error) {
-    console.error("getRankPredictorData error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server mein error aa gaya rank predictor data fetch karte waqt.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
-<file path="backend/controllers/predictRank.js">
-// controllers/predictRank.js
-import RankPredictorData from "../models/RankPredictorData.js";
-
-// ─────────────────────────────────────────────
-// HELPER: Linear interpolation
-// Do known points (score1,rank1) aur (score2,rank2) ke beech
-// diye gaye score ke liye rank estimate karta hai
-// ─────────────────────────────────────────────
-const interpolate = (score, lowerPoint, upperPoint) => {
-  // lowerPoint = lower score (higher rank number)
-  // upperPoint = higher score (lower rank number)
-  const { score: s1, rank: r1 } = upperPoint; // upper score, better rank
-  const { score: s2, rank: r2 } = lowerPoint; // lower score, worse rank
-
-  if (s1 === s2) return r1; // avoid divide by zero
-
-  // Linear interpolation formula
-  const ratio = (score - s2) / (s1 - s2);
-  const estimatedRank = r2 - ratio * (r2 - r1);
-
-  return Math.round(estimatedRank);
-};
-
-export const predictRank = async (req, res) => {
-  try {
-    const { examName } = req.params;
-    const { score } = req.query;
-
-    if (score === undefined || isNaN(Number(score))) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid score query parameter zaroori hai! (e.g. ?score=145)",
-      });
-    }
-
-    const userScore = Number(score);
-
-    // ─────────────────────────────────────────────
-    // STEP 1: Is exam ka active data dhundo
-    // ─────────────────────────────────────────────
-    const rankData = await RankPredictorData.findOne({
-      examName,
-      isActive: true,
-    });
-
-    if (!rankData || rankData.dataPoints.length < 2) {
-      return res.status(404).json({
-        success: false,
-        message: "Is exam ke liye rank predictor data abhi available nahi hai.",
-      });
-    }
-
-    // dataPoints already descending order mein save hain (highest score first)
-    const points = rankData.dataPoints;
-
-    let estimatedRank;
-    let confidence = "medium"; // "high" | "medium" | "low" — kitna reliable estimate hai
-
-    // ─────────────────────────────────────────────
-    // STEP 2: Edge cases handle karo
-    // ─────────────────────────────────────────────
-    if (userScore >= points[0].score) {
-      // User ka score sabse highest reference point se bhi zyada/equal hai
-      // Extrapolation risky hai — top rank ke aas-paas bata do, low confidence
-      estimatedRank = Math.max(1, points[0].rank - Math.round((userScore - points[0].score) * 10));
-      confidence = "low";
-    } else if (userScore <= points[points.length - 1].score) {
-      // User ka score sabse lowest reference point se bhi kam hai
-      const lastPoint = points[points.length - 1];
-      estimatedRank = lastPoint.rank + Math.round((lastPoint.score - userScore) * 50);
-      confidence = "low";
-    } else {
-      // ─────────────────────────────────────────────
-      // STEP 3: Normal case — do points ke beech interpolate karo
-      // ─────────────────────────────────────────────
-      for (let i = 0; i < points.length - 1; i++) {
-        const upper = points[i];     // higher score
-        const lower = points[i + 1]; // lower score
-
-        if (userScore <= upper.score && userScore >= lower.score) {
-          estimatedRank = interpolate(userScore, lower, upper);
-          confidence = "high"; // do actual reference points ke beech hai — reliable
-          break;
-        }
-      }
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 4: Rank ko ek RANGE mein convert karo
-    // Exact number dena galat expectation create karta hai —
-    // isliye ±10% ka range dikhayenge
-    // ─────────────────────────────────────────────
-    const rangeMargin = Math.max(50, Math.round(estimatedRank * 0.1));
-    const rankRangeLow = Math.max(1, estimatedRank - rangeMargin);
-    const rankRangeHigh = estimatedRank + rangeMargin;
-
-    // ─────────────────────────────────────────────
-    // STEP 5: Selection chance (agar vacancies data hai)
-    // ─────────────────────────────────────────────
-    let selectionChance = null;
-    if (rankData.totalVacancies) {
-      if (rankRangeHigh <= rankData.totalVacancies) {
-        selectionChance = "strong"; // rank range poori tarah vacancy ke andar hai
-      } else if (rankRangeLow <= rankData.totalVacancies) {
-        selectionChance = "borderline"; // range vacancy line ke aas-paas hai
-      } else {
-        selectionChance = "unlikely";
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        examName: rankData.examName,
-        year: rankData.year,
-        userScore,
-        estimatedRank,
-        rankRangeLow,
-        rankRangeHigh,
-        confidence,
-        totalCandidates: rankData.totalCandidates || null,
-        totalVacancies: rankData.totalVacancies || null,
-        selectionChance,
-      },
-    });
-  } catch (error) {
-    console.error("predictRank error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server mein error aa gaya rank predict karte waqt.",
-      error: error.message,
-    });
-  }
-};
-</file>
-
-<file path="backend/models/RankPredictorData.js">
-// models/RankPredictorData.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const rankPredictorDataSchema = new mongoose.Schema(
-  {
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-      index: true,
-    },
-
-    // Kis saal/attempt ka data hai — future mein multiple years support
-    // karne ke liye (abhi ke liye ek hi "current" wala use hoga)
-    year: {
-      type: Number,
-      required: true,
-    },
-
-    // Reference points — score aur uske corresponding rank
-    // Frontend/backend isi array ko sort karke interpolate karega
-    dataPoints: [
-      {
-        score: { type: Number, required: true },
-        rank: { type: Number, required: true },
-      },
-    ],
-
-    // Total kitne candidates ne exam diya tha (context ke liye)
-    totalCandidates: {
-      type: Number,
-    },
-
-    // Total vacancies — "selection chance" dikhane ke liye
-    totalVacancies: {
-      type: Number,
-    },
-
-    // Kya ye data currently active hai (predictor mein use hoga)
-    // Agar naya saal ka data aaye, purana inactive kar denge
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-  },
-  { timestamps: true }
-);
-
-// Ek exam ke liye ek hi "active" year ka data ho — duplicate active entries na banein
-rankPredictorDataSchema.index({ examName: 1, isActive: 1 });
-
-const RankPredictorData = rowQuestionConnection.model(
-  "RankPredictorData",
-  rankPredictorDataSchema
-);
-
-export default RankPredictorData;
-</file>
-
 <file path="backend/config/rowQuestion.js">
 // config/rowQuestion.js
 import mongoose from "mongoose";
@@ -979,6 +668,68 @@ export const addQuestion = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/addRankPredictorData.js">
+// controllers/addRankPredictorData.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+export const addRankPredictorData = async (req, res) => {
+  try {
+    const { examName, year, dataPoints, totalCandidates, totalVacancies } = req.body;
+
+    if (!examName || !year || !Array.isArray(dataPoints) || dataPoints.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "examName, year, aur kam se kam 2 dataPoints zaroori hain!",
+      });
+    }
+
+    // Validate: har point mein score aur rank dono ho
+    for (const point of dataPoints) {
+      if (typeof point.score !== "number" || typeof point.rank !== "number") {
+        return res.status(400).json({
+          success: false,
+          message: "Har dataPoint mein numeric score aur rank hona zaroori hai!",
+        });
+      }
+    }
+
+    // Score ke hisaab se descending sort kar do (high score = low rank)
+    // taaki interpolation logic simple rahe
+    const sortedPoints = [...dataPoints].sort((a, b) => b.score - a.score);
+
+    // Naya data active banayenge — isliye purana active data (agar hai) inactive kar do
+    await RankPredictorData.updateMany(
+      { examName, isActive: true },
+      { $set: { isActive: false } }
+    );
+
+    const newData = new RankPredictorData({
+      examName,
+      year,
+      dataPoints: sortedPoints,
+      totalCandidates,
+      totalVacancies,
+      isActive: true,
+    });
+
+    await newData.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Rank predictor data successfully save ho gaya!",
+      data: newData,
+    });
+  } catch (error) {
+    console.error("addRankPredictorData error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya data save karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/getChallenge.js">
 // controllers/getChallenge.js
 import Challenge from "../models/Challenge.js";
@@ -1274,6 +1025,269 @@ export const getMyChallenges = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Challenges list fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getRankPredictorData.js">
+// controllers/getRankPredictorData.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+// ─────────────────────────────────────────────
+// HELPER: Rank → Score interpolation (predictRank.js ke ulta)
+// Do known points (score1,rank1) aur (score2,rank2) ke beech
+// diye gaye rank ke liye score estimate karta hai
+// ─────────────────────────────────────────────
+const interpolateScore = (targetRank, betterPoint, worsePoint) => {
+  // betterPoint = better rank (lower number, higher score)
+  // worsePoint = worse rank (higher number, lower score)
+  const { score: s1, rank: r1 } = betterPoint;
+  const { score: s2, rank: r2 } = worsePoint;
+
+  if (r1 === r2) return s1; // avoid divide by zero
+
+  const ratio = (targetRank - r1) / (r2 - r1);
+  const estimatedScore = s1 - ratio * (s1 - s2);
+
+  return Math.round(estimatedScore * 100) / 100; // 2 decimal tak
+};
+
+// ─────────────────────────────────────────────
+// HELPER: totalVacancies (target rank) ke hisaab se
+// expected cutoff score calculate karta hai
+// ─────────────────────────────────────────────
+const calculateExpectedCutoff = (points, totalVacancies) => {
+  if (!totalVacancies || points.length < 2) return null;
+
+  const targetRank = totalVacancies;
+
+  let estimatedScore;
+  let confidence = "medium";
+
+  // points already score ke hisaab se descending sorted hain
+  // (matlab rank ke hisaab se ascending — best rank pehle)
+
+  if (targetRank <= points[0].rank) {
+    // Target rank sabse best reference point se bhi behtar/equal hai
+    // Extrapolation — top score ke aas-paas, low confidence
+    estimatedScore = points[0].score + (points[0].rank - targetRank) * 0.1;
+    confidence = "low";
+  } else if (targetRank >= points[points.length - 1].rank) {
+    // Target rank sabse worst reference point se bhi zyada hai
+    const lastPoint = points[points.length - 1];
+    estimatedScore = lastPoint.score - (targetRank - lastPoint.rank) * 0.02;
+    confidence = "low";
+  } else {
+    // Normal case — do points ke beech interpolate karo
+    for (let i = 0; i < points.length - 1; i++) {
+      const better = points[i];     // better rank (lower number)
+      const worse = points[i + 1];  // worse rank (higher number)
+
+      if (targetRank >= better.rank && targetRank <= worse.rank) {
+        estimatedScore = interpolateScore(targetRank, better, worse);
+        confidence = "high"; // do actual reference points ke beech hai
+        break;
+      }
+    }
+  }
+
+  // Score negative na ho jaaye
+  estimatedScore = Math.max(0, estimatedScore);
+
+  return {
+    expectedScore: estimatedScore,
+    targetRank,
+    confidence,
+  };
+};
+
+export const getRankPredictorData = async (req, res) => {
+  try {
+    const { examName } = req.params;
+
+    const rankData = await RankPredictorData.findOne({
+      examName,
+      isActive: true,
+    });
+
+    // ─────────────────────────────────────────────
+    // Note: Yahan 404 nahi bheja — jaanbujh kar 200 status
+    // ke sath "available: false" bheja hai. Isse frontend
+    // ko har baar try/catch se error handle nahi karna padega
+    // sirf "data hai ya nahi" check karne ke liye — simple
+    // if-else se kaam chal jayega.
+    // ─────────────────────────────────────────────
+    if (!rankData) {
+      return res.status(200).json({
+        success: true,
+        available: false,
+        data: null,
+      });
+    }
+
+    // 👇 NAYA: Expected cutoff calculate karo (totalVacancies ke basis pe)
+    const expectedCutoff = calculateExpectedCutoff(
+      rankData.dataPoints,
+      rankData.totalVacancies
+    );
+
+    return res.status(200).json({
+      success: true,
+      available: true,
+      data: {
+        examName: rankData.examName,
+        year: rankData.year,
+        dataPoints: rankData.dataPoints,
+        totalCandidates: rankData.totalCandidates,
+        totalVacancies: rankData.totalVacancies,
+        expectedCutoff, // 👈 NAYA — { expectedScore, targetRank, confidence } ya null
+        updatedAt: rankData.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error("getRankPredictorData error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya rank predictor data fetch karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/predictRank.js">
+// controllers/predictRank.js
+import RankPredictorData from "../models/RankPredictorData.js";
+
+// ─────────────────────────────────────────────
+// HELPER: Linear interpolation
+// Do known points (score1,rank1) aur (score2,rank2) ke beech
+// diye gaye score ke liye rank estimate karta hai
+// ─────────────────────────────────────────────
+const interpolate = (score, lowerPoint, upperPoint) => {
+  // lowerPoint = lower score (higher rank number)
+  // upperPoint = higher score (lower rank number)
+  const { score: s1, rank: r1 } = upperPoint; // upper score, better rank
+  const { score: s2, rank: r2 } = lowerPoint; // lower score, worse rank
+
+  if (s1 === s2) return r1; // avoid divide by zero
+
+  // Linear interpolation formula
+  const ratio = (score - s2) / (s1 - s2);
+  const estimatedRank = r2 - ratio * (r2 - r1);
+
+  return Math.round(estimatedRank);
+};
+
+export const predictRank = async (req, res) => {
+  try {
+    const { examName } = req.params;
+    const { score } = req.query;
+
+    if (score === undefined || isNaN(Number(score))) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid score query parameter zaroori hai! (e.g. ?score=145)",
+      });
+    }
+
+    const userScore = Number(score);
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Is exam ka active data dhundo
+    // ─────────────────────────────────────────────
+    const rankData = await RankPredictorData.findOne({
+      examName,
+      isActive: true,
+    });
+
+    if (!rankData || rankData.dataPoints.length < 2) {
+      return res.status(404).json({
+        success: false,
+        message: "Is exam ke liye rank predictor data abhi available nahi hai.",
+      });
+    }
+
+    // dataPoints already descending order mein save hain (highest score first)
+    const points = rankData.dataPoints;
+
+    let estimatedRank;
+    let confidence = "medium"; // "high" | "medium" | "low" — kitna reliable estimate hai
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Edge cases handle karo
+    // ─────────────────────────────────────────────
+    if (userScore >= points[0].score) {
+      // User ka score sabse highest reference point se bhi zyada/equal hai
+      // Extrapolation risky hai — top rank ke aas-paas bata do, low confidence
+      estimatedRank = Math.max(1, points[0].rank - Math.round((userScore - points[0].score) * 10));
+      confidence = "low";
+    } else if (userScore <= points[points.length - 1].score) {
+      // User ka score sabse lowest reference point se bhi kam hai
+      const lastPoint = points[points.length - 1];
+      estimatedRank = lastPoint.rank + Math.round((lastPoint.score - userScore) * 50);
+      confidence = "low";
+    } else {
+      // ─────────────────────────────────────────────
+      // STEP 3: Normal case — do points ke beech interpolate karo
+      // ─────────────────────────────────────────────
+      for (let i = 0; i < points.length - 1; i++) {
+        const upper = points[i];     // higher score
+        const lower = points[i + 1]; // lower score
+
+        if (userScore <= upper.score && userScore >= lower.score) {
+          estimatedRank = interpolate(userScore, lower, upper);
+          confidence = "high"; // do actual reference points ke beech hai — reliable
+          break;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Rank ko ek RANGE mein convert karo
+    // Exact number dena galat expectation create karta hai —
+    // isliye ±10% ka range dikhayenge
+    // ─────────────────────────────────────────────
+    const rangeMargin = Math.max(50, Math.round(estimatedRank * 0.1));
+    const rankRangeLow = Math.max(1, estimatedRank - rangeMargin);
+    const rankRangeHigh = estimatedRank + rangeMargin;
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Selection chance (agar vacancies data hai)
+    // ─────────────────────────────────────────────
+    let selectionChance = null;
+    if (rankData.totalVacancies) {
+      if (rankRangeHigh <= rankData.totalVacancies) {
+        selectionChance = "strong"; // rank range poori tarah vacancy ke andar hai
+      } else if (rankRangeLow <= rankData.totalVacancies) {
+        selectionChance = "borderline"; // range vacancy line ke aas-paas hai
+      } else {
+        selectionChance = "unlikely";
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        examName: rankData.examName,
+        year: rankData.year,
+        userScore,
+        estimatedRank,
+        rankRangeLow,
+        rankRangeHigh,
+        confidence,
+        totalCandidates: rankData.totalCandidates || null,
+        totalVacancies: rankData.totalVacancies || null,
+        selectionChance,
+      },
+    });
+  } catch (error) {
+    console.error("predictRank error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya rank predict karte waqt.",
       error: error.message,
     });
   }
@@ -1593,6 +1607,67 @@ const performanceSchema = new mongoose.Schema(
 const Performance = rowQuestionConnection.model("Performance", performanceSchema);
 
 export default Performance;
+</file>
+
+<file path="backend/models/RankPredictorData.js">
+// models/RankPredictorData.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const rankPredictorDataSchema = new mongoose.Schema(
+  {
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+      index: true,
+    },
+
+    // Kis saal/attempt ka data hai — future mein multiple years support
+    // karne ke liye (abhi ke liye ek hi "current" wala use hoga)
+    year: {
+      type: Number,
+      required: true,
+    },
+
+    // Reference points — score aur uske corresponding rank
+    // Frontend/backend isi array ko sort karke interpolate karega
+    dataPoints: [
+      {
+        score: { type: Number, required: true },
+        rank: { type: Number, required: true },
+      },
+    ],
+
+    // Total kitne candidates ne exam diya tha (context ke liye)
+    totalCandidates: {
+      type: Number,
+    },
+
+    // Total vacancies — "selection chance" dikhane ke liye
+    totalVacancies: {
+      type: Number,
+    },
+
+    // Kya ye data currently active hai (predictor mein use hoga)
+    // Agar naya saal ka data aaye, purana inactive kar denge
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { timestamps: true }
+);
+
+// Ek exam ke liye ek hi "active" year ka data ho — duplicate active entries na banein
+rankPredictorDataSchema.index({ examName: 1, isActive: 1 });
+
+const RankPredictorData = rowQuestionConnection.model(
+  "RankPredictorData",
+  rankPredictorDataSchema
+);
+
+export default RankPredictorData;
 </file>
 
 <file path="backend/models/rowQuestionSchema.js">
@@ -6606,113 +6681,6 @@ rowQuestionConnection.on("error", (err) => {
 });
 </file>
 
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-// ── Models ────────────────────────────────────
-import Blueprint from "../models/bluePrint.js";
-
-// ── Controllers ──────────────────────────────
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
-import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
-
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-import { getMyChallenges } from "../controllers/getMyChallenges.js";
-
-// 👇 NAYA: Rank Predictor ke controllers
-import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
-import { predictRank } from "../controllers/predictRank.js";
-import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-router.post("/create-challenge", userInfo, createChallenge);
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
-router.post("/add-rank-predictor-data", addRankPredictorData);
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-router.get("/is-admin", userInfo, (req, res) => {
-    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
-    res.status(200).json({ success: true, isAdmin: isAdminUser });
-});
-
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-router.get("/my-challenges", userInfo, getMyChallenges);
-
-// 👇 NAYA: Rank Predictor ke GET routes
-// Score query param se aayega: /rank-predictor/UP%20Police%20Constable?score=145
-router.get("/rank-predictor/:examName", userInfo, predictRank);
-// Data availability check karne ke liye (frontend button dikhana/chupana)
-router.get("/rank-predictor-data/:examName", getRankPredictorData);
-
-export default router;
-</file>
-
 <file path="frontend/src/pages/MockTest.jsx">
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -8750,39 +8718,210 @@ const QuestionDetailCard = ({ q }) => {
 export default UserAllAnalysis;
 </file>
 
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+// ── Models ────────────────────────────────────
+import Blueprint from "../models/bluePrint.js";
+
+// ── Controllers ──────────────────────────────
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+import { getMyChallenges } from "../controllers/getMyChallenges.js";
+
+// 👇 NAYA: Rank Predictor ke controllers
+import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
+import { predictRank } from "../controllers/predictRank.js";
+import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+router.post("/create-challenge", userInfo, createChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
+router.post("/add-rank-predictor-data", addRankPredictorData);
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+router.get("/my-challenges", userInfo, getMyChallenges);
+
+// 👇 NAYA: Rank Predictor ke GET routes
+// Score query param se aayega: /rank-predictor/UP%20Police%20Constable?score=145
+router.get("/rank-predictor/:examName", userInfo, predictRank);
+// Data availability check karne ke liye (frontend button dikhana/chupana)
+router.get("/rank-predictor-data/:examName", getRankPredictorData);
+
+export default router;
+</file>
+
 <file path="frontend/src/pages/HomePage.jsx">
 import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import api from "../api/api";
 
 const HomePage = () => {
   const navigate = useNavigate();
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ["overview", "UP Police Constable"],
+  // ─────────────────────────────────────────────
+  // STEP 1: Pehle logged-in user ka data lao —
+  // isi se exam nikalega, jo pehle hardcoded tha
+  // ─────────────────────────────────────────────
+  const {
+    data: user,
+    isLoading: userLoading,
+    isError: userError,
+    error: userErrorObj,
+  } = useQuery({
+    queryKey: ["me"],
     queryFn: async () => {
-      const encodedExamName = encodeURIComponent("UP Police Constable");
+      const res = await api.get("/me");
+      return res.data.data;
+    },
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (userError && userErrorObj?.response?.status === 401) {
+      navigate("/Singup");
+    }
+  }, [userError, userErrorObj, navigate]);
+
+  const examName = user?.exam;
+
+  // ─────────────────────────────────────────────
+  // STEP 2: Overview — ab hardcoded exam ki jagah
+  // user ke apne exam se query hogi
+  // ─────────────────────────────────────────────
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewIsError,
+  } = useQuery({
+    queryKey: ["overview", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
       const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
       return res.data.data;
     },
-    retry: false, // 401 pe baar baar retry na kare
+    enabled: !!examName, // 👈 jab tak exam na mile, ye query fire hi nahi hogi
+    retry: false,
   });
 
-  // 👇 Agar user login nahi hai (401), Signup page pe bhejo
-  useEffect(() => {
-    if (isError && error?.response?.status === 401) {
-      navigate("/Singup");
-    }
-  }, [isError, error, navigate]);
+  // ─────────────────────────────────────────────
+  // STEP 3: 👇 NAYA — Rank Predictor data (expected cutoff + graph)
+  // ─────────────────────────────────────────────
+  const {
+    data: rankPredictor,
+    isLoading: rankLoading,
+  } = useQuery({
+    queryKey: ["rank-predictor-data", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(`/rank-predictor-data/${encodedExamName}`);
+      return res.data;
+    },
+    enabled: !!examName,
+    retry: false,
+  });
 
-  const averageScore = data?.averageScore ?? null;
+  const averageScore = overview?.averageScore ?? null;
+  const isLoading = userLoading || overviewLoading;
+  const isError = userError || overviewIsError;
   const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
   const scoreDashArray = averageScore !== null ? `${averageScore}, 100` : "0, 100";
 
-  // 👇 Bottom nav ke teeno buttons ke liye ek hi consistent style
   const navBtnClass =
     "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
+
+  // 👇 NAYA: Rank predictor ka data availability + chart-ready format
+  const rankData = rankPredictor?.available ? rankPredictor.data : null;
+  const chartData = rankData?.dataPoints
+    ? [...rankData.dataPoints]
+        .sort((a, b) => a.rank - b.rank) // rank ke hisaab se ascending — chart left-to-right sahi dikhe
+        .map((p) => ({ rank: p.rank, score: p.score }))
+    : [];
+  const expectedCutoff = rankData?.expectedCutoff || null;
 
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
@@ -8803,7 +8942,7 @@ const HomePage = () => {
       {/* Main Content */}
       <main className="px-5 py-8 max-w-lg mx-auto">
 
-        {/* 👇 NAYA: Challenge-a-Friend banner — sabse upar taaki turant dikhe */}
+        {/* Challenge-a-Friend banner */}
         <section className="mb-8">
           <button
             onClick={() => navigate("/Challenge")}
@@ -8819,7 +8958,6 @@ const HomePage = () => {
             </div>
             <span className="text-2xl flex-shrink-0">&rarr;</span>
           </button>
-          {/* 👇 NAYA: Apne diye hue challenges ki list */}
           <button
             onClick={() => navigate("/MyChallenges")}
             className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
@@ -8917,6 +9055,92 @@ const HomePage = () => {
           </div>
         </section>
 
+        {/* ───────────────────────────────────────────── */}
+        {/* 👇 NAYA: Rank Predictor Section — sirf tab dikhega
+            jab data available ho aur loading khatam ho chuki ho */}
+        {/* ───────────────────────────────────────────── */}
+        {!rankLoading && rankData && chartData.length >= 2 && (
+          <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm text-gray-400">Rank Predictor</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA]">
+                {rankData.year}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
+
+            {/* Expected Cutoff Card */}
+            {expectedCutoff && (
+              <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Expected Cutoff Score</p>
+                  <p className="text-2xl font-bold text-[#A78BFA]">
+                    {expectedCutoff.expectedScore}
+                  </p>
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    Rank ~{expectedCutoff.targetRank.toLocaleString("en-IN")} ke liye
+                  </p>
+                </div>
+                <span
+                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
+                    expectedCutoff.confidence === "high"
+                      ? "bg-green-500/10 text-green-400"
+                      : expectedCutoff.confidence === "medium"
+                      ? "bg-yellow-500/10 text-yellow-400"
+                      : "bg-red-500/10 text-red-400"
+                  }`}
+                >
+                  {expectedCutoff.confidence} confidence
+                </span>
+              </div>
+            )}
+
+            {/* Score vs Rank Chart */}
+            <h4 className="text-xs text-gray-500 mb-3">Score vs Rank Trend</h4>
+            <div className="w-full h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
+                  <XAxis
+                    dataKey="rank"
+                    stroke="#4B5563"
+                    fontSize={11}
+                    tickFormatter={(v) => v.toLocaleString("en-IN")}
+                  />
+                  <YAxis stroke="#4B5563" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111827",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    labelFormatter={(v) => `Rank: ${v.toLocaleString("en-IN")}`}
+                    formatter={(value) => [value, "Score"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#A78BFA"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#7C3AED" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+
+            {rankData.totalVacancies && (
+              <p className="text-[11px] text-gray-600 mt-3 text-center">
+                Total Vacancies: {rankData.totalVacancies.toLocaleString("en-IN")}
+                {rankData.totalCandidates
+                  ? ` • Total Candidates: ${rankData.totalCandidates.toLocaleString("en-IN")}`
+                  : ""}
+              </p>
+            )}
+          </section>
+        )}
+
         {/* Feature Row */}
         <section className="flex flex-col gap-5 py-8 border-y border-gray-800 mb-10">
           <div className="flex items-center gap-4">
@@ -8977,7 +9201,7 @@ const HomePage = () => {
         </section>
       </main>
 
-      {/* Bottom Navigation — teeno buttons consistent style */}
+      {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
         <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

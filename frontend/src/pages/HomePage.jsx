@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,8 +16,7 @@ const HomePage = () => {
   const navigate = useNavigate();
 
   // ─────────────────────────────────────────────
-  // STEP 1: Pehle logged-in user ka data lao —
-  // isi se exam nikalega, jo pehle hardcoded tha
+  // Logged-in user ka data
   // ─────────────────────────────────────────────
   const {
     data: user,
@@ -42,8 +41,7 @@ const HomePage = () => {
   const examName = user?.exam;
 
   // ─────────────────────────────────────────────
-  // STEP 2: Overview — ab hardcoded exam ki jagah
-  // user ke apne exam se query hogi
+  // Overview
   // ─────────────────────────────────────────────
   const {
     data: overview,
@@ -56,12 +54,12 @@ const HomePage = () => {
       const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
       return res.data.data;
     },
-    enabled: !!examName, // 👈 jab tak exam na mile, ye query fire hi nahi hogi
+    enabled: !!examName,
     retry: false,
   });
 
   // ─────────────────────────────────────────────
-  // STEP 3: 👇 NAYA — Rank Predictor data (expected cutoff + graph)
+  // Rank Predictor data (expected cutoff + graph)
   // ─────────────────────────────────────────────
   const {
     data: rankPredictor,
@@ -77,6 +75,42 @@ const HomePage = () => {
     retry: false,
   });
 
+  // ─────────────────────────────────────────────
+  // 👇 NAYA: "Apna Score Check Karo" — score input se rank predict
+  // ─────────────────────────────────────────────
+  const [scoreInput, setScoreInput] = useState("");
+  const [rankPrediction, setRankPrediction] = useState(null);
+  const [predictLoading, setPredictLoading] = useState(false);
+  const [predictError, setPredictError] = useState("");
+
+  const checkMyRank = async () => {
+    if (scoreInput === "" || isNaN(Number(scoreInput))) {
+      setPredictError("Kripya sahi score darj karein.");
+      setRankPrediction(null);
+      return;
+    }
+    setPredictLoading(true);
+    setPredictError("");
+    try {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(
+        `/rank-predictor/${encodedExamName}?score=${scoreInput}`
+      );
+      setRankPrediction(res.data.data);
+    } catch (err) {
+      setPredictError(
+        err.response?.data?.message || "Rank predict nahi ho paaya."
+      );
+      setRankPrediction(null);
+    } finally {
+      setPredictLoading(false);
+    }
+  };
+
+  const handleScoreKeyDown = (e) => {
+    if (e.key === "Enter") checkMyRank();
+  };
+
   const averageScore = overview?.averageScore ?? null;
   const isLoading = userLoading || overviewLoading;
   const isError = userError || overviewIsError;
@@ -86,14 +120,32 @@ const HomePage = () => {
   const navBtnClass =
     "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
 
-  // 👇 NAYA: Rank predictor ka data availability + chart-ready format
   const rankData = rankPredictor?.available ? rankPredictor.data : null;
   const chartData = rankData?.dataPoints
     ? [...rankData.dataPoints]
-        .sort((a, b) => a.rank - b.rank) // rank ke hisaab se ascending — chart left-to-right sahi dikhe
+        .sort((a, b) => a.rank - b.rank)
         .map((p) => ({ rank: p.rank, score: p.score }))
     : [];
   const expectedCutoff = rankData?.expectedCutoff || null;
+
+  const confidenceBadgeClass = (confidence) =>
+    confidence === "high"
+      ? "bg-green-500/10 text-green-400"
+      : confidence === "medium"
+      ? "bg-yellow-500/10 text-yellow-400"
+      : "bg-red-500/10 text-red-400";
+
+  const selectionChanceLabel = {
+    strong: "Achi Sambhavna",
+    borderline: "Borderline",
+    unlikely: "Kam Sambhavna",
+  };
+
+  const selectionChanceClass = {
+    strong: "text-green-400",
+    borderline: "text-yellow-400",
+    unlikely: "text-red-400",
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
@@ -228,8 +280,7 @@ const HomePage = () => {
         </section>
 
         {/* ───────────────────────────────────────────── */}
-        {/* 👇 NAYA: Rank Predictor Section — sirf tab dikhega
-            jab data available ho aur loading khatam ho chuki ho */}
+        {/* Rank Predictor Section */}
         {/* ───────────────────────────────────────────── */}
         {!rankLoading && rankData && chartData.length >= 2 && (
           <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
@@ -240,6 +291,63 @@ const HomePage = () => {
               </span>
             </div>
             <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
+
+            {/* 👇 NAYA: Apna score check karo */}
+            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-4 mb-6">
+              <p className="text-xs text-gray-500 mb-3">Apna Score Dalke Apni Rank Check Karo</p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={scoreInput}
+                  onChange={(e) => setScoreInput(e.target.value)}
+                  onKeyDown={handleScoreKeyDown}
+                  placeholder="e.g. 140"
+                  className="flex-1 min-w-0 bg-[#111827] border border-gray-700 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600 outline-none focus:border-[#7C3AED]"
+                />
+                <button
+                  onClick={checkMyRank}
+                  disabled={predictLoading}
+                  className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-50 flex-shrink-0"
+                >
+                  {predictLoading ? "..." : "Check Karo"}
+                </button>
+              </div>
+
+              {predictError && (
+                <p className="text-xs text-red-400 mt-3">{predictError}</p>
+              )}
+
+              {rankPrediction && (
+                <div className="mt-4 pt-4 border-t border-gray-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-500">
+                      Score {rankPrediction.userScore} ke liye Aapki Estimated Rank
+                    </p>
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ml-2 ${confidenceBadgeClass(
+                        rankPrediction.confidence
+                      )}`}
+                    >
+                      {rankPrediction.confidence} confidence
+                    </span>
+                  </div>
+                  <p className="text-2xl font-bold text-[#A78BFA] mb-1">
+                    {rankPrediction.rankRangeLow.toLocaleString("en-IN")} – {rankPrediction.rankRangeHigh.toLocaleString("en-IN")}
+                  </p>
+                  {rankPrediction.selectionChance && (
+                    <p
+                      className={`text-xs mt-2 font-medium ${
+                        selectionChanceClass[rankPrediction.selectionChance] || "text-gray-400"
+                      }`}
+                    >
+                      Selection Chance: {selectionChanceLabel[rankPrediction.selectionChance] || rankPrediction.selectionChance}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
 
             {/* Expected Cutoff Card */}
             {expectedCutoff && (
@@ -254,13 +362,9 @@ const HomePage = () => {
                   </p>
                 </div>
                 <span
-                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${
-                    expectedCutoff.confidence === "high"
-                      ? "bg-green-500/10 text-green-400"
-                      : expectedCutoff.confidence === "medium"
-                      ? "bg-yellow-500/10 text-yellow-400"
-                      : "bg-red-500/10 text-red-400"
-                  }`}
+                  className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${confidenceBadgeClass(
+                    expectedCutoff.confidence
+                  )}`}
                 >
                   {expectedCutoff.confidence} confidence
                 </span>
