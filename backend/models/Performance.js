@@ -35,6 +35,10 @@ const performanceSchema = new mongoose.Schema(
           default: null,
           min: [0, "Time negative nahi ho sakta"],
         },
+        isMarkedForReview: {
+          type: Boolean,
+          default: false,
+        },
       },
     ],
 
@@ -69,6 +73,7 @@ const performanceSchema = new mongoose.Schema(
         // Subject-wise time tracking ke liye
         totalTimeTaken:          { type: Number, default: 0 },
         averageTimePerQuestion:  { type: Number, default: 0 },
+        
       },
     ],
   },

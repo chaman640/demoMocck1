@@ -45,6 +45,8 @@ backend/
     rowQuestion.js
   controllers/
     addBlluePrient.js
+    addCurrentAffair.js
+    addCurrentAffairQuiz.js
     addMockTest.js
     addPerformence.js
     addQuestion.js
@@ -56,10 +58,14 @@ backend/
     getChallenge.js
     getChallengeAttemptDetail.js
     getChallengeLeaderboard.js
+    getCurrentAffair.js
+    getCurrentAffairAttemptDetail.js
+    getCurrentAffairQuiz.js
     getMyChallenges.js
     getRankPredictorData.js
     predictRank.js
     submitChallenge.js
+    submitCurrentAffairQuiz.js
     updateSutf.js
   middlewares/
     processQuestion.js
@@ -68,6 +74,9 @@ backend/
     bluePrint.js
     Challenge.js
     ChallengeAttempt.js
+    CurrentAffair.js
+    CurrentAffairAttempt.js
+    CurrentAffairQuiz.js
     Performance.js
     RankPredictorData.js
     rowQuestionSchema.js
@@ -77,6 +86,8 @@ backend/
       analysicUser.js
   routes/
     Routes.js
+  utils/
+    dateHelpers.js
   .env
   .gitignore
   .gitignoretouch
@@ -96,6 +107,7 @@ frontend/
     pages/
       Challenge.jsx
       ChallengeReview.jsx
+      CurrentAffairs.jsx
       HomePage.jsx
       Login.jsx
       MockTest.jsx
@@ -150,6 +162,120 @@ rowQuestionConnection.on("connected", () => {
 rowQuestionConnection.on("error", (err) => {
   console.error("❌ ROWQUESTION_URI connection error:", err.message);
 });
+</file>
+
+<file path="backend/controllers/addCurrentAffair.js">
+import CurrentAffair from "../models/CurrentAffair.js";
+import { getTodayIST } from "../utils/dateHelpers.js";
+
+export const addCurrentAffair = async (req, res) => {
+  try {
+    const { examName, date, title, items } = req.body;
+
+    if (!examName || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur kam se kam ek item zaroori hai!",
+      });
+    }
+
+    for (const item of items) {
+      if (!item.headline || !item.content) {
+        return res.status(400).json({
+          success: false,
+          message: "Har item mein headline aur content zaroori hai!",
+        });
+      }
+    }
+
+    const finalDate = date || getTodayIST();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(finalDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Date format 'YYYY-MM-DD' mein hona chahiye (e.g. 2026-07-16)!",
+      });
+    }
+
+    // upsert — agar isi din ka entry pehle se hai to update ho jayega,
+    // taaki content edit karne ke liye dobara POST karne par duplicate-key error na aaye
+    const saved = await CurrentAffair.findOneAndUpdate(
+      { examName, date: finalDate },
+      { $set: { examName, date: finalDate, title, items } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `'${finalDate}' ke liye '${examName}' current affairs save ho gaye!`,
+      data: saved,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Current affairs save karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/addCurrentAffairQuiz.js">
+import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
+import { getTodayIST } from "../utils/dateHelpers.js";
+
+export const addCurrentAffairQuiz = async (req, res) => {
+  try {
+    const { examName, date, questions } = req.body;
+
+    if (!examName || !Array.isArray(questions) || questions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "examName aur kam se kam ek question zaroori hai!",
+      });
+    }
+
+    for (const q of questions) {
+      if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
+        return res.status(400).json({
+          success: false,
+          message: "Har question mein sawaal aur chaaro options zaroori hain!",
+        });
+      }
+      if (!q.correctOption || q.correctOption < 1 || q.correctOption > 4) {
+        return res.status(400).json({
+          success: false,
+          message: "correctOption 1 se 4 ke beech hona chahiye!",
+        });
+      }
+    }
+
+    const finalDate = date || getTodayIST();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(finalDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Date format 'YYYY-MM-DD' mein hona chahiye (e.g. 2026-07-16)!",
+      });
+    }
+
+    const saved = await CurrentAffairQuiz.findOneAndUpdate(
+      { examName, date: finalDate },
+      { $set: { examName, date: finalDate, questions } },
+      { new: true, upsert: true, runValidators: true }
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `'${finalDate}' ke liye '${examName}' quiz save ho gaya! (${questions.length} sawaal)`,
+      data: saved,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Quiz save karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
 </file>
 
 <file path="backend/controllers/addMockTest.js">
@@ -994,6 +1120,229 @@ export const getChallengeLeaderboard = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/getCurrentAffair.js">
+import CurrentAffair from "../models/CurrentAffair.js";
+import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
+import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+import { getTodayIST } from "../utils/dateHelpers.js";
+
+// GET /current-affair/:examName  ya  /current-affair/:examName/:date
+// date na diya ho to aaj (IST) dhundta hai; agar aaj ka publish nahi hua
+// to sabse latest available date de deta hai — taaki khali screen na dikhe
+export const getCurrentAffair = async (req, res) => {
+  try {
+    const { examName } = req.params;
+    const requestedDate = req.params.date;
+    const userId = req.user._id;
+
+    let affair;
+
+    if (requestedDate) {
+      affair = await CurrentAffair.findOne({ examName, date: requestedDate });
+    } else {
+      const today = getTodayIST();
+      affair = await CurrentAffair.findOne({ examName, date: today });
+      if (!affair) {
+        affair = await CurrentAffair.findOne({ examName }).sort({ date: -1 });
+      }
+    }
+
+    if (!affair) {
+      return res.status(200).json({ success: true, available: false, data: null });
+    }
+
+    const [quiz, attempt] = await Promise.all([
+      CurrentAffairQuiz.findOne({ examName, date: affair.date }).select("_id questions"),
+      CurrentAffairAttempt.findOne({ userId, examName, date: affair.date }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      available: true,
+      data: {
+        examName: affair.examName,
+        date: affair.date,
+        title: affair.title,
+        items: affair.items,
+        quizAvailable: !!quiz,
+        totalQuizQuestions: quiz ? quiz.questions.length : 0,
+        alreadyAttempted: !!attempt,
+        attemptSummary: attempt
+          ? {
+              totalScore: attempt.totalScore,
+              correctCount: attempt.correctCount,
+              wrongCount: attempt.wrongCount,
+              unattemptedCount: attempt.unattemptedCount,
+            }
+          : null,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Current affairs fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+
+// GET /current-affair/:examName/dates — history list ke liye
+export const getCurrentAffairDates = async (req, res) => {
+  try {
+    const { examName } = req.params;
+    const userId = req.user._id;
+
+    const affairs = await CurrentAffair.find({ examName })
+      .select("date title items")
+      .sort({ date: -1 })
+      .limit(60);
+
+    const attempts = await CurrentAffairAttempt.find({
+      userId,
+      examName,
+      date: { $in: affairs.map((a) => a.date) },
+    }).select("date totalScore");
+
+    const attemptMap = {};
+    attempts.forEach((a) => { attemptMap[a.date] = a.totalScore; });
+
+    return res.status(200).json({
+      success: true,
+      data: affairs.map((a) => ({
+        date: a.date,
+        title: a.title,
+        itemCount: a.items.length,
+        attempted: a.date in attemptMap,
+        score: attemptMap[a.date] ?? null,
+      })),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Dates list fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getCurrentAffairAttemptDetail.js">
+import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
+import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+
+export const getCurrentAffairAttemptDetail = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { examName, date } = req.params;
+
+    const [quiz, attempt] = await Promise.all([
+      CurrentAffairQuiz.findOne({ examName, date }),
+      CurrentAffairAttempt.findOne({ userId, examName, date }),
+    ]);
+
+    if (!quiz) return res.status(404).json({ success: false, message: "Quiz nahi mila." });
+    if (!attempt) {
+      return res.status(404).json({
+        success: false,
+        message: "Aapne abhi tak ye quiz attempt nahi kiya hai.",
+      });
+    }
+
+    const questionMap = {};
+    for (const q of quiz.questions) {
+      questionMap[q._id.toString()] = q;
+    }
+
+    const questionBreakdown = attempt.attemptedQuestions
+      .map((aq) => {
+        const frozenQ = questionMap[aq.questionId.toString()];
+        if (!frozenQ) return null;
+        return {
+          questionId: frozenQ._id,
+          question: frozenQ.question,
+          options: {
+            option1: frozenQ.option1,
+            option2: frozenQ.option2,
+            option3: frozenQ.option3,
+            option4: frozenQ.option4,
+          },
+          correctOption: frozenQ.correctOption,
+          userAnswer: aq.userAnswer,
+          isCorrect: aq.isCorrect,
+          answerExplain: frozenQ.answerExplain || null,
+        };
+      })
+      .filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        examName,
+        date,
+        overview: {
+          totalScore: attempt.totalScore,
+          correctCount: attempt.correctCount,
+          wrongCount: attempt.wrongCount,
+          unattemptedCount: attempt.unattemptedCount,
+        },
+        questionBreakdown,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Detail fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getCurrentAffairQuiz.js">
+import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
+import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+
+export const getCurrentAffairQuiz = async (req, res) => {
+  try {
+    const { examName, date } = req.params;
+    const userId = req.user._id;
+
+    const quiz = await CurrentAffairQuiz.findOne({ examName, date });
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: "Is din ka quiz abhi available nahi hai." });
+    }
+
+    const existingAttempt = await CurrentAffairAttempt.findOne({ userId, examName, date });
+
+    const safeQuestions = quiz.questions.map((q) => ({
+      _id: q._id,
+      question: q.question,
+      option1: q.option1,
+      option2: q.option2,
+      option3: q.option3,
+      option4: q.option4,
+    }));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        examName,
+        date,
+        totalQuestions: safeQuestions.length,
+        questions: safeQuestions,
+        alreadyAttempted: !!existingAttempt,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Quiz fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/getMyChallenges.js">
 import ChallengeAttempt from "../models/ChallengeAttempt.js";
 
@@ -1294,6 +1643,109 @@ export const predictRank = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/submitCurrentAffairQuiz.js">
+import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
+import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+
+export const submitCurrentAffairQuiz = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { examName, date } = req.params;
+    const { attemptedQuestions } = req.body;
+
+    if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+      });
+    }
+
+    const quiz = await CurrentAffairQuiz.findOne({ examName, date });
+    if (!quiz) {
+      return res.status(404).json({ success: false, message: "Is din ka quiz nahi mila." });
+    }
+
+    const existing = await CurrentAffairAttempt.findOne({ userId, examName, date });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is din ka quiz pehle hi de chuke hain!",
+      });
+    }
+
+    const questionMap = {};
+    for (const q of quiz.questions) {
+      questionMap[q._id.toString()] = q;
+    }
+
+    let correctCount = 0, wrongCount = 0, unattemptedCount = 0;
+    const finalAttemptedQuestions = [];
+
+    for (const aq of attemptedQuestions) {
+      const qId = aq.questionId ? aq.questionId.toString() : null;
+      const frozenQ = qId ? questionMap[qId] : null;
+      if (!frozenQ) continue; // is quiz ka sawaal nahi — skip
+
+      const userAnswer =
+        aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
+          ? String(aq.userAnswer)
+          : null;
+
+      const isCorrect = userAnswer === null ? null : userAnswer === String(frozenQ.correctOption);
+
+      if (isCorrect === true) correctCount++;
+      else if (isCorrect === false) wrongCount++;
+      else unattemptedCount++;
+
+      finalAttemptedQuestions.push({ questionId: frozenQ._id, userAnswer, isCorrect });
+    }
+
+    if (finalAttemptedQuestions.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Koi valid question match nahi hua is quiz ke sath.",
+      });
+    }
+
+    // Sirf +1 per correct — koi negative marking nahi.
+    // Ye learning/understanding quiz hai, exam simulation nahi, isliye galat guess ki punishment nahi.
+    const totalScore = correctCount;
+
+    const newAttempt = new CurrentAffairAttempt({
+      userId,
+      examName,
+      date,
+      attemptedQuestions: finalAttemptedQuestions,
+      totalScore,
+      correctCount,
+      wrongCount,
+      unattemptedCount,
+    });
+
+    await newAttempt.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Quiz submit ho gaya!",
+      data: { totalScore, correctCount, wrongCount, unattemptedCount },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Aap is din ka quiz pehle hi de chuke hain!",
+      });
+    }
+    console.error("submitCurrentAffairQuiz error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya quiz submit karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/updateSutf.js">
 // controllers/updateUserInfo.js
 import User from "../models/User.js";
@@ -1524,8 +1976,120 @@ export const userInfo = async (req, res, next) => {
 };
 </file>
 
+<file path="backend/models/CurrentAffair.js">
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const currentAffairItemSchema = new mongoose.Schema(
+  {
+    headline: { type: String, required: true, trim: true },
+    content: { type: String, required: true },
+    category: { type: String, trim: true, default: "General" },
+    imageUrl: { type: String },
+    source: { type: String },
+  },
+  { _id: false }
+);
+
+const currentAffairSchema = new mongoose.Schema(
+  {
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+      index: true,
+    },
+    date: {
+      type: String, // "YYYY-MM-DD" — IST date key
+      required: [true, "Date zaroori hai"],
+      trim: true,
+    },
+    title: { type: String, trim: true },
+    items: [currentAffairItemSchema],
+  },
+  { timestamps: true }
+);
+
+// Ek exam ke liye ek din mein sirf ek hi entry ho
+currentAffairSchema.index({ examName: 1, date: 1 }, { unique: true });
+
+const CurrentAffair = rowQuestionConnection.model("CurrentAffair", currentAffairSchema);
+export default CurrentAffair;
+</file>
+
+<file path="backend/models/CurrentAffairAttempt.js">
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const currentAffairAttemptSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    examName: { type: String, required: true, trim: true },
+    date: { type: String, required: true, trim: true }, // kis din ka quiz tha
+
+    attemptedQuestions: [
+      {
+        questionId: { type: mongoose.Schema.Types.ObjectId, required: true }, // CurrentAffairQuiz.questions._id
+        userAnswer: { type: String, default: null },
+        isCorrect: { type: Boolean, default: null },
+      },
+    ],
+
+    totalScore: { type: Number, default: 0 },
+    correctCount: { type: Number, default: 0 },
+    wrongCount: { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+// Ek user ek din ka quiz sirf ek baar de sake (usi exam ke liye)
+currentAffairAttemptSchema.index({ userId: 1, examName: 1, date: 1 }, { unique: true });
+
+const CurrentAffairAttempt = rowQuestionConnection.model(
+  "CurrentAffairAttempt",
+  currentAffairAttemptSchema
+);
+export default CurrentAffairAttempt;
+</file>
+
+<file path="backend/models/CurrentAffairQuiz.js">
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const caQuizQuestionSchema = new mongoose.Schema({
+  question: { type: String, required: true },
+  option1: { type: String, required: true },
+  option2: { type: String, required: true },
+  option3: { type: String, required: true },
+  option4: { type: String, required: true },
+  correctOption: { type: Number, required: true },
+  answerExplain: { type: String },
+});
+// _id: false NAHI lagaya — har question ko apna khud ka auto _id milega,
+// isi se attempt mein answer track hoga (Challenge.js ke questions jaisa pattern)
+
+const currentAffairQuizSchema = new mongoose.Schema(
+  {
+    examName: { type: String, required: true, trim: true, index: true },
+    date: { type: String, required: true, trim: true },
+    questions: [caQuizQuestionSchema],
+  },
+  { timestamps: true }
+);
+
+currentAffairQuizSchema.index({ examName: 1, date: 1 }, { unique: true });
+
+const CurrentAffairQuiz = rowQuestionConnection.model("CurrentAffairQuiz", currentAffairQuizSchema);
+export default CurrentAffairQuiz;
+</file>
+
 <file path="backend/models/Performance.js">
-// models/Performance.js
 import mongoose from "mongoose";
 import { rowQuestionConnection } from "../config/rowQuestion.js";
 
@@ -1546,21 +2110,21 @@ const performanceSchema = new mongoose.Schema(
         },
         userAnswer: {
           type: String,
-          // BUG FIX: required: true hata diya —
-          // unattempted questions mein userAnswer null/empty hoga
-          // required: true se puri performance save fail ho jaati thi
           default: null,
         },
         isCorrect: {
           type: Boolean,
           default: null,
         },
-        // Frontend se aayega — student ne kitne seconds mein answer diya
-        // null allowed hai — agar frontend ne nahi bheja (unattempted questions)
         timeTakenInSeconds: {
           type: Number,
           default: null,
           min: [0, "Time negative nahi ho sakta"],
+        },
+        // 👇 NAYA: Test ke dauraan "Mark for Review" kiya tha ya nahi
+        isMarkedForReview: {
+          type: Boolean,
+          default: false,
         },
       },
     ],
@@ -1576,7 +2140,6 @@ const performanceSchema = new mongoose.Schema(
       trim: true,
     },
 
-    // Analytics fields (backend calculate karta hai)
     totalScore:       { type: Number, default: 0 },
     correctCount:     { type: Number, default: 0 },
     wrongCount:       { type: Number, default: 0 },
@@ -1587,15 +2150,13 @@ const performanceSchema = new mongoose.Schema(
         subjectName:    String,
         accuracy:       Number,
         correctCount:   Number,
-        // BUG FIX: ye dono fields schema mein missing the —
-        // addPerformence.js save karta tha but Mongoose silently drop kar deta tha
-        // Ab schema mein add kiya — ab sahi se save honge
         wrongCount:       { type: Number, default: 0 },
         unattemptedCount: { type: Number, default: 0 },
         totalQuestions:   Number,
-        // Subject-wise time tracking ke liye
         totalTimeTaken:          { type: Number, default: 0 },
         averageTimePerQuestion:  { type: Number, default: 0 },
+        // 👇 NAYA: Is subject mein kitne questions mark-for-review kiye the
+        markedForReviewCount:    { type: Number, default: 0 },
       },
     ],
   },
@@ -1751,6 +2312,18 @@ const User = rowQuestionConnection.model("User", userSchema);
 export default User;
 </file>
 
+<file path="backend/utils/dateHelpers.js">
+// IST (UTC+5:30) ke hisaab se "aaj" ki date "YYYY-MM-DD" format mein deta hai.
+// Server (Render) UTC mein chalta hai — seedha new Date() use karne se
+// raat 12:00 se subah 5:30 IST tak "kal" ki date aa jaati, isliye ye helper zaroori hai.
+export const getTodayIST = () => {
+  const now = new Date();
+  const istOffsetMs = 5.5 * 60 * 60 * 1000;
+  const istTime = new Date(now.getTime() + istOffsetMs);
+  return istTime.toISOString().split("T")[0];
+};
+</file>
+
 <file path="backend/.gitignore">
 
 </file>
@@ -1829,6 +2402,475 @@ export default User;
 
 <file path="frontend/src/assets/vite.svg">
 <svg xmlns="http://www.w3.org/2000/svg" width="77" height="47" fill="none" aria-labelledby="vite-logo-title" viewBox="0 0 77 47"><title id="vite-logo-title">Vite</title><style>.parenthesis{fill:#000}@media (prefers-color-scheme:dark){.parenthesis{fill:#fff}}</style><path fill="#9135ff" d="M40.151 45.71c-.663.844-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.493c-.92 0-1.457-1.04-.92-1.788l7.479-10.471c1.07-1.498 0-3.578-1.842-3.578H15.443c-.92 0-1.456-1.04-.92-1.788l9.696-13.576c.213-.297.556-.474.92-.474h28.894c.92 0 1.456 1.04.92 1.788l-7.48 10.472c-1.07 1.497 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.087.89 1.83L40.153 45.712z"/><mask id="a" width="48" height="47" x="14" y="0" maskUnits="userSpaceOnUse" style="mask-type:alpha"><path fill="#000" d="M40.047 45.71c-.663.843-2.02.374-2.02-.699V34.708a2.26 2.26 0 0 0-2.262-2.262H24.389c-.92 0-1.457-1.04-.92-1.788l7.479-10.472c1.07-1.497 0-3.578-1.842-3.578H15.34c-.92 0-1.456-1.04-.92-1.788l9.696-13.575c.213-.297.556-.474.92-.474H53.93c.92 0 1.456 1.04.92 1.788L47.37 13.03c-1.07 1.498 0 3.578 1.842 3.578h11.376c.944 0 1.474 1.088.89 1.831L40.049 45.712z"/></mask><g mask="url(#a)"><g filter="url(#b)"><ellipse cx="5.508" cy="14.704" fill="#eee6ff" rx="5.508" ry="14.704" transform="rotate(269.814 20.96 11.29)scale(-1 1)"/></g><g filter="url(#c)"><ellipse cx="10.399" cy="29.851" fill="#eee6ff" rx="10.399" ry="29.851" transform="rotate(89.814 -16.902 -8.275)scale(1 -1)"/></g><g filter="url(#d)"><ellipse cx="5.508" cy="30.487" fill="#8900ff" rx="5.508" ry="30.487" transform="rotate(89.814 -19.197 -7.127)scale(1 -1)"/></g><g filter="url(#e)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.928 4.177)scale(1 -1)"/></g><g filter="url(#f)"><ellipse cx="5.508" cy="30.599" fill="#8900ff" rx="5.508" ry="30.599" transform="rotate(89.814 -25.738 5.52)scale(1 -1)"/></g><g filter="url(#g)"><ellipse cx="14.072" cy="22.078" fill="#eee6ff" rx="14.072" ry="22.078" transform="rotate(93.35 31.245 55.578)scale(-1 1)"/></g><g filter="url(#h)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#i)"><ellipse cx="3.47" cy="21.501" fill="#8900ff" rx="3.47" ry="21.501" transform="rotate(89.009 35.419 55.202)scale(-1 1)"/></g><g filter="url(#j)"><ellipse cx="14.592" cy="9.743" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(39.51 14.592 9.743)"/></g><g filter="url(#k)"><ellipse cx="61.728" cy="-5.321" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 61.728 -5.32)"/></g><g filter="url(#l)"><ellipse cx="55.618" cy="7.104" fill="#00c2ff" rx="5.971" ry="9.665" transform="rotate(37.892 55.618 7.104)"/></g><g filter="url(#m)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#n)"><ellipse cx="12.326" cy="39.103" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 12.326 39.103)"/></g><g filter="url(#o)"><ellipse cx="49.857" cy="30.678" fill="#8900ff" rx="4.407" ry="29.108" transform="rotate(37.892 49.857 30.678)"/></g><g filter="url(#p)"><ellipse cx="52.623" cy="33.171" fill="#00c2ff" rx="5.971" ry="15.297" transform="rotate(37.892 52.623 33.17)"/></g></g><path d="M6.919 0c-9.198 13.166-9.252 33.575 0 46.789h6.215c-9.25-13.214-9.196-33.623 0-46.789zm62.424 0h-6.215c9.198 13.166 9.252 33.575 0 46.789h6.215c9.25-13.214 9.196-33.623 0-46.789" class="parenthesis"/><defs><filter id="b" width="60.045" height="41.654" x="-5.564" y="16.92" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="c" width="90.34" height="51.437" x="-40.407" y="-6.762" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="d" width="79.355" height="29.4" x="-35.435" y="2.801" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="e" width="79.579" height="29.4" x="-30.84" y="20.8" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="f" width="79.579" height="29.4" x="-29.307" y="21.949" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="g" width="74.749" height="58.852" x="29.961" y="-17.13" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="7.659"/></filter><filter id="h" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="i" width="61.377" height="25.362" x="37.754" y="3.055" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="j" width="56.045" height="63.649" x="-13.43" y="-22.082" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="k" width="54.814" height="64.646" x="34.321" y="-37.644" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="l" width="33.541" height="35.313" x="38.847" y="-10.552" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="m" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="n" width="54.814" height="64.646" x="-15.081" y="6.78" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="o" width="54.814" height="64.646" x="22.45" y="-1.645" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter><filter id="p" width="39.409" height="43.623" x="32.919" y="11.36" color-interpolation-filters="sRGB" filterUnits="userSpaceOnUse"><feFlood flood-opacity="0" result="BackgroundImageFix"/><feBlend in="SourceGraphic" in2="BackgroundImageFix" result="shape"/><feGaussianBlur result="effect1_foregroundBlur_2002_17286" stdDeviation="4.596"/></filter></defs></svg>
+</file>
+
+<file path="frontend/src/pages/CurrentAffairs.jsx">
+import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import api from "../api/api";
+
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+const ReadingSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="max-w-2xl mx-auto">
+      <SkeletonBlock className="w-32 h-4 mb-6" />
+      <SkeletonBlock className="w-64 h-7 mb-2" />
+      <SkeletonBlock className="w-40 h-4 mb-8" />
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+            <SkeletonBlock className="w-20 h-3 mb-3" />
+            <SkeletonBlock className="w-3/4 h-5 mb-3" />
+            <SkeletonBlock className="w-full h-4 mb-1" />
+            <SkeletonBlock className="w-full h-4 mb-1" />
+            <SkeletonBlock className="w-2/3 h-4" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// "YYYY-MM-DD" ko manually parse karke display karta hai — Date object use
+// nahi kiya taaki koi timezone-shift bug na aaye
+const formatDateDisplay = (dateStr) => {
+  if (!dateStr) return "";
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const months = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  return `${d} ${months[m - 1]} ${y}`;
+};
+
+const STATUS_FILTERS = [
+  { key: "all", label: "All" },
+  { key: "correct", label: "Correct" },
+  { key: "wrong", label: "Wrong" },
+  { key: "unattempted", label: "Unattempted" },
+];
+
+const CurrentAffairs = () => {
+  const navigate = useNavigate();
+  const { date: dateParam } = useParams();
+
+  const [phase, setPhase] = useState("loading"); // loading | reading | quiz | submitting | result | review | error
+  const [errorMsg, setErrorMsg] = useState("");
+  const [examName, setExamName] = useState("");
+
+  const [affair, setAffair] = useState(null);
+  const [quiz, setQuiz] = useState(null);
+  const [answers, setAnswers] = useState({});
+  const [activeQIdx, setActiveQIdx] = useState(0);
+  const [resultData, setResultData] = useState(null);
+
+  const [reviewData, setReviewData] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [reviewIdx, setReviewIdx] = useState(0);
+
+  const submittingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      setPhase("loading");
+      try {
+        const meRes = await api.get("/me");
+        if (cancelled) return;
+        const exam = meRes.data.data.exam;
+        setExamName(exam);
+
+        const url = dateParam
+          ? `/current-affair/${encodeURIComponent(exam)}/${dateParam}`
+          : `/current-affair/${encodeURIComponent(exam)}`;
+
+        const res = await api.get(url);
+        if (cancelled) return;
+
+        setAffair(res.data.available ? res.data.data : null);
+        setPhase("reading");
+      } catch (err) {
+        if (!cancelled) {
+          setErrorMsg(err.response?.data?.message || "Current affairs load nahi ho paaye.");
+          setPhase("error");
+        }
+      }
+    };
+    init();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateParam]);
+
+  const startQuiz = async () => {
+    if (!affair) return;
+    setPhase("loading");
+    try {
+      const res = await api.get(
+        `/current-affair-quiz/${encodeURIComponent(examName)}/${affair.date}`
+      );
+      setQuiz(res.data.data);
+      setAnswers({});
+      setActiveQIdx(0);
+      submittingRef.current = false;
+      setPhase("quiz");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Quiz load nahi ho paaya.");
+      setPhase("error");
+    }
+  };
+
+  const currentQuestion = quiz ? quiz.questions[activeQIdx] : null;
+
+  const selectAnswer = (n) => {
+    if (!currentQuestion) return;
+    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
+  };
+
+  const goNext = () => {
+    if (quiz && activeQIdx < quiz.questions.length - 1) setActiveQIdx((i) => i + 1);
+  };
+  const goPrev = () => {
+    if (activeQIdx > 0) setActiveQIdx((i) => i - 1);
+  };
+
+  const handleSubmit = async () => {
+    if (!quiz || submittingRef.current) return;
+    submittingRef.current = true;
+    setPhase("submitting");
+    try {
+      const attemptedQuestions = quiz.questions.map((q) => ({
+        questionId: q._id,
+        userAnswer: answers[q._id] || null,
+      }));
+
+      const res = await api.post(
+        `/current-affair-quiz/${encodeURIComponent(examName)}/${affair.date}/submit`,
+        { attemptedQuestions }
+      );
+      setResultData(res.data.data);
+      setPhase("result");
+    } catch (err) {
+      submittingRef.current = false;
+      if (err.response?.status === 409) {
+        setResultData(affair.attemptSummary);
+        setPhase("result");
+      } else {
+        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setPhase("error");
+      }
+    }
+  };
+
+  const openReview = async () => {
+    setPhase("loading");
+    try {
+      const res = await api.get(
+        `/current-affair-quiz/${encodeURIComponent(examName)}/${affair.date}/my-attempt`
+      );
+      setReviewData(res.data.data);
+      setStatusFilter("all");
+      setReviewIdx(0);
+      setPhase("review");
+    } catch (err) {
+      setErrorMsg(err.response?.data?.message || "Review load nahi ho paaya.");
+      setPhase("error");
+    }
+  };
+
+  const filteredReviewQuestions = useMemo(() => {
+    if (!reviewData) return [];
+    return reviewData.questionBreakdown.filter((q) => {
+      if (statusFilter === "correct") return q.isCorrect === true;
+      if (statusFilter === "wrong") return q.isCorrect === false;
+      if (statusFilter === "unattempted") return q.isCorrect === null;
+      return true;
+    });
+  }, [reviewData, statusFilter]);
+
+  useEffect(() => setReviewIdx(0), [statusFilter]);
+
+  // ────────────────────────────── RENDER ──────────────────────────────
+
+  if (phase === "loading") return <ReadingSkeleton />;
+  if (phase === "submitting") return <ReadingSkeleton />;
+
+  if (phase === "error") {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center space-y-4">
+          <p className="text-gray-300">{errorMsg}</p>
+          <button onClick={() => navigate("/HomePage")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "reading") {
+    if (!affair) {
+      return (
+        <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+          <div className="max-w-md text-center space-y-4">
+            <div className="text-4xl mb-2">📰</div>
+            <h2 className="text-lg font-semibold">Aaj Ka Current Affairs Abhi Nahi Aaya</h2>
+            <p className="text-gray-400 text-sm">Thodi der baad wapas check karein.</p>
+            <button onClick={() => navigate("/HomePage")} className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
+              Home Jaayein
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-10">
+        <div className="max-w-2xl mx-auto">
+          <button onClick={() => navigate("/HomePage")} className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1">
+            &larr; Home
+          </button>
+
+          <h1 className="text-2xl font-bold mb-1">{affair.title || "Current Affairs"}</h1>
+          <p className="text-gray-400 text-sm mb-8">
+            {formatDateDisplay(affair.date)} &middot; {examName}
+          </p>
+
+          <div className="space-y-4 mb-10">
+            {affair.items.map((item, i) => (
+              <div key={i} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+                <span className="inline-block text-[11px] px-2.5 py-1 rounded-full mb-3 bg-[#1F2937] text-[#A78BFA] border border-gray-700">
+                  {item.category || "General"}
+                </span>
+                <h3 className="text-base font-semibold mb-2 leading-relaxed">{item.headline}</h3>
+                {item.imageUrl && (
+                  <img src={item.imageUrl} alt={item.headline} className="w-full rounded-lg mb-3 object-cover max-h-56" />
+                )}
+                <p className="text-sm text-gray-300 leading-relaxed">{item.content}</p>
+                {item.source && <p className="text-[11px] text-gray-600 mt-2">Source: {item.source}</p>}
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
+            {!affair.quizAvailable ? (
+              <p className="text-sm text-gray-400">Is din ka quiz abhi taiyar nahi hai.</p>
+            ) : affair.alreadyAttempted ? (
+              <>
+                <p className="text-sm text-gray-400 mb-1">Aapne ye quiz de diya hai</p>
+                <p className="text-3xl font-bold text-[#A78BFA] mb-4">
+                  {affair.attemptSummary?.correctCount} / {affair.attemptSummary?.correctCount + affair.attemptSummary?.wrongCount + affair.attemptSummary?.unattemptedCount}
+                </p>
+                <button onClick={openReview} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold">
+                  Answers Review Karein
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-400 mb-4">Ab is din ki current affairs par apni understanding test karein</p>
+                <button onClick={startQuiz} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold">
+                  Quiz Shuru Karein ({affair.totalQuizQuestions} sawaal)
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "quiz" && currentQuestion) {
+    const selected = answers[currentQuestion._id];
+    const isLast = activeQIdx === quiz.questions.length - 1;
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-10">
+        <div className="max-w-xl mx-auto">
+          <p className="text-xs text-gray-500 mb-6">Question {activeQIdx + 1} of {quiz.questions.length}</p>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-6">
+            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+            <div className="space-y-3">
+              {[1, 2, 3, 4].map((n) => {
+                const optText = currentQuestion[`option${n}`];
+                const isSelected = selected === String(n);
+                return (
+                  <button
+                    key={n}
+                    onClick={() => selectAnswer(n)}
+                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 transition-colors ${
+                      isSelected ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white" : "border-gray-800 bg-[#1F2937] text-gray-300 hover:border-gray-600"
+                    }`}
+                  >
+                    <span className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
+                      isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
+                    }`}>
+                      {n}
+                    </span>
+                    <span>{optText}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button onClick={goPrev} disabled={activeQIdx === 0} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 disabled:opacity-40">
+              Previous
+            </button>
+            {isLast ? (
+              <button onClick={handleSubmit} className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
+                Submit Karein
+              </button>
+            ) : (
+              <button onClick={goNext} className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
+                Next
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "result" && resultData) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+        <div className="max-w-xl mx-auto text-center">
+          <h1 className="text-2xl font-bold mb-1">Quiz Complete! ✅</h1>
+          <p className="text-gray-400 text-sm mb-8">Dekho kitna samjhe aaj ki khabrein</p>
+
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
+            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
+            <p className="text-sm text-gray-500 mt-1">
+              / {resultData.correctCount + resultData.wrongCount + resultData.unattemptedCount} Score
+            </p>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
+              <p className="text-[11px] text-gray-500">Correct</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
+              <p className="text-[11px] text-gray-500">Wrong</p>
+            </div>
+            <div className="bg-[#1F2937] rounded-xl p-4">
+              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
+              <p className="text-[11px] text-gray-500">Unattempted</p>
+            </div>
+          </div>
+
+          <button onClick={openReview} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3">
+            Answers Review Karein
+          </button>
+          <button onClick={() => navigate("/HomePage")} className="w-full py-3 rounded-lg border border-gray-700 text-gray-300">
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "review" && reviewData) {
+    const currentQ = filteredReviewQuestions[reviewIdx];
+    const counts = {
+      all: reviewData.questionBreakdown.length,
+      correct: reviewData.questionBreakdown.filter((q) => q.isCorrect === true).length,
+      wrong: reviewData.questionBreakdown.filter((q) => q.isCorrect === false).length,
+      unattempted: reviewData.questionBreakdown.filter((q) => q.isCorrect === null).length,
+    };
+
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+        <div className="max-w-3xl mx-auto">
+          <button onClick={() => setPhase("reading")} className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1">
+            &larr; Wapas
+          </button>
+
+          <h1 className="text-xl sm:text-2xl font-bold mb-6">Answers Review</h1>
+
+          <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+            {STATUS_FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setStatusFilter(f.key)}
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  statusFilter === f.key ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
+                }`}
+              >
+                {f.label} ({counts[f.key]})
+              </button>
+            ))}
+          </div>
+
+          {filteredReviewQuestions.length === 0 && (
+            <p className="text-gray-400 text-sm py-10 text-center">Is category mein koi sawaal nahi hai.</p>
+          )}
+
+          {currentQ && (
+            <>
+              <p className="text-xs text-gray-500 mb-3">Question {reviewIdx + 1} of {filteredReviewQuestions.length}</p>
+              <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+                <div className="flex justify-end mb-4">
+                  <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                    currentQ.isCorrect === true ? "text-green-400 bg-green-500/10 border-green-500/30" :
+                    currentQ.isCorrect === false ? "text-red-400 bg-red-500/10 border-red-500/30" :
+                    "text-gray-400 bg-gray-500/10 border-gray-500/30"
+                  }`}>
+                    {currentQ.isCorrect === true ? "Correct" : currentQ.isCorrect === false ? "Wrong" : "Unattempted"}
+                  </span>
+                </div>
+                <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQ.question}</p>
+                <div className="space-y-2.5 mb-6">
+                  {[1, 2, 3, 4].map((n) => {
+                    const optText = currentQ.options?.[`option${n}`];
+                    const isCorrectOpt = currentQ.correctOption === n;
+                    const isUserPick = currentQ.userAnswer === String(n);
+                    let style = "border-gray-800 bg-[#1F2937] text-gray-300";
+                    if (isCorrectOpt) style = "border-green-500/40 bg-green-500/10 text-green-300";
+                    else if (isUserPick) style = "border-red-500/40 bg-red-500/10 text-red-300";
+                    return (
+                      <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
+                        <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">{n}</span>
+                        <span className="flex-1">{optText}</span>
+                        {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+                        {isUserPick && !isCorrectOpt && <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                {currentQ.answerExplain && (
+                  <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">
+                    <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-2">Explanation</p>
+                    <p className="text-sm text-gray-300 leading-relaxed">{currentQ.answerExplain}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between items-center mt-6">
+                <button onClick={() => setReviewIdx((i) => Math.max(0, i - 1))} disabled={reviewIdx === 0} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 disabled:opacity-40">
+                  &larr; Previous
+                </button>
+                <button onClick={() => setReviewIdx((i) => Math.min(filteredReviewQuestions.length - 1, i + 1))} disabled={reviewIdx >= filteredReviewQuestions.length - 1} className="px-4 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40">
+                  Next &rarr;
+                </button>
+              </div>
+            </>
+          )}
+
+          <button onClick={() => navigate("/HomePage")} className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300">
+            Home Jaayein
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+};
+
+export default CurrentAffairs;
 </file>
 
 <file path="frontend/src/pages/ProfilePage.jsx">
@@ -2407,6 +3449,7 @@ export const addPerformence = async (req, res) => {
           total: 0,
           totalTime: 0,
           timedCount: 0,
+          markedForReview: 0,
         };
       }
 
@@ -2427,6 +3470,9 @@ export const addPerformence = async (req, res) => {
       ) {
         subjectGroups[subjectName].totalTime += q.timeTakenInSeconds;
         subjectGroups[subjectName].timedCount++;
+      }
+      if (q.isMarkedForReview === true) {
+        subjectGroups[subjectName].markedForReview++;
       }
     }
 
@@ -2452,6 +3498,7 @@ export const addPerformence = async (req, res) => {
         totalQuestions: total,
         totalTimeTaken: totalTime,
         averageTimePerQuestion,
+        markedForReviewCount: markedForReview,
       };
     });
 
@@ -2486,6 +3533,7 @@ export const addPerformence = async (req, res) => {
           wrong: wrongCount,
           unattempted: unattemptedCount,
           totalScore: calculatedScore,
+          markedForReview: attemptedQuestions.filter((q) => q.isMarkedForReview === true).length,
         },
         subjectAnalysis,
       },
@@ -2912,25 +3960,17 @@ import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
 
 
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 1
-// Overview: average score, lifetime graph, subject list (last 3)
-// Route: GET /analysis/overview/:userId/:examName
-// ─────────────────────────────────────────────
 export const getAllAnalysis1stPage = async (req, res) => {
   try {
     let { userId, examName } = req.params;
 
-    // 👇 YEH LOGIC MISSING HAI TUMHARI FILE MEIN
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
-      userId = req.user._id; // 'active_user' text ko real ID se replace kar dega
+      userId = req.user._id;
     }
-    // 👆 YEH LOGIC ADD KARO
 
-    // 1. Sare mocks fetch karo
     const allTests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 });
       
@@ -2942,26 +3982,19 @@ export const getAllAnalysis1stPage = async (req, res) => {
       });
     }
 
-    // 2. Average Score — sirf last 3 mocks ka
     const last3Tests = allTests.slice(0, 3);
     const totalScoreSum = last3Tests.reduce((acc, test) => acc + test.totalScore, 0);
     const averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
 
-    // 3. Graph Data — LIFETIME ke saare mocks
-    // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
     const graphData = allTests
-  .map((test) => ({
-    performanceId: test._id,
-    score: test.totalScore,
-    date: test.createdAt,
-    blueprintName: test.blueprintName, // 👈 NAYA — Mini/Full + subject filter ke liye
-  }))
-  .reverse(); // chronological order (purana → naya)
+      .map((test) => ({
+        performanceId: test._id,
+        score: test.totalScore,
+        date: test.createdAt,
+        blueprintName: test.blueprintName,
+      }))
+      .reverse();
 
-    // 4. Subject-wise accuracy + time — last 3 mocks se
-    // BUG FIX: || 0 ki jagah ?? 0 use kiya —
-    // agar averageTimePerQuestion exactly 0 ho tab || 0 bhi 0 deta tha
-    // lekin ?? 0 sirf null/undefined pe fallback karta hai, 0 pe nahi
     const subjectMap = {};
     last3Tests.forEach((test) => {
       if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
@@ -2974,7 +4007,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
             };
           }
           subjectMap[sub.subjectName].totalAcc += sub.accuracy;
-          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0; // ✅ FIX
+          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
           subjectMap[sub.subjectName].count += 1;
         });
       }
@@ -3005,12 +4038,6 @@ export const getAllAnalysis1stPage = async (req, res) => {
 };
 
 
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 2
-// Graph click → ek specific mock ka pura breakdown
-// (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
-// Route: GET /analysis/mock-detail/:performanceId
-// ─────────────────────────────────────────────
 export const getPerformanceAnalysis = async (req, res) => {
   try {
     const { performanceId } = req.params;
@@ -3057,7 +4084,6 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number(((correct / totalQuestions) * 100).toFixed(2));
 
-    // Total time: sirf jinka time data hai unka sum
     let totalTimeTaken = 0;
     for (const aq of performance.attemptedQuestions) {
       totalTimeTaken += aq.timeTakenInSeconds ?? 0;
@@ -3068,10 +4094,13 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number((totalTimeTaken / totalQuestions).toFixed(2));
 
-    // Sawaal-by-sawaal breakdown
-    // Null-safe: agar koi question DB se delete ho gaya ho to crash nahi hoga
+    // 👇 NAYA: markedForReview count calculate karo
+    const markedForReviewCount = performance.attemptedQuestions.filter(
+      (aq) => aq.isMarkedForReview === true
+    ).length;
+
     const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId; // populate ho gaya hai upar
+      const q = aq.questionId;
 
       return {
         questionId: q ? q._id : aq.questionId,
@@ -3087,6 +4116,7 @@ export const getPerformanceAnalysis = async (req, res) => {
         correctOption: q ? q.correctOption : null,
         userAnswer: aq.userAnswer,
         isCorrect: aq.isCorrect,
+        isMarkedForReview: aq.isMarkedForReview === true, // 👈 NAYA
         answerExplain: q ? q.answerExplain : null,
         answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
         topicName: q ? q.topicName : null,
@@ -3108,6 +4138,7 @@ export const getPerformanceAnalysis = async (req, res) => {
         accuracy,
         totalTimeTaken,
         averageTimePerQuestion,
+        markedForReviewCount, // 👈 NAYA
       },
       questionBreakdown,
     });
@@ -3117,25 +4148,17 @@ export const getPerformanceAnalysis = async (req, res) => {
 };
 
 
-// ─────────────────────────────────────────────
-// PAGE 2: Subject-wise Analysis
-// Route: GET /analysis/subject/:userId/:examName/:subjectName
-// ─────────────────────────────────────────────
 export const getSubjectAnalysis = async (req, res) => {
   try {
-    // FIX: 'const' ki jagah 'let' use kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName } = req.params;
 
-    // 👇 YEH LOGIC ADD KIYA HAI TAAKI "active_user" CRASH NA KARE
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
       userId = req.user._id;
     }
-    // 👆 YAHAN TAK
 
-    // 1. Last 3 mocks fetch karo
     const last3Tests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 })
       .limit(3);
@@ -3148,7 +4171,6 @@ export const getSubjectAnalysis = async (req, res) => {
       });
     }
 
-    // 2. Subject ka average accuracy + time (last 3 mocks)
     let totalAccuracy = 0;
     let totalTime = 0;
     let subjectFoundCount = 0;
@@ -3172,7 +4194,7 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
-    graphData.reverse(); // chronological order
+    graphData.reverse();
 
     const averageAccuracy =
       subjectFoundCount === 0
@@ -3184,27 +4206,20 @@ export const getSubjectAnalysis = async (req, res) => {
         ? 0
         : Number((totalTime / subjectFoundCount).toFixed(2));
 
-    // 3. Topic-wise data (last 3 mocks se, runtime calculate)
-    // Topic data Performance mein store nahi — Question model se nikalna padega
-
-    // 3a. Sare questionIds (teen mocks ke)
     const allQuestionIds = last3Tests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
-    // 3b. Sirf is subject ke questions ka topicName fetch karo — ek query
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
     }).select("_id topicName");
 
-    // 3c. Lookup map: questionId → topicName
     const topicNameMap = {};
     for (const doc of questionDocs) {
       topicNameMap[doc._id.toString()] = doc.topicName;
     }
 
-    // 3d. Topic-wise group karo
     const topicGroups = {};
 
     for (const test of last3Tests) {
@@ -3212,7 +4227,7 @@ export const getSubjectAnalysis = async (req, res) => {
         if (!aq.questionId) continue;
 
         const topicName = topicNameMap[aq.questionId.toString()];
-        if (!topicName) continue; // is subject ka question nahi — skip
+        if (!topicName) continue;
 
         if (!topicGroups[topicName]) {
           topicGroups[topicName] = {
@@ -3222,6 +4237,7 @@ export const getSubjectAnalysis = async (req, res) => {
             total: 0,
             totalTime: 0,
             timedCount: 0,
+            markedForReview: 0, // 👈 NAYA
           };
         }
 
@@ -3235,6 +4251,11 @@ export const getSubjectAnalysis = async (req, res) => {
           topicGroups[topicName].unattempted++; 
         }
 
+        // 👇 NAYA
+        if (aq.isMarkedForReview === true) {
+          topicGroups[topicName].markedForReview++;
+        }
+
         if (
           typeof aq.timeTakenInSeconds === "number" &&
           aq.timeTakenInSeconds >= 0
@@ -3245,9 +4266,8 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
-    // 3e. Topic list banao
     const topicList = Object.keys(topicGroups).map((topicName) => {
-      const { correct, wrong, unattempted, total, totalTime, timedCount } =
+      const { correct, wrong, unattempted, total, totalTime, timedCount, markedForReview } =
         topicGroups[topicName];
 
       const efficiency =
@@ -3266,10 +4286,10 @@ export const getSubjectAnalysis = async (req, res) => {
         wrongCount: wrong,         
         unattemptedCount: unattempted, 
         averageTimePerQuestion: avgTime,
+        markedForReviewCount: markedForReview, // 👈 NAYA
       };
     });
 
-    // 4. Top 5 weak topics
     const weakTopics = [...topicList]
       .filter((t) => t.totalAttempted > 0)
       .sort((a, b) => {
@@ -3313,35 +4333,20 @@ export const getSubjectAnalysis = async (req, res) => {
 };
 
 
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
-// Page 2 mein topic pe click karne pe ye page khulega
-// Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
-// ─────────────────────────────────────────────
 export const getTopicAnalysis = async (req, res) => {
   try {
-    // 👇 Const ko let kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName, topicName } = req.params;
 
-    // 👇 YEH LOGIC ADD KARNA ZAROORI HAI
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
       userId = req.user._id; 
     }
-    // 👆 YEH LOGIC ADD KARNE KE BAAD HI MONGODB ERROR BAND HOGA
 
-    // ─────────────────────────────────────────────
-    // 1. LIFETIME ke saare mocks fetch karo
-    // ─────────────────────────────────────────────
     const allTests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 });
     
-    // ... baaki ka purana code waisa hi rahega ...
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
@@ -3350,17 +4355,10 @@ export const getTopicAnalysis = async (req, res) => {
       });
     }
 
-    // ─────────────────────────────────────────────
-    // 2. Sare mocks ke questionIds nikalo ek saath
-    // ─────────────────────────────────────────────
     const allQuestionIds = allTests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
-    // ─────────────────────────────────────────────
-    // 3. Sirf is topic + subject ke questions fetch karo — ek query
-    //    Pura question detail chahiye (sawaal, options, explanation)
-    // ─────────────────────────────────────────────
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
@@ -3369,28 +4367,22 @@ export const getTopicAnalysis = async (req, res) => {
       "_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName"
     );
 
-    // Lookup map: questionId → full question document
     const questionMap = {};
     for (const doc of questionDocs) {
       questionMap[doc._id.toString()] = doc;
     }
 
-    // ─────────────────────────────────────────────
-    // 4. Har mock ke har attempted question ko check karo
-    //    Agar wo is topic ka hai to uski entry banao
-    //    Same question multiple mocks mein aaya to teeno baar aayega (deduplicate nahi)
-    // ─────────────────────────────────────────────
-    const goodAtQuestions = [];    // isCorrect === true
-    const wrongQuestions = [];     // isCorrect === false
-    const unattemptedQuestions = []; // isCorrect === null
+    const goodAtQuestions = [];
+    const wrongQuestions = [];
+    const unattemptedQuestions = [];
 
-    // Topic-level stats ke liye counters
     let totalAttempted = 0;
     let totalCorrect = 0;
     let totalWrong = 0;
     let totalUnattempted = 0;
     let totalTime = 0;
     let timedCount = 0;
+    let totalMarkedForReview = 0; // 👈 NAYA
 
     for (const test of allTests) {
       for (const aq of test.attemptedQuestions) {
@@ -3399,12 +4391,10 @@ export const getTopicAnalysis = async (req, res) => {
         const qId = aq.questionId.toString();
         const qDoc = questionMap[qId];
 
-        // Sirf is topic ke questions process karo
         if (!qDoc) continue;
 
         totalAttempted++;
 
-        // Time tracking
         if (
           typeof aq.timeTakenInSeconds === "number" &&
           aq.timeTakenInSeconds >= 0
@@ -3413,8 +4403,11 @@ export const getTopicAnalysis = async (req, res) => {
           timedCount++;
         }
 
-        // Har entry mein performanceId bhi rakho taaki
-        // frontend track kar sake ye kaunse mock se hai
+        // 👇 NAYA
+        if (aq.isMarkedForReview === true) {
+          totalMarkedForReview++;
+        }
+
         const entry = {
           performanceId: test._id,
           mockDate: test.createdAt,
@@ -3428,6 +4421,7 @@ export const getTopicAnalysis = async (req, res) => {
           },
           correctOption: qDoc.correctOption,
           userAnswer: aq.userAnswer,
+          isMarkedForReview: aq.isMarkedForReview === true, // 👈 NAYA
           answerExplain: qDoc.answerExplain,
           answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
           timeTakenInSeconds: aq.timeTakenInSeconds,
@@ -3446,9 +4440,6 @@ export const getTopicAnalysis = async (req, res) => {
       }
     }
 
-    // ─────────────────────────────────────────────
-    // 5. Topic-level summary calculate karo
-    // ─────────────────────────────────────────────
     const efficiency =
       totalAttempted === 0
         ? 0
@@ -3459,25 +4450,21 @@ export const getTopicAnalysis = async (req, res) => {
         ? 0
         : Number((totalTime / timedCount).toFixed(2));
 
-    // ─────────────────────────────────────────────
-    // 6. Response
-    // ─────────────────────────────────────────────
     return res.status(200).json({
       success: true,
       data: {
         topicName,
         subjectName,
-        // Upar dikhayi jaane wali summary
         summary: {
-          efficiency,              // % sahi (correct / total * 100)
-          averageTimePerQuestion,  // sirf timed questions ka average
+          efficiency,
+          averageTimePerQuestion,
           totalAttempted,
           totalCorrect,
           totalWrong,
           totalUnattempted,
+          totalMarkedForReview, // 👈 NAYA
           totalMocksConsidered: allTests.length,
         },
-        // Teen sections — har ek mein pura sawaal + explanation
         goodAt: goodAtQuestions,
         wrong: wrongQuestions,
         unattempted: unattemptedQuestions,
@@ -3493,10 +4480,6 @@ export const getTopicAnalysis = async (req, res) => {
 };
 
 
-// ─────────────────────────────────────────────
-// Mock test list — user ke sare mocks
-// Route: GET /analysis/mock-list/:userId/:examName
-// ─────────────────────────────────────────────
 export const getUserMockTests = async (req, res) => {
   try {
     const { userId, examName } = req.params;
@@ -8741,6 +9724,13 @@ import { createChallenge } from "../controllers/createChallenge.js";
 import { submitChallenge } from "../controllers/submitChallenge.js";
 import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
 import { getMyChallenges } from "../controllers/getMyChallenges.js";
+import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
+import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
+import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
+import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
+import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
+import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
+
 
 // 👇 NAYA: Rank Predictor ke controllers
 import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
@@ -8778,6 +9768,8 @@ router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 
 // 👇 NAYA: Admin is route se rank-predictor ka reference data feed karega
 router.post("/add-rank-predictor-data", addRankPredictorData);
+router.post("/add-current-affair", addCurrentAffair);
+router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -8821,7 +9813,13 @@ router.get("/my-challenges", userInfo, getMyChallenges);
 router.get("/rank-predictor/:examName", userInfo, predictRank);
 // Data availability check karne ke liye (frontend button dikhana/chupana)
 router.get("/rank-predictor-data/:examName", getRankPredictorData);
+router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
+router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
+router.get("/current-affair/:examName", userInfo, getCurrentAffair);
 
+router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
+router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
+router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
 export default router;
 </file>
 
@@ -8840,6 +9838,7 @@ import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
 import MyChallenges from './pages/MyChallenges';
+import CurrentAffairs from './pages/CurrentAffairs';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -8870,6 +9869,8 @@ const App = () => {
             <Route path="/Challenge/:code" element={<Challenge/>} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
             <Route path="/MyChallenges" element={<MyChallenges/>} />
+            <Route path="/CurrentAffairs" element={<CurrentAffairs/>} />
+<Route path="/CurrentAffairs/:date" element={<CurrentAffairs/>} />
           </Routes>
         </div>
       </HashRouter>
@@ -9940,6 +10941,16 @@ const HomePage = () => {
             </div>
             <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
           </button>
+          <button
+  onClick={() => navigate("/CurrentAffairs")}
+  className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
+>
+  <div className="text-left">
+    <p className="text-sm font-semibold flex items-center gap-2">Daily Current Affairs <span>📰</span></p>
+    <p className="text-xs text-gray-500 mt-1">Aaj ki khabrein padho, quiz do</p>
+  </div>
+  <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
+</button>
         </section>
 
         {/* Hero */}
