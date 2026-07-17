@@ -166,6 +166,7 @@ const HomePage = () => {
             </div>
             <span className="text-2xl flex-shrink-0">&rarr;</span>
           </button>
+          
           <button
             onClick={() => navigate("/MyChallenges")}
             className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
@@ -180,6 +181,7 @@ const HomePage = () => {
             </div>
             <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
           </button>
+
           <button
             onClick={() => navigate("/PreviousYearTests")}
             className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
@@ -194,6 +196,23 @@ const HomePage = () => {
             </div>
             <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
           </button>
+
+          {/* Current Affairs Button Added Here */}
+          <button
+            onClick={() => navigate("/CurrentAffairs")}
+            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
+          >
+            <div className="text-left">
+              <p className="text-sm font-semibold flex items-center gap-2">
+                Daily Current Affairs <span>📰</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Aaj ki khabrein padho, quiz do
+              </p>
+            </div>
+            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
+          </button>
+
         </section>
 
         {/* Hero */}
