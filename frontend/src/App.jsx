@@ -14,6 +14,7 @@ import ChallengeReview from './pages/ChallengeReview';
 import MyChallenges from './pages/MyChallenges';
 import PreviousYearTests from './pages/PreviousYearTests';
 import PreviousYearTest from './pages/PreviousYearTest';
+import CurrentAffairs from './pages/CurrentAffairs'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -46,6 +47,7 @@ const App = () => {
             <Route path="/MyChallenges" element={<MyChallenges/>} />
             <Route path="/PreviousYearTests" element={<PreviousYearTests/>} />
             <Route path="/PreviousYearTest/:testId" element={<PreviousYearTest/>} />
+            <Route path="/CurrentAffairs" element={<CurrentAffairs/>} />
           </Routes>
         </div>
       </HashRouter>
