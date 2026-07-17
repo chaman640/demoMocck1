@@ -33,6 +33,14 @@ import { getPreviousYearTest } from "../controllers/getPreviousYearTest.js";
 import { submitPreviousYearTest } from "../controllers/submitPreviousYearTest.js";
 import { getPreviousYearAttemptDetail } from "../controllers/getPreviousYearAttemptDetail.js";
 
+// imports ke sath (upar)
+import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
+import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
+import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
+import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
+import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
+import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
+
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
@@ -68,6 +76,10 @@ router.post("/add-rank-predictor-data", addRankPredictorData);
 // 👇 NAYA: Admin is route se poora Previous Year Test (paper + sab questions) add karega
 router.post("/add-previous-year-test", addPreviousYearTest);
 router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTest);
+
+
+router.post("/add-current-affair", addCurrentAffair);
+router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -114,5 +126,16 @@ router.get("/rank-predictor-data/:examName", getRankPredictorData);
 router.get("/previous-year-tests/:examName", userInfo, getAllPreviousYearTests);
 router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
 router.get("/previous-year-attempt/:attemptId", userInfo, getPreviousYearAttemptDetail);
+
+
+// GET routes ke sath — IMPORTANT: /dates wala route pehle aana chahiye
+// warna ":date" param usko match kar lega aur wrong controller chalega
+router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
+router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
+router.get("/current-affair/:examName", userInfo, getCurrentAffair);
+
+router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
+router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
+router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
 
 export default router;
