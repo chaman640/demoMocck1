@@ -69,7 +69,7 @@ const AnalysisPageSkeleton = () => (
         <SkeletonBlock className="w-32 h-5" />
         <div className="flex gap-2">
           {[1, 2, 3].map((i) => (
-            <SkeletonBlock key={i} className="w-24 h-9 rounded-full" />
+            <SkeletonBlock key={i} className="w-24 h-10 rounded-full" />
           ))}
         </div>
         {[1, 2, 3].map((i) => (
@@ -125,16 +125,16 @@ const ScreenHeader = ({ title, onBack }) => (
 // ──────────────────────────────────────────────
 // Ek subject ka card — accuracy badge + progress bar + time, poora tappable
 // ──────────────────────────────────────────────
-const SubjectCard = ({ subjectName, accuracy, timeSeconds, questionCount, onClick }) => {
+const SubjectCard = ({ subjectName, accuracy, timeSeconds, onClick }) => {
   const tier = getAccuracyTier(accuracy);
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-4 transition-colors"
+      className="w-full text-left bg-[#111827] border border-gray-800 active:border-[#7C3AED]/60 rounded-2xl p-4 transition-colors"
     >
       <div className="flex items-center justify-between gap-3 mb-3">
-        <h3 className="font-semibold text-[15px] text-gray-100 truncate">{subjectName}</h3>
-        <span className={`flex-shrink-0 px-2.5 py-1 rounded-full text-xs font-bold ${tier.bg} ${tier.text}`}>
+        <h3 className="font-semibold text-base text-gray-100 truncate">{subjectName}</h3>
+        <span className={`flex-shrink-0 px-2.5 py-1 rounded-full text-sm font-bold ${tier.bg} ${tier.text}`}>
           {accuracy}%
         </span>
       </div>
@@ -145,10 +145,9 @@ const SubjectCard = ({ subjectName, accuracy, timeSeconds, questionCount, onClic
         />
       </div>
       <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Clock className="w-3.5 h-3.5" />
-          {formatDuration(timeSeconds)}
-          {questionCount != null ? ` · ${questionCount} sawaal` : ""}
+        <span className="flex items-center gap-1.5 text-sm text-gray-500">
+          <Clock className="w-4 h-4" />
+          Time: {formatDuration(timeSeconds)}
         </span>
         <ChevronRight className="w-4 h-4 text-gray-600 flex-shrink-0" />
       </div>
@@ -162,20 +161,20 @@ const SubjectCard = ({ subjectName, accuracy, timeSeconds, questionCount, onClic
 const TestHistoryCard = ({ blueprintName, mockType, date, score, onClick }) => (
   <button
     onClick={onClick}
-    className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-4 transition-colors"
+    className="w-full text-left bg-[#111827] border border-gray-800 active:border-[#7C3AED]/60 rounded-2xl p-4 transition-colors"
   >
     <div className="flex items-center justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <p className="font-medium text-sm text-gray-100 truncate">{blueprintName || "Mock Test"}</p>
           {mockType && (
-            <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
+            <span className="flex-shrink-0 text-[11px] px-1.5 py-0.5 rounded bg-gray-800 text-gray-400">
               {mockType}
             </span>
           )}
         </div>
-        <p className="flex items-center gap-1.5 text-xs text-gray-500">
-          <Calendar className="w-3.5 h-3.5 flex-shrink-0" />
+        <p className="flex items-center gap-1.5 text-sm text-gray-500">
+          <Calendar className="w-4 h-4 flex-shrink-0" />
           {new Date(date).toLocaleString("en-IN", {
             day: "numeric",
             month: "short",
@@ -194,16 +193,16 @@ const TestHistoryCard = ({ blueprintName, mockType, date, score, onClick }) => (
 );
 
 const MOCK_TYPE_FILTERS = [
-  { key: "all", label: "All" },
+  { key: "all", label: "Sabhi" },
   { key: "Full", label: "Full Mock" },
   { key: "Mini", label: "Mini Mock" },
 ];
 
 const STATUS_FILTERS = [
-  { key: "all", label: "All" },
-  { key: "correct", label: "Correct" },
-  { key: "wrong", label: "Wrong" },
-  { key: "unattempted", label: "Unattempted" },
+  { key: "all", label: "Sabhi" },
+  { key: "correct", label: "Sahi" },
+  { key: "wrong", label: "Galat" },
+  { key: "unattempted", label: "Chhoda Hua" },
 ];
 
 const UserAllAnalysis = () => {
@@ -217,7 +216,6 @@ const UserAllAnalysis = () => {
   const [blueprints, setBlueprints] = useState([]);
 
   const [mockTypeFilter, setMockTypeFilter] = useState("all");
-  const [miniSubjectFilter, setMiniSubjectFilter] = useState("all");
 
   const [viewingMockId, setViewingMockId] = useState(null);
 
@@ -288,46 +286,13 @@ const UserAllAnalysis = () => {
     return counts;
   }, [sortedHistory, blueprintMetaMap]);
 
-  const miniSubjects = useMemo(() => {
-    const set = new Set();
-    sortedHistory.forEach((g) => {
-      const meta = blueprintMetaMap[g.blueprintName];
-      if (meta?.mockType === "Mini") {
-        (meta.subjectNames || []).forEach((s) => set.add(s));
-      }
-    });
-    return Array.from(set).sort();
-  }, [sortedHistory, blueprintMetaMap]);
-
-  const miniSubjectCounts = useMemo(() => {
-    const counts = { all: 0 };
-    sortedHistory.forEach((g) => {
-      const meta = blueprintMetaMap[g.blueprintName];
-      if (meta?.mockType !== "Mini") return;
-      counts.all++;
-      (meta.subjectNames || []).forEach((s) => {
-        counts[s] = (counts[s] || 0) + 1;
-      });
-    });
-    return counts;
-  }, [sortedHistory, blueprintMetaMap]);
-
   const filteredHistory = useMemo(() => {
     return sortedHistory.filter((g) => {
-      const meta = blueprintMetaMap[g.blueprintName];
       if (mockTypeFilter === "all") return true;
-      if (meta?.mockType !== mockTypeFilter) return false;
-      if (mockTypeFilter === "Mini" && miniSubjectFilter !== "all") {
-        return (meta.subjectNames || []).includes(miniSubjectFilter);
-      }
-      return true;
+      const meta = blueprintMetaMap[g.blueprintName];
+      return meta?.mockType === mockTypeFilter;
     });
-  }, [sortedHistory, blueprintMetaMap, mockTypeFilter, miniSubjectFilter]);
-
-  const selectMockType = (type) => {
-    setMockTypeFilter(type);
-    setMiniSubjectFilter("all");
-  };
+  }, [sortedHistory, blueprintMetaMap, mockTypeFilter]);
 
   if (loading) {
     return <AnalysisPageSkeleton />;
@@ -389,7 +354,7 @@ const UserAllAnalysis = () => {
       <div className="max-w-lg mx-auto px-4 mt-6 space-y-8">
 
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Your Analysis</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Aapki Analysis</h1>
           <p className="text-gray-400 mt-1 text-sm">
             <span className="text-[#A78BFA] font-medium">{examName}</span> ke mocks ka summary
           </p>
@@ -402,21 +367,21 @@ const UserAllAnalysis = () => {
               <TrendingUp className="w-5 h-5" />
             </div>
             <p className="text-2xl font-bold text-white">{overview.averageScore}%</p>
-            <p className="text-xs text-gray-500 mt-0.5">Average Score</p>
+            <p className="text-sm text-gray-500 mt-0.5">Average Score</p>
           </div>
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
             <div className="w-9 h-9 rounded-lg bg-blue-500/15 text-blue-400 flex items-center justify-center mb-2.5">
               <ListChecks className="w-5 h-5" />
             </div>
             <p className="text-2xl font-bold text-white">{overview.totalTestsGiven}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Mocks Diye</p>
+            <p className="text-sm text-gray-500 mt-0.5">Mocks Diye</p>
           </div>
         </div>
 
         {/* Subject-wise performance */}
         <div>
           <h2 className="text-lg font-semibold mb-1">Subject-wise Performance</h2>
-          <p className="text-xs text-gray-500 mb-3">Pichle 3 mocks ka average</p>
+          <p className="text-sm text-gray-500 mb-3">Pichle 3 mocks ka average</p>
 
           {overview.subjectAnalysis?.length === 0 ? (
             <p className="text-sm text-yellow-500 bg-[#111827] border border-gray-800 rounded-2xl p-4 text-center">
@@ -433,7 +398,6 @@ const UserAllAnalysis = () => {
                     subjectName={s.subjectName}
                     accuracy={s.averageAccuracy}
                     timeSeconds={totalTimeSeconds}
-                    questionCount={qCount}
                     onClick={() =>
                       navigate('/UserSubjectAnallysis', {
                         state: { subjectName: s.subjectName, examName },
@@ -449,14 +413,14 @@ const UserAllAnalysis = () => {
         {/* Test History */}
         <div>
           <h2 className="text-lg font-semibold mb-1">Test History</h2>
-          <p className="text-xs text-gray-500 mb-3">Kisi bhi test par tap karke poora result dekhein</p>
+          <p className="text-sm text-gray-500 mb-3">Kisi bhi test par tap karke poora result dekhein</p>
 
-          <div className="flex gap-2 overflow-x-auto pb-1 mb-2.5">
+          <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
             {MOCK_TYPE_FILTERS.map((f) => (
               <button
                 key={f.key}
-                onClick={() => selectMockType(f.key)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                onClick={() => setMockTypeFilter(f.key)}
+                className={`px-4 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
                   mockTypeFilter === f.key
                     ? "bg-[#7C3AED] text-white"
                     : "bg-[#111827] border border-gray-800 text-gray-400"
@@ -466,34 +430,6 @@ const UserAllAnalysis = () => {
               </button>
             ))}
           </div>
-
-          {mockTypeFilter === "Mini" && miniSubjects.length > 0 && (
-            <div className="flex gap-2 overflow-x-auto pb-1 mb-4">
-              <button
-                onClick={() => setMiniSubjectFilter("all")}
-                className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${
-                  miniSubjectFilter === "all"
-                    ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
-                    : "bg-transparent border border-gray-800 text-gray-500"
-                }`}
-              >
-                Sabhi Subjects ({miniSubjectCounts.all || 0})
-              </button>
-              {miniSubjects.map((subj) => (
-                <button
-                  key={subj}
-                  onClick={() => setMiniSubjectFilter(subj)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${
-                    miniSubjectFilter === subj
-                      ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
-                      : "bg-transparent border border-gray-800 text-gray-500"
-                  }`}
-                >
-                  {subj} ({miniSubjectCounts[subj] || 0})
-                </button>
-              ))}
-            </div>
-          )}
 
           {filteredHistory.length === 0 ? (
             <p className="text-sm text-gray-500 text-center py-8 bg-[#111827] border border-gray-800 rounded-2xl">
@@ -605,28 +541,19 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
         <ScreenHeader title="Question Review" onBack={closeReview} />
 
         <div className="max-w-lg mx-auto px-4 mt-5">
+
+          {/* Subject as a simple dropdown — only shown when there's more than 1 subject */}
           {subjects.length > 1 && (
-            <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-              <button
-                onClick={() => { setSubjectFilter("all"); setIndex(0); }}
-                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
-                  subjectFilter === "all" ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
-                }`}
-              >
-                Sabhi Subjects
-              </button>
+            <select
+              value={subjectFilter}
+              onChange={(e) => { setSubjectFilter(e.target.value); setIndex(0); }}
+              className="w-full mb-3 px-4 py-3 rounded-xl bg-[#111827] border border-gray-800 text-sm text-gray-200"
+            >
+              <option value="all">Sabhi Subjects</option>
               {subjects.map((s) => (
-                <button
-                  key={s}
-                  onClick={() => { setSubjectFilter(s); setIndex(0); }}
-                  className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
-                    subjectFilter === s ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
-                  }`}
-                >
-                  {s}
-                </button>
+                <option key={s} value={s}>{s}</option>
               ))}
-            </div>
+            </select>
           )}
 
           <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
@@ -634,7 +561,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
               <button
                 key={f.key}
                 onClick={() => { setStatusFilter(f.key); setIndex(0); }}
-                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
+                className={`px-4 py-2.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
                   statusFilter === f.key ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
                 }`}
               >
@@ -651,8 +578,8 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
           {currentQ && (
             <>
-              <p className="text-xs text-gray-500 mb-3">
-                Question {index + 1} of {filteredQuestions.length} &middot; {currentQ.subjectName}
+              <p className="text-sm text-gray-500 mb-3">
+                Sawaal {index + 1} / {filteredQuestions.length} &middot; {currentQ.subjectName}
               </p>
               <QuestionDetailCard q={currentQ} />
 
@@ -660,16 +587,16 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
                 <button
                   onClick={() => setIndex((i) => Math.max(0, i - 1))}
                   disabled={index === 0}
-                  className="flex-1 py-3 rounded-xl border border-gray-700 text-sm font-medium text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3.5 rounded-xl border border-gray-700 text-sm font-medium text-gray-300 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
-                  <ArrowLeft className="w-4 h-4" /> Previous
+                  <ArrowLeft className="w-4 h-4" /> Pichla
                 </button>
                 <button
                   onClick={() => setIndex((i) => Math.min(filteredQuestions.length - 1, i + 1))}
                   disabled={index >= filteredQuestions.length - 1}
-                  className="flex-1 py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                 >
-                  Next <ChevronRight className="w-4 h-4" />
+                  Agla <ChevronRight className="w-4 h-4" />
                 </button>
               </div>
             </>
@@ -695,27 +622,27 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
         <div className="grid grid-cols-3 gap-3 mb-6">
           <button
             onClick={() => openReview("correct")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-green-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 active:border-green-500/50 rounded-xl p-4 text-center transition-colors"
           >
             <CheckCircle2 className="w-5 h-5 text-green-400 mx-auto mb-1.5" />
             <p className="text-lg font-bold text-green-400">{overview.correct}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Correct</p>
+            <p className="text-xs text-gray-500 mt-0.5">Sahi</p>
           </button>
           <button
             onClick={() => openReview("wrong")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-red-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 active:border-red-500/50 rounded-xl p-4 text-center transition-colors"
           >
             <XCircle className="w-5 h-5 text-red-400 mx-auto mb-1.5" />
             <p className="text-lg font-bold text-red-400">{overview.wrong}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Wrong</p>
+            <p className="text-xs text-gray-500 mt-0.5">Galat</p>
           </button>
           <button
             onClick={() => openReview("unattempted")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-gray-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 active:border-gray-500/50 rounded-xl p-4 text-center transition-colors"
           >
             <Circle className="w-5 h-5 text-gray-400 mx-auto mb-1.5" />
             <p className="text-lg font-bold text-gray-300">{overview.unattempted}</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Unattempted</p>
+            <p className="text-xs text-gray-500 mt-0.5">Chhoda Hua</p>
           </button>
         </div>
 
@@ -735,7 +662,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 // ──────────────────────────────────────────────
 const QuestionDetailCard = ({ q }) => {
   const statusLabel =
-    q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
+    q.isCorrect === true ? "Sahi" : q.isCorrect === false ? "Galat" : "Chhoda Hua";
   const statusColor =
     q.isCorrect === true
       ? "text-green-400 bg-green-500/10 border-green-500/30"
@@ -746,7 +673,7 @@ const QuestionDetailCard = ({ q }) => {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
       <div className="flex items-center justify-between mb-4 gap-3">
-        <span className="text-xs text-gray-500">{q.topicName}</span>
+        <span className="text-sm text-gray-500">{q.topicName}</span>
         <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
           {statusLabel}
         </span>
