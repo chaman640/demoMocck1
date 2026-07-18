@@ -62,19 +62,15 @@ const HomePage = () => {
 
   const isLoading = userLoading || overviewLoading;
 
-  // Quick actions — swipe row mein dikhne wale
+  // 👇 UPDATED: Quick actions row — Challenge yahan se hata diya (ab bade
+  // grid mein hai), uski jagah Current Affairs daal diya. Mini Mock bhi
+  // yahan se hata diya (ab bade grid mein Full Mock jaisa card hai).
   const quickActions = [
     {
-      icon: "⚡",
-      label: "Mini Mock",
-      sub: "10 min",
-      onClick: () => navigate('/MockTest', { state: { mockType: "Mini" } }),
-    },
-    {
-      icon: "⚔️",
-      label: "Challenge",
-      sub: "Dost se",
-      onClick: () => navigate("/Challenge"),
+      icon: "📰",
+      label: "Current Affairs",
+      sub: "Roz ki khabrein",
+      onClick: () => navigate("/CurrentAffairs"),
     },
     {
       icon: "🏆",
@@ -84,7 +80,10 @@ const HomePage = () => {
     },
   ];
 
-  // Main grid — bade buttons
+  // 👇 UPDATED: Main grid — Mini Mock add hua (Full Mock jaisa hi primary
+  // style), Current Affairs yahan se hata diya, uski jagah Challenge aaya
+  // (Prev. Papers jaisa secondary style, kyunki sirf dono mock-modes ko
+  // primary-highlight diya hai).
   const mainActions = [
     {
       icon: "📝",
@@ -94,6 +93,13 @@ const HomePage = () => {
       onClick: () => navigate('/MockTest', { state: { mockType: "Full" } }),
     },
     {
+      icon: "⚡",
+      title: "Mini Mock",
+      desc: "10 min ka practice",
+      primary: true,
+      onClick: () => navigate('/MockTest', { state: { mockType: "Mini" } }),
+    },
+    {
       icon: "📚",
       title: "Prev. Papers",
       desc: "Purane saal ke",
@@ -101,24 +107,19 @@ const HomePage = () => {
       onClick: () => navigate("/PreviousYearTests"),
     },
     {
-      icon: "📰",
-      title: "Current Affairs",
-      desc: "Roz ki khabrein",
+      icon: "⚔️",
+      title: "Challenge",
+      desc: "Dost ko bulao",
       primary: false,
-      onClick: () => navigate("/CurrentAffairs"),
-    },
-    {
-      icon: "📊",
-      title: "Analysis",
-      desc: "Kahan weak hain",
-      primary: false,
-      onClick: () => navigate('/UserAllAnalysis'),
+      onClick: () => navigate("/Challenge"),
     },
   ];
 
+  // 👇 UPDATED: Analysis add hui Test aur Profile ke saath
   const navItems = [
     { label: "Home", active: true, icon: "home" },
     { label: "Test", icon: "test", onClick: () => navigate('/MockTest') },
+    { label: "Analysis", icon: "analysis", onClick: () => navigate('/UserAllAnalysis') },
     { label: "Profile", icon: "profile", onClick: () => navigate('/ProfilePage') },
   ];
 
@@ -269,7 +270,7 @@ const HomePage = () => {
           <button
             key={item.label}
             onClick={item.onClick}
-            className={`flex flex-col items-center gap-0.5 py-1.5 px-6 ${item.active ? "text-[#A78BFA]" : "text-gray-500"}`}
+            className={`flex flex-col items-center gap-0.5 py-1.5 px-3 ${item.active ? "text-[#A78BFA]" : "text-gray-500"}`}
           >
             {item.icon === "home" && (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -279,6 +280,11 @@ const HomePage = () => {
             {item.icon === "test" && (
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            )}
+            {item.icon === "analysis" && (
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             )}
             {item.icon === "profile" && (
