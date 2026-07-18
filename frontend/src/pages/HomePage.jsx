@@ -15,9 +15,7 @@ import api from "../api/api";
 const HomePage = () => {
   const navigate = useNavigate();
 
-  // ─────────────────────────────────────────────
   // Logged-in user ka data
-  // ─────────────────────────────────────────────
   const {
     data: user,
     isLoading: userLoading,
@@ -40,9 +38,7 @@ const HomePage = () => {
 
   const examName = user?.exam;
 
-  // ─────────────────────────────────────────────
   // Overview — averageScore yahin se milta hai
-  // ─────────────────────────────────────────────
   const {
     data: overview,
     isLoading: overviewLoading,
@@ -60,13 +56,8 @@ const HomePage = () => {
 
   const averageScore = overview?.averageScore ?? null;
 
-  // ─────────────────────────────────────────────
-  // Rank Predictor data (dataPoints, totalVacancies etc.)
-  // ─────────────────────────────────────────────
-  const {
-    data: rankPredictor,
-    isLoading: rankLoading,
-  } = useQuery({
+  // Rank Predictor data
+  const { data: rankPredictor, isLoading: rankLoading } = useQuery({
     queryKey: ["rank-predictor-data", examName],
     queryFn: async () => {
       const encodedExamName = encodeURIComponent(examName);
@@ -84,14 +75,8 @@ const HomePage = () => {
         .map((p) => ({ rank: p.rank, score: p.score }))
     : [];
 
-  // ─────────────────────────────────────────────
-  // 👇 Automatic Expected Rank — user ke apne average
-  // score se, koi manual input nahi chahiye
-  // ─────────────────────────────────────────────
-  const {
-    data: autoRankPrediction,
-    isLoading: autoRankLoading,
-  } = useQuery({
+  // Automatic Expected Rank
+  const { data: autoRankPrediction, isLoading: autoRankLoading } = useQuery({
     queryKey: ["rank-predictor-auto", examName, averageScore],
     queryFn: async () => {
       const encodedExamName = encodeURIComponent(examName);
@@ -131,122 +116,61 @@ const HomePage = () => {
     unlikely: "text-red-400",
   };
 
+  // Practice options — ek jagah define kiya taaki grid clean rahe
+  const practiceOptions = [
+    { icon: "⚔️", title: "Dost Ko Challenge Karo", onClick: () => navigate("/Challenge") },
+    { icon: "📊", title: "Apne Challenges", onClick: () => navigate("/MyChallenges") },
+    { icon: "📜", title: "Previous Year Papers", onClick: () => navigate("/PreviousYearTests") },
+    { icon: "📰", title: "Daily Current Affairs", onClick: () => navigate("/CurrentAffairs") },
+  ];
+
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
-      
+
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-5 py-5 border-b border-gray-800">
+      <nav className="flex items-center px-5 py-5 border-b border-gray-800">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-md bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
             mt
           </div>
           <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
         </div>
-        <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
       </nav>
 
-      {/* Main Content */}
       <main className="px-5 py-8 max-w-lg mx-auto">
 
-        {/* Challenge-a-Friend banner */}
+        {/* Hero — sabse pehle, kyunki yahi page ka main kaam hai */}
         <section className="mb-8">
-          <button
-            onClick={() => navigate("/Challenge")}
-            className="w-full rounded-2xl p-5 flex items-center justify-between gap-4 bg-gradient-to-r from-[#7C3AED] to-[#DB2777] active:opacity-90 transition-opacity shadow-lg shadow-purple-900/30"
-          >
-            <div className="text-left">
-              <p className="text-base font-bold flex items-center gap-2">
-                Dost Ko Challenge Karo <span>⚔️</span>
-              </p>
-              <p className="text-xs text-white/80 mt-1">
-                Link banao, dosto ko bhejo, score compare karo
-              </p>
-            </div>
-            <span className="text-2xl flex-shrink-0">&rarr;</span>
-          </button>
-          
-          <button
-            onClick={() => navigate("/MyChallenges")}
-            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
-          >
-            <div className="text-left">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                Apne Challenges Dekho <span>📊</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Leaderboard aur apna performance dekhein
-              </p>
-            </div>
-            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
-          </button>
-
-          <button
-            onClick={() => navigate("/PreviousYearTests")}
-            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
-          >
-            <div className="text-left">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                Previous Year Papers <span>📜</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Purane asli exam papers practice karein
-              </p>
-            </div>
-            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
-          </button>
-
-          {/* Current Affairs Button Added Here */}
-          <button
-            onClick={() => navigate("/CurrentAffairs")}
-            className="w-full mt-3 rounded-2xl p-4 flex items-center justify-between gap-4 bg-[#111827] border border-gray-800 active:border-gray-600 transition-colors"
-          >
-            <div className="text-left">
-              <p className="text-sm font-semibold flex items-center gap-2">
-                Daily Current Affairs <span>📰</span>
-              </p>
-              <p className="text-xs text-gray-500 mt-1">
-                Aaj ki khabrein padho, quiz do
-              </p>
-            </div>
-            <span className="text-xl flex-shrink-0 text-gray-500">&rarr;</span>
-          </button>
-
-        </section>
-
-        {/* Hero */}
-        <section className="mb-10">
-          <h1 className="text-4xl leading-tight font-bold mb-5">
+          <h1 className="text-4xl leading-tight font-bold mb-4">
             Full Practice.<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A78BFA] to-[#7C3AED]">
               Real Results.
             </span>
           </h1>
-          <p className="text-gray-400 text-lg leading-relaxed mb-6">
-            Take mock tests, analyze your performance and improve with detailed insights.
+          <p className="text-gray-400 text-base leading-relaxed mb-6">
+            Mock test do, apni performance analyze karo, aur detailed insights se improve karo.
           </p>
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3">
             <button
               onClick={() => navigate('/MockTest', { state: { mockType: "Full" } })}
-              className="py-3.5 px-6 rounded-lg text-base font-medium flex items-center justify-center gap-2 bg-[#7C3AED] text-white active:bg-[#6D28D9]"
+              className="py-3.5 px-6 rounded-lg text-base font-semibold flex items-center justify-center gap-2 bg-[#7C3AED] text-white active:bg-[#6D28D9]"
             >
               Start Full Mock Test <span>&rarr;</span>
             </button>
             <button
               onClick={() => navigate('/MockTest', { state: { mockType: "Mini" } })}
-              className="py-3.5 px-6 rounded-lg text-base font-medium flex items-center justify-center gap-2 bg-transparent border border-gray-700 text-gray-300 active:border-gray-500"
+              className="py-3 px-6 rounded-lg text-sm font-medium flex items-center justify-center gap-2 bg-transparent border border-gray-700 text-gray-400 active:border-gray-500"
             >
-              Start Mini Mock <span>&rarr;</span>
+              Ya ek chhota Mini Mock try karo <span>&rarr;</span>
             </button>
           </div>
         </section>
 
         {/* Performance Card */}
-        <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
+        <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-8 shadow-2xl">
           <h3 className="text-sm text-gray-400 mb-6">Overall Performance</h3>
 
-          <div className="flex justify-center mb-8">
+          <div className="flex justify-center mb-4">
             <div className="relative w-[150px] h-[150px]">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                 <path
@@ -268,39 +192,22 @@ const HomePage = () => {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className="text-3xl font-bold">{displayedScore}</span>
-                <span className="text-xs text-gray-500 mt-1">Score</span>
+                <span className="text-xs text-gray-500 mt-1">Avg. Score</span>
               </div>
             </div>
           </div>
 
-          <h3 className="text-xs text-gray-500 mb-2.5">Performance Overview</h3>
-          <div className="w-full h-24 relative flex items-end">
-            <svg className="w-full h-full" viewBox="0 0 100 30" preserveAspectRatio="none">
-              <path d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12" fill="none" stroke="#8B5CF6" strokeWidth="1" />
-              <path
-                d="M0,25 Q10,15 20,20 T40,10 T60,18 T80,5 T100,12 L100,30 L0,30 Z"
-                fill="url(#gradient)"
-                opacity="0.2"
-              />
-              <defs>
-                <linearGradient id="gradient" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity="1" />
-                  <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <circle cx="20" cy="20" r="1.5" fill="#A78BFA" />
-              <circle cx="40" cy="10" r="1.5" fill="#A78BFA" />
-              <circle cx="60" cy="18" r="1.5" fill="#A78BFA" />
-              <circle cx="80" cy="5" r="1.5" fill="#A78BFA" />
-            </svg>
-          </div>
+          <button
+            onClick={() => navigate('/UserAllAnalysis')}
+            className="w-full text-center text-sm text-[#A78BFA] font-medium py-2"
+          >
+            Poori Analysis Dekhein &rarr;
+          </button>
         </section>
 
-        {/* ───────────────────────────────────────────── */}
-        {/* Rank Predictor Section — poori tarah automatic */}
-        {/* ───────────────────────────────────────────── */}
+        {/* Rank Predictor Section */}
         {!rankLoading && rankData && chartData.length >= 2 && (
-          <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-10 shadow-2xl">
+          <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-8 shadow-2xl">
             <div className="flex items-center justify-between mb-1">
               <h3 className="text-sm text-gray-400">Rank Predictor</h3>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA]">
@@ -309,7 +216,6 @@ const HomePage = () => {
             </div>
             <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
 
-            {/* Automatic Expected Rank — koi input nahi, seedha average score se */}
             <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-5 mb-6">
               <p className="text-xs text-gray-500 mb-2">Aapki Expected Rank</p>
 
@@ -351,7 +257,6 @@ const HomePage = () => {
               )}
             </div>
 
-            {/* Score vs Rank Chart */}
             <h4 className="text-xs text-gray-500 mb-3">Score vs Rank Trend</h4>
             <div className="w-full h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -397,62 +302,20 @@ const HomePage = () => {
           </section>
         )}
 
-        {/* Feature Row */}
-        <section className="flex flex-col gap-5 py-8 border-y border-gray-800 mb-10">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-purple-900/30 text-purple-400 flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold mb-0.5">Exam Focused</h3>
-              <p className="text-xs text-gray-500">Topic-wise tests</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-green-900/30 text-green-400 flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold mb-0.5">Smart Analysis</h3>
-              <p className="text-xs text-gray-500">Detailed insights</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-blue-900/30 text-blue-400 flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-base font-semibold mb-0.5">Track Progress</h3>
-              <p className="text-xs text-gray-500">Measure growth</p>
-            </div>
-          </div>
-        </section>
-
-        {/* Stats Grid */}
-        <section className="grid grid-cols-2 gap-5 bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-          <div>
-            <h4 className="text-2xl font-bold mb-1">10,000+</h4>
-            <p className="text-xs text-gray-500">Tests Attempted</p>
-          </div>
-          <div>
-            <h4 className="text-2xl font-bold mb-1">95%</h4>
-            <p className="text-xs text-gray-500">Success Rate</p>
-          </div>
-          <div>
-            <h4 className="text-2xl font-bold mb-1">50,000+</h4>
-            <p className="text-xs text-gray-500">Happy Students</p>
-          </div>
-          <div>
-            <h4 className="text-2xl font-bold mb-1">4.9/5</h4>
-            <p className="text-xs text-gray-500">User Rating</p>
+        {/* More Ways to Practice — compact grid, chaar alag banners ki jagah */}
+        <section className="mb-4">
+          <h3 className="text-sm text-gray-400 mb-3">More Ways to Practice</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {practiceOptions.map((opt) => (
+              <button
+                key={opt.title}
+                onClick={opt.onClick}
+                className="bg-[#111827] border border-gray-800 active:border-[#7C3AED]/60 rounded-xl p-4 text-left transition-colors"
+              >
+                <span className="text-2xl mb-2 block">{opt.icon}</span>
+                <span className="text-sm font-medium leading-snug block">{opt.title}</span>
+              </button>
+            ))}
           </div>
         </section>
       </main>
