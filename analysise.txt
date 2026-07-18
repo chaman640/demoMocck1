@@ -1,637 +1,351 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+frontend/src/pages/HomePage.jsx
+import React, { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 import api from "../api/api";
 
-const formatTime = (totalSeconds) => {
-  const safe = Math.max(0, Math.floor(totalSeconds || 0));
-  const m = Math.floor(safe / 60);
-  const s = safe % 60;
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${pad(m)}:${pad(s)}`;
-};
-
-// 👇 NAYA: localStorage key — har user ka apna alag saved "created challenge"
-const getChallengeStorageKey = (userId) => `activeChallenge_${userId}`;
-
-// ──────────────────────────────────────────────
-// 👇 NAYA: Skeleton loading building blocks (spinner ki jagah)
-// ──────────────────────────────────────────────
-const SkeletonBlock = ({ className = "" }) => (
-  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
-);
-
-// Create-flow: apna challenge auto-generate ho raha hai (share-card jaisa skeleton)
-const CreateFlowSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-    <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
-      <SkeletonBlock className="w-16 h-16 rounded-full mx-auto mb-4" />
-      <SkeletonBlock className="w-48 h-6 mx-auto mb-3" />
-      <SkeletonBlock className="w-56 h-4 mx-auto mb-6" />
-      <SkeletonBlock className="w-full h-14 rounded-lg mb-4" />
-      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
-      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
-      <SkeletonBlock className="w-full h-12 rounded-lg" />
-    </div>
-  </div>
-);
-
-// Join-flow: kisi aur ka challenge load ho raha hai (instructions-card jaisa skeleton)
-const JoinFlowSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-    <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
-      <SkeletonBlock className="w-64 h-6 mb-3" />
-      <SkeletonBlock className="w-48 h-4 mb-6" />
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-[#1F2937] rounded-xl p-4">
-            <SkeletonBlock className="w-10 h-6 mx-auto mb-2" />
-            <SkeletonBlock className="w-14 h-3 mx-auto" />
-          </div>
-        ))}
-      </div>
-      <SkeletonBlock className="w-full h-4 mb-2" />
-      <SkeletonBlock className="w-3/4 h-4 mb-8" />
-      <SkeletonBlock className="w-full h-12 rounded-lg" />
-    </div>
-  </div>
-);
-
-// Submit ho raha hai (result-card jaisa skeleton)
-const SubmittingSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-    <div className="max-w-xl mx-auto text-center">
-      <SkeletonBlock className="w-56 h-6 mx-auto mb-3" />
-      <SkeletonBlock className="w-40 h-4 mx-auto mb-8" />
-      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
-        <SkeletonBlock className="w-24 h-10 mx-auto mb-2" />
-        <SkeletonBlock className="w-20 h-3 mx-auto" />
-      </div>
-      <SkeletonBlock className="w-full h-20 rounded-2xl mb-8" />
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        {[1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} className="h-16 rounded-xl" />
-        ))}
-      </div>
-      <SkeletonBlock className="w-full h-12 rounded-lg mb-3" />
-      <SkeletonBlock className="w-full h-12 rounded-lg" />
-    </div>
-  </div>
-);
-
-const Challenge = () => {
+const HomePage = () => {
   const navigate = useNavigate();
-  const { code: codeParam } = useParams(); // URL mein code hai to "join" flow, warna "create" flow
 
-  const [phase, setPhase] = useState(codeParam ? "loading-join" : "loading-create");
-  const [errorMsg, setErrorMsg] = useState("");
-  const [userName, setUserName] = useState("");
-  const [userId, setUserId] = useState("");
-  const [copied, setCopied] = useState(false);
+  // Logged-in user ka data
+  const {
+    data: user,
+    isLoading: userLoading,
+    isError: userError,
+    error: userErrorObj,
+  } = useQuery({
+    queryKey: ["me"],
+    queryFn: async () => {
+      const res = await api.get("/me");
+      return res.data.data;
+    },
+    retry: false,
+  });
 
-  // ── Create-flow state ──
-  const [createdChallenge, setCreatedChallenge] = useState(null);
-
-  // ── Join/Test-flow state ──
-  const [challengeMeta, setChallengeMeta] = useState(null);
-  const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
-  const [activeQIdx, setActiveQIdx] = useState(0);
-  const [answers, setAnswers] = useState({});
-  const [timeSpent, setTimeSpent] = useState({});
-  const [remainingSeconds, setRemainingSeconds] = useState(0);
-  const [endTimestamp, setEndTimestamp] = useState(null);
-  const [resultData, setResultData] = useState(null);
-  const [leaderboard, setLeaderboard] = useState(null);
-
-  const questionStartRef = useRef(Date.now());
-  const currentQIdRef = useRef(null);
-  const submittingRef = useRef(false);
-
-  // 👇 Effective challenge code — URL se (join) ya khud banaye challenge se (own-test)
-  const effectiveCode = codeParam || createdChallenge?.challengeCode || null;
-
-  // ── Step 1: Init — decide karo create-flow ya join-flow ──
   useEffect(() => {
-    let cancelled = false;
-    const init = async () => {
-      setPhase(codeParam ? "loading-join" : "loading-create");
-      try {
-        const meRes = await api.get("/me");
-        if (cancelled) return;
-        const user = meRes.data.data;
-        setUserName(user.name);
-        setUserId(user._id);
-
-        if (codeParam) {
-          // ── JOIN FLOW: kisi ne link bheja hai ──
-          const chRes = await api.get(`/challenge/${codeParam}`);
-          if (cancelled) return;
-          const data = chRes.data.data;
-          setChallengeMeta(data);
-
-          if (data.alreadyAttempted) {
-            await loadLeaderboard(codeParam);
-            setPhase("leaderboard");
-          } else {
-            setPhase("instructions");
-          }
-          return;
-        }
-
-        // ── CREATE FLOW: pehle localStorage check karo — dobara generate na ho ──
-        const storageKey = getChallengeStorageKey(user._id);
-        const savedRaw = localStorage.getItem(storageKey);
-        if (savedRaw) {
-          try {
-            const saved = JSON.parse(savedRaw);
-            const notExpired = saved?.expiresAt && new Date(saved.expiresAt) > new Date();
-            const sameExam = saved?.examName === user.exam;
-            if (saved?.challengeCode && notExpired && sameExam) {
-              setCreatedChallenge(saved);
-              setPhase("created");
-              return;
-            }
-            localStorage.removeItem(storageKey);
-          } catch {
-            localStorage.removeItem(storageKey);
-          }
-        }
-
-        // Koi valid saved challenge nahi mila — seedha naya generate karo
-        const bpRes = await api.get(`/blueprints/${encodeURIComponent(user.exam)}`);
-        if (cancelled) return;
-        const list = bpRes.data.data || [];
-        if (list.length === 0) {
-          throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
-        }
-        const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
-
-        const createRes = await api.post("/create-challenge", {
-          examName: user.exam,
-          blueprintName: chosenBlueprint.blueprintName,
-        });
-        if (cancelled) return;
-        const created = createRes.data.data;
-        setCreatedChallenge(created);
-        localStorage.setItem(storageKey, JSON.stringify(created));
-        setPhase("created");
-      } catch (err) {
-        if (!cancelled) {
-          setErrorMsg(err.response?.data?.message || err.message);
-          setPhase("error");
-        }
-      }
-    };
-    init();
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [codeParam]);
-
-  // ── Apna khud ka challenge test dene ke liye ──
-  const startOwnTest = async () => {
-    if (!createdChallenge) return;
-    setPhase("loading-join");
-    try {
-      const chRes = await api.get(`/challenge/${createdChallenge.challengeCode}`);
-      const data = chRes.data.data;
-      setChallengeMeta(data);
-
-      if (data.alreadyAttempted) {
-        await loadLeaderboard(createdChallenge.challengeCode);
-        setPhase("leaderboard");
-      } else {
-        setPhase("instructions");
-      }
-    } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
-      setPhase("error");
+    if (userError && userErrorObj?.response?.status === 401) {
+      navigate("/Singup");
     }
-  };
+  }, [userError, userErrorObj, navigate]);
 
-  // ── Test start karo (join-flow ya khud ka test) ──
-  const startChallengeTest = () => {
-    setAnswers({});
-    setTimeSpent({});
-    setActiveSubjectIdx(0);
-    setActiveQIdx(0);
-    submittingRef.current = false;
+  const examName = user?.exam;
 
-    const firstQ = challengeMeta.subjects[0].questions[0];
-    currentQIdRef.current = firstQ._id;
-    questionStartRef.current = Date.now();
+  // Overview — averageScore yahin se milta hai
+  const {
+    data: overview,
+    isLoading: overviewLoading,
+    isError: overviewIsError,
+  } = useQuery({
+    queryKey: ["overview", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(`/analysis/overview/active_user/${encodedExamName}`);
+      return res.data.data;
+    },
+    enabled: !!examName,
+    retry: false,
+  });
 
-    const totalSeconds = challengeMeta.durationMinutes * 60;
-    setEndTimestamp(Date.now() + totalSeconds * 1000);
-    setRemainingSeconds(totalSeconds);
-    setPhase("test");
-  };
+  const averageScore = overview?.averageScore ?? null;
 
-  const flushTime = () => {
-    const qId = currentQIdRef.current;
-    if (!qId) return;
-    const elapsed = Math.round((Date.now() - questionStartRef.current) / 1000);
-    if (elapsed > 0) {
-      setTimeSpent((prev) => ({ ...prev, [qId]: (prev[qId] || 0) + elapsed }));
-    }
-    questionStartRef.current = Date.now();
-  };
+  // Rank Predictor data
+  const { data: rankPredictor, isLoading: rankLoading } = useQuery({
+    queryKey: ["rank-predictor-data", examName],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(`/rank-predictor-data/${encodedExamName}`);
+      return res.data;
+    },
+    enabled: !!examName,
+    retry: false,
+  });
 
-  const goToQuestion = (subjIdx, qIdx) => {
-    flushTime();
-    const q = challengeMeta.subjects[subjIdx].questions[qIdx];
-    currentQIdRef.current = q ? q._id : null;
-    setActiveSubjectIdx(subjIdx);
-    setActiveQIdx(qIdx);
-  };
+  const rankData = rankPredictor?.available ? rankPredictor.data : null;
+  const chartData = rankData?.dataPoints
+    ? [...rankData.dataPoints]
+        .sort((a, b) => a.rank - b.rank)
+        .map((p) => ({ rank: p.rank, score: p.score }))
+    : [];
 
-  const currentSubject = challengeMeta ? challengeMeta.subjects[activeSubjectIdx] : null;
-  const currentQuestion = currentSubject ? currentSubject.questions[activeQIdx] : null;
-
-  const selectAnswer = (n) => {
-    if (!currentQuestion) return;
-    setAnswers((prev) => ({ ...prev, [currentQuestion._id]: String(n) }));
-  };
-
-  const goNext = () => {
-    const subj = challengeMeta.subjects[activeSubjectIdx];
-    if (activeQIdx < subj.questions.length - 1) {
-      goToQuestion(activeSubjectIdx, activeQIdx + 1);
-    } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
-      goToQuestion(activeSubjectIdx + 1, 0);
-    }
-  };
-
-  const goPrev = () => {
-    if (activeQIdx > 0) {
-      goToQuestion(activeSubjectIdx, activeQIdx - 1);
-    } else if (activeSubjectIdx > 0) {
-      const prevSubj = challengeMeta.subjects[activeSubjectIdx - 1];
-      goToQuestion(activeSubjectIdx - 1, prevSubj.questions.length - 1);
-    }
-  };
-
-  const loadLeaderboard = async (challengeCode) => {
-    const cc = challengeCode || effectiveCode;
-    if (!cc) return;
-    try {
-      const res = await api.get(`/challenge/${cc}/leaderboard`);
-      setLeaderboard(res.data.data);
-    } catch (err) {
-      // silently fail — leaderboard optional hai result ke saath
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!challengeMeta || submittingRef.current || !effectiveCode) return;
-    submittingRef.current = true;
-    flushTime();
-    setPhase("submitting");
-    try {
-      const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
-        subj.questions.map((q) => ({
-          questionId: q._id,
-          userAnswer: answers[q._id] || null,
-          timeTakenInSeconds: timeSpent[q._id] || 0,
-        }))
+  // Automatic Expected Rank
+  const { data: autoRankPrediction, isLoading: autoRankLoading } = useQuery({
+    queryKey: ["rank-predictor-auto", examName, averageScore],
+    queryFn: async () => {
+      const encodedExamName = encodeURIComponent(examName);
+      const res = await api.get(
+        `/rank-predictor/${encodedExamName}?score=${averageScore}`
       );
+      return res.data.data;
+    },
+    enabled: !!examName && averageScore !== null && !!rankData,
+    retry: false,
+  });
 
-      const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
-      setResultData(res.data.data);
-      await loadLeaderboard(effectiveCode);
-      setPhase("result");
-    } catch (err) {
-      // Agar already-attempted error aaye, seedha leaderboard dikha do
-      if (err.response?.status === 409) {
-        await loadLeaderboard(effectiveCode);
-        setPhase("leaderboard");
-      } else {
-        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
-        setPhase("error");
-      }
-    }
+  const isLoading = userLoading || overviewLoading;
+  const isError = userError || overviewIsError;
+  const displayedScore = isLoading || isError || averageScore === null ? "--" : `${averageScore}%`;
+  const scoreDashArray = averageScore !== null ? `${averageScore}, 100` : "0, 100";
+
+  const navBtnClass =
+    "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
+
+  const confidenceBadgeClass = (confidence) =>
+    confidence === "high"
+      ? "bg-green-500/10 text-green-400"
+      : confidence === "medium"
+      ? "bg-yellow-500/10 text-yellow-400"
+      : "bg-red-500/10 text-red-400";
+
+  const selectionChanceLabel = {
+    strong: "Achi Sambhavna",
+    borderline: "Borderline",
+    unlikely: "Kam Sambhavna",
   };
 
-  // ── Countdown timer ──
-  useEffect(() => {
-    if (phase !== "test") return;
-    if (remainingSeconds <= 0) {
-      const t = setTimeout(() => handleSubmit(), 0);
-      return () => clearTimeout(t);
-    }
-    const t = setTimeout(() => {
-      if (endTimestamp) {
-        setRemainingSeconds(Math.max(0, Math.round((endTimestamp - Date.now()) / 1000)));
-      } else {
-        setRemainingSeconds((s) => Math.max(0, s - 1));
-      }
-    }, 1000);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, remainingSeconds, endTimestamp]);
-
-  const copyLink = () => {
-    const link = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const selectionChanceClass = {
+    strong: "text-green-400",
+    borderline: "text-yellow-400",
+    unlikely: "text-red-400",
   };
 
-  // ────────────────────────────── RENDER ──────────────────────────────
+  // Practice options — ek jagah define kiya taaki grid clean rahe
+  const practiceOptions = [
+    { icon: "⚔️", title: "Dost Ko Challenge Karo", onClick: () => navigate("/Challenge") },
+    { icon: "📊", title: "Apne Challenges", onClick: () => navigate("/MyChallenges") },
+    { icon: "📜", title: "Previous Year Papers", onClick: () => navigate("/PreviousYearTests") },
+    { icon: "📰", title: "Daily Current Affairs", onClick: () => navigate("/CurrentAffairs") },
+  ];
 
-  if (phase === "loading-create") return <CreateFlowSkeleton />;
-  if (phase === "loading-join") return <JoinFlowSkeleton />;
-  if (phase === "submitting") return <SubmittingSkeleton />;
+  return (
+    <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-20 selection:bg-[#7C3AED] selection:text-white">
 
-  if (phase === "error") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{errorMsg}</p>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── Challenge ban gaya — link share karo + khud test bhi de sakte ho ──
-  if (phase === "created" && createdChallenge) {
-    const shareLink = `${window.location.origin}${window.location.pathname}#/Challenge/${createdChallenge.challengeCode}`;
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md w-full bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center">
-          <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
-            🎉
+      {/* Navbar */}
+      <nav className="flex items-center px-5 py-5 border-b border-gray-800">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-md bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
+            mt
           </div>
-          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
-          <p className="text-gray-400 text-sm mb-6">
-            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
+          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
+        </div>
+      </nav>
+
+      <main className="px-5 py-8 max-w-lg mx-auto">
+
+        {/* Hero — sabse pehle, kyunki yahi page ka main kaam hai */}
+        <section className="mb-8">
+          <h1 className="text-4xl leading-tight font-bold mb-4">
+            Full Practice.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A78BFA] to-[#7C3AED]">
+              Real Results.
+            </span>
+          </h1>
+          <p className="text-gray-400 text-base leading-relaxed mb-6">
+            Mock test do, apni performance analyze karo, aur detailed insights se improve karo.
           </p>
-
-          <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
-            {shareLink}
-          </div>
-
-          <button
-            onClick={copyLink}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
-          >
-            {copied ? "Link Copy Ho Gaya ✓" : "Link Copy Karein"}
-          </button>
-          <button
-            onClick={startOwnTest}
-            className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold mb-3"
-          >
-            Khud Mock Test Do
-          </button>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── JOIN FLOW: Instructions dikhao ──
-  if (phase === "instructions" && challengeMeta) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
-          <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
-
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">{challengeMeta.totalQuestions}</p>
-              <p className="text-[11px] text-gray-500 mt-1">Questions</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">{challengeMeta.durationMinutes} min</p>
-              <p className="text-[11px] text-gray-500 mt-1">Duration</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4 text-center">
-              <p className="text-xl font-bold">+{challengeMeta.marksPerQuestion}</p>
-              <p className="text-[11px] text-gray-500 mt-1">Marks/Q</p>
-            </div>
-          </div>
-
-          <p className="text-sm text-gray-400 mb-8">
-            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
-          </p>
-
-          <button
-            onClick={startChallengeTest}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
-          >
-            Challenge Accept Karo — Test Shuru Karo
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // ── TEST SCREEN ──
-  if (phase === "test" && challengeMeta && currentQuestion) {
-    const subject = challengeMeta.subjects[activeSubjectIdx];
-    const selected = answers[currentQuestion._id];
-    const timeLow = remainingSeconds <= 60;
-
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-gray-800 sticky top-0 bg-[#0A0D14] z-10">
-          <span className="font-semibold text-sm sm:text-base">{challengeMeta.blueprintName}</span>
-          <span
-            className={`text-sm font-mono px-3 py-1 rounded-lg border ${
-              timeLow ? "border-red-500 text-red-400 bg-red-500/10" : "border-gray-700 text-gray-200 bg-[#111827]"
-            }`}
-          >
-            {formatTime(remainingSeconds)}
-          </span>
-        </div>
-
-        <div className="flex gap-2 px-4 sm:px-6 py-3 overflow-x-auto border-b border-gray-800">
-          {challengeMeta.subjects.map((s, i) => (
+          <div className="flex flex-col gap-3">
             <button
-              key={s.subjectName}
-              onClick={() => goToQuestion(i, 0)}
-              className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap ${
-                i === activeSubjectIdx ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400"
-              }`}
+              onClick={() => navigate('/MockTest', { state: { mockType: "Full" } })}
+              className="py-3.5 px-6 rounded-lg text-base font-semibold flex items-center justify-center gap-2 bg-[#7C3AED] text-white active:bg-[#6D28D9]"
             >
-              {s.subjectName}
+              Start Full Mock Test <span>&rarr;</span>
             </button>
-          ))}
-        </div>
-
-        <div className="flex-1 px-4 sm:px-6 py-6">
-          <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-6">
-            <p className="text-xs text-gray-500 mb-3">
-              Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
-            </p>
-            <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
-
-            <div className="space-y-3 mb-8">
-              {[1, 2, 3, 4].map((n) => {
-                const optText = currentQuestion[`option${n}`];
-                const isSelected = selected === String(n);
-                return (
-                  <button
-                    key={n}
-                    onClick={() => selectAnswer(n)}
-                    className={`w-full text-left px-4 py-3 rounded-xl border flex items-center gap-3 ${
-                      isSelected
-                        ? "border-[#7C3AED] bg-[#7C3AED]/15 text-white"
-                        : "border-gray-800 bg-[#1F2937] text-gray-300"
-                    }`}
-                  >
-                    <span
-                      className={`w-6 h-6 flex-shrink-0 rounded-full border flex items-center justify-center text-xs ${
-                        isSelected ? "border-[#A78BFA] bg-[#7C3AED] text-white" : "border-gray-600 text-gray-500"
-                      }`}
-                    >
-                      {n}
-                    </span>
-                    <span>{optText}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex flex-wrap gap-3">
-              <button onClick={goPrev} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
-                Previous
-              </button>
-              <button onClick={goNext} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
-                Next
-              </button>
-              <button
-                onClick={handleSubmit}
-                className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
-              >
-                Submit Karo
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/MockTest', { state: { mockType: "Mini" } })}
+              className="py-3 px-6 rounded-lg text-sm font-medium flex items-center justify-center gap-2 bg-transparent border border-gray-700 text-gray-400 active:border-gray-500"
+            >
+              Ya ek chhota Mini Mock try karo <span>&rarr;</span>
+            </button>
           </div>
-        </div>
-      </div>
-    );
-  }
+        </section>
 
-  // ── RESULT SCREEN — score + rank ──
-  if (phase === "result" && resultData) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto text-center">
-          <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
-          <p className="text-gray-400 text-sm mb-8">Dekho tum kahan khade ho</p>
+        {/* Performance Card */}
+        <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-8 shadow-2xl">
+          <h3 className="text-sm text-gray-400 mb-6">Overall Performance</h3>
 
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
-            <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
-            <p className="text-sm text-gray-500 mt-1">Total Score</p>
-          </div>
-
-          <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-8">
-            <p className="text-3xl font-bold">#{resultData.currentRank}</p>
-            <p className="text-sm text-white/80 mt-1">
-              {resultData.totalParticipants} logo mein se aapki rank
-            </p>
-          </div>
-
-          <div className="grid grid-cols-3 gap-4 mb-8">
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-green-400">{resultData.correctCount}</p>
-              <p className="text-[11px] text-gray-500">Correct</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-red-400">{resultData.wrongCount}</p>
-              <p className="text-[11px] text-gray-500">Wrong</p>
-            </div>
-            <div className="bg-[#1F2937] rounded-xl p-4">
-              <p className="text-lg font-bold text-gray-300">{resultData.unattemptedCount}</p>
-              <p className="text-[11px] text-gray-500">Unattempted</p>
+          <div className="flex justify-center mb-4">
+            <div className="relative w-[150px] h-[150px]">
+              <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                <path
+                  className="text-gray-800"
+                  strokeWidth="3"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+                <path
+                  className="text-[#8B5CF6]"
+                  strokeDasharray={scoreDashArray}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="none"
+                  d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold">{displayedScore}</span>
+                <span className="text-xs text-gray-500 mt-1">Avg. Score</span>
+              </div>
             </div>
           </div>
 
           <button
-            onClick={() => setPhase("leaderboard")}
-            className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
+            onClick={() => navigate('/UserAllAnalysis')}
+            className="w-full text-center text-sm text-[#A78BFA] font-medium py-2"
           >
-            Poora Leaderboard Dekho
+            Poori Analysis Dekhein &rarr;
           </button>
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
+        </section>
 
-  // ── LEADERBOARD SCREEN ──
-  if (phase === "leaderboard") {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
-        <div className="max-w-xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
-          <p className="text-gray-400 text-sm mb-8">
-            {leaderboard?.challenge?.blueprintName} &middot; {leaderboard?.totalParticipants || 0} participants
-          </p>
+        {/* Rank Predictor Section */}
+        {!rankLoading && rankData && chartData.length >= 2 && (
+          <section className="bg-[#111827] border border-gray-800 rounded-2xl p-6 mb-8 shadow-2xl">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm text-gray-400">Rank Predictor</h3>
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA]">
+                {rankData.year}
+              </span>
+            </div>
+            <p className="text-xs text-gray-600 mb-5">{rankData.examName}</p>
 
-          {!leaderboard || leaderboard.leaderboard.length === 0 ? (
-            <p className="text-gray-400 text-sm">Abhi tak koi attempt nahi hua.</p>
-          ) : (
-            <div className="space-y-3">
-              {leaderboard.leaderboard.map((entry) => (
-                <div
-                  key={entry.userId}
-                  className={`flex items-center justify-between px-5 py-4 rounded-xl border ${
-                    entry.userName === userName
-                      ? "border-[#7C3AED] bg-[#7C3AED]/10"
-                      : "border-gray-800 bg-[#111827]"
-                  }`}
-                >
-                  <div className="flex items-center gap-4">
+            <div className="bg-[#1F2937] border border-gray-800 rounded-xl p-5 mb-6">
+              <p className="text-xs text-gray-500 mb-2">Aapki Expected Rank</p>
+
+              {averageScore === null ? (
+                <p className="text-sm text-gray-400 mt-2">
+                  Apni expected rank dekhne ke liye pehle kam se kam ek mock test dein.
+                </p>
+              ) : autoRankLoading ? (
+                <div className="h-9 w-48 bg-gray-800/70 rounded animate-pulse mt-2" />
+              ) : autoRankPrediction ? (
+                <>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-3xl font-bold text-[#A78BFA]">
+                      {autoRankPrediction.rankRangeLow.toLocaleString("en-IN")} – {autoRankPrediction.rankRangeHigh.toLocaleString("en-IN")}
+                    </p>
                     <span
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                        entry.rank === 1
-                          ? "bg-yellow-500/20 text-yellow-400"
-                          : entry.rank === 2
-                          ? "bg-gray-400/20 text-gray-300"
-                          : entry.rank === 3
-                          ? "bg-orange-500/20 text-orange-400"
-                          : "bg-gray-800 text-gray-500"
-                      }`}
+                      className={`text-[10px] px-2.5 py-1 rounded-full font-medium flex-shrink-0 ${confidenceBadgeClass(
+                        autoRankPrediction.confidence
+                      )}`}
                     >
-                      {entry.rank}
+                      {autoRankPrediction.confidence} confidence
                     </span>
-                    <span className="font-medium">{entry.userName}</span>
                   </div>
-                  <span className="font-bold text-[#A78BFA]">{entry.totalScore}</span>
-                </div>
-              ))}
+                  <p className="text-[11px] text-gray-500 mt-1.5">
+                    Aapke average score ({averageScore}) ke aadhar par
+                  </p>
+                  {autoRankPrediction.selectionChance && (
+                    <p
+                      className={`text-xs mt-2 font-medium ${
+                        selectionChanceClass[autoRankPrediction.selectionChance] || "text-gray-400"
+                      }`}
+                    >
+                      Selection Chance: {selectionChanceLabel[autoRankPrediction.selectionChance] || autoRankPrediction.selectionChance}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 mt-2">Data abhi available nahi hai.</p>
+              )}
             </div>
-          )}
 
-          <button
-            onClick={() => navigate("/HomePage")}
-            className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300"
-          >
-            Home Jaayein
-          </button>
-        </div>
-      </div>
-    );
-  }
+            <h4 className="text-xs text-gray-500 mb-3">Score vs Rank Trend</h4>
+            <div className="w-full h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
+                  <XAxis
+                    dataKey="rank"
+                    stroke="#4B5563"
+                    fontSize={11}
+                    tickFormatter={(v) => v.toLocaleString("en-IN")}
+                  />
+                  <YAxis stroke="#4B5563" fontSize={11} />
+                  <Tooltip
+                    contentStyle={{
+                      background: "#111827",
+                      border: "1px solid #374151",
+                      borderRadius: "8px",
+                      fontSize: "12px",
+                    }}
+                    labelFormatter={(v) => `Rank: ${v.toLocaleString("en-IN")}`}
+                    formatter={(value) => [value, "Score"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="score"
+                    stroke="#A78BFA"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#7C3AED" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
 
-  return null;
+            {rankData.totalVacancies && (
+              <p className="text-[11px] text-gray-600 mt-3 text-center">
+                Total Vacancies: {rankData.totalVacancies.toLocaleString("en-IN")}
+                {rankData.totalCandidates
+                  ? ` • Total Candidates: ${rankData.totalCandidates.toLocaleString("en-IN")}`
+                  : ""}
+              </p>
+            )}
+          </section>
+        )}
+
+        {/* More Ways to Practice — compact grid, chaar alag banners ki jagah */}
+        <section className="mb-4">
+          <h3 className="text-sm text-gray-400 mb-3">More Ways to Practice</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {practiceOptions.map((opt) => (
+              <button
+                key={opt.title}
+                onClick={opt.onClick}
+                className="bg-[#111827] border border-gray-800 active:border-[#7C3AED]/60 rounded-xl p-4 text-left transition-colors"
+              >
+                <span className="text-2xl mb-2 block">{opt.icon}</span>
+                <span className="text-sm font-medium leading-snug block">{opt.title}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {/* Bottom Navigation */}
+      <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
+        <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          <span className="text-xs font-medium">Mock Tests</span>
+        </button>
+
+        <button onClick={() => navigate('/UserAllAnalysis')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span className="text-xs font-medium">Analysis</span>
+        </button>
+
+        <button onClick={() => navigate('/ProfilePage')} className={navBtnClass}>
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          <span className="text-xs font-medium">Profile</span>
+        </button>
+      </nav>
+    </div>
+  );
 };
 
-export default Challenge;
+export default HomePage;
