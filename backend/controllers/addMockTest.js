@@ -386,6 +386,10 @@ export const addMocktest = async (req, res) => {
         ...fallbackQuestions.flatMap((g) => g.questions),
       ];
 
+      // 👇 BUG FIX (security): correctOption yahan se HATA diya gaya —
+      // pehle ye seedha frontend ko chala jaata tha, aur DevTools ke
+      // Network tab mein test dete waqt hi sahi jawab dikh jaata tha.
+      // Ab isCorrect backend (addPerformence.js) khud DB se check karega.
       const finalQuestions = allFetchedQuestions
         .filter((q) => selectedIdsThisSubject.has(q._id.toString()))
         .map((q) => ({
@@ -395,7 +399,6 @@ export const addMocktest = async (req, res) => {
           option2: q.option2,
           option3: q.option3,
           option4: q.option4,
-          correctOption: q.correctOption,
           topicName: q.topicName,
           subjectName: q.subjectName,
           questionNumber: q.questionNumber,

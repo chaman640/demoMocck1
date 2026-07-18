@@ -418,11 +418,15 @@ const MockTest = () => {
     flushTime();
     setPhase("submitting");
     try {
+      // 👇 BUG FIX: isCorrect ab yahan calculate NAHI hota — backend
+      // (addPerformence.js) ab khud DB ke correctOption se compare karke
+      // isCorrect nikalta hai. Pehle q.correctOption client ko mockData
+      // ke saath mil jaata tha (DevTools se dikhta tha) aur is line se
+      // score bhi manipulate kiya ja sakta tha.
       const attemptedQuestions = mockData.subjects.flatMap(subj => 
         subj.questions.map(q => ({
           questionId: q._id,
           userAnswer: answers[q._id] || null,
-          isCorrect: answers[q._id] ? (answers[q._id] === String(q.correctOption)) : null,
           timeTakenInSeconds: visited.has(q._id) ? timeSpent[q._id] || 0 : null
         }))
       );
