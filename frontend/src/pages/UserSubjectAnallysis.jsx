@@ -58,8 +58,8 @@ const SubjectAnalysisSkeleton = () => (
         </div>
         <div className="divide-y divide-gray-800">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="p-4">
-              <SkeletonBlock className="w-full h-12 rounded-xl" />
+            <div key={i} className="px-4 py-2.5">
+              <SkeletonBlock className="w-full h-8 rounded-lg" />
             </div>
           ))}
         </div>
@@ -72,8 +72,8 @@ const SubjectAnalysisSkeleton = () => (
         </div>
         <div className="divide-y divide-gray-800">
           {[1, 2].map((i) => (
-            <div key={i} className="p-4">
-              <SkeletonBlock className="w-full h-12 rounded-xl" />
+            <div key={i} className="px-4 py-2.5">
+              <SkeletonBlock className="w-full h-8 rounded-lg" />
             </div>
           ))}
         </div>
@@ -83,9 +83,9 @@ const SubjectAnalysisSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Ek tap-able topic row — poori row button hai
-// (chhoti "Deep Research" link pe precisely tap karne ki
-// zaroorat nahi, poori row kahin bhi dabao chal jaayega)
+// 👇 UPDATED: Topic name aur efficiency badge ab ek hi line pe —
+// row patli ho gayi hai, isliye ek screen pe zyada rows fit ho
+// jaate hain bina scroll kiye
 // ──────────────────────────────────────────────
 const TopicRow = ({ topic, tone = "default", onClick }) => {
   const efficiencyClass =
@@ -98,26 +98,24 @@ const TopicRow = ({ topic, tone = "default", onClick }) => {
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-3 p-4 text-left transition-colors ${
+      className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
         tone === "weak" ? "hover:bg-red-500/5" : "hover:bg-[#1F2937]/50"
       }`}
     >
-      <div className="min-w-0 flex-1">
-        <p className="text-sm font-medium text-gray-200 truncate mb-1.5">
-          {topic.topicName}
-        </p>
-        <span
-          className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${efficiencyClass}`}
-        >
-          {topic.efficiency}% efficiency
-        </span>
-      </div>
+      <p className="text-sm font-medium text-gray-200 truncate flex-1 min-w-0">
+        {topic.topicName}
+      </p>
+      <span
+        className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${efficiencyClass}`}
+      >
+        {topic.efficiency}%
+      </span>
       <span
         className={`flex-shrink-0 text-xs font-medium ${
           tone === "weak" ? "text-red-300" : "text-[#A78BFA]"
         }`}
       >
-        Dekho &rarr;
+        &rarr;
       </span>
     </button>
   );
@@ -262,7 +260,7 @@ const UserSubjectAnallysis = () => {
           </div>
         </div>
 
-        {/* Topic-wise Efficiency — ab card-rows, table nahi */}
+        {/* Topic-wise Efficiency — patli card-rows */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-base sm:text-lg">Topic-wise Efficiency</h3>
@@ -284,7 +282,7 @@ const UserSubjectAnallysis = () => {
           )}
         </div>
 
-        {/* Top Weak Topics — same card-row pattern, red tint */}
+        {/* Top Weak Topics — same patli pattern, red tint */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-red-900/10">
             <h3 className="font-semibold text-base sm:text-lg text-red-400">
