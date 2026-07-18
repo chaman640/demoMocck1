@@ -1,10 +1,9 @@
 // routes/Routes.js
 import express from "express";
 
-// ── Models ────────────────────────────────────
+
 import Blueprint from "../models/bluePrint.js";
 
-// ── Controllers ──────────────────────────────
 import { addQuestion }    from "../controllers/addQuestion.js";
 import { addUser }        from "../controllers/addUser.js";
 import { addPerformence } from "../controllers/addPerformence.js";
@@ -105,7 +104,7 @@ router.get("/blueprints/:examName", userInfo, async (req, res) => {
     }
 });
 
-router.get("/analysis/mock-list/:userId/:examName",    getUserMockTests);
+router.get("/analysis/mock-list/:userId/:examName", userInfo, getUserMockTests);
 router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
 router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
 router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
