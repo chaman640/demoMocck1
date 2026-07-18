@@ -53,6 +53,7 @@ import {
   getUserMockTests,        
 } from "../pages/user/analysicUser.js";
 import { logoutUser } from "../controllers/logoutUser.js";
+import { hideQuestion } from "../controllers/hideQuestion.js";
 
 const router = express.Router();
 
@@ -81,6 +82,9 @@ router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTe
 router.post("/add-current-affair", addCurrentAffair);
 router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
 router.post("/logout", logoutUser);
+router.post("/analysis/hide-question", userInfo, hideQuestion);
+
+
 // ─────────────────────────────────────────────
 // GET ROUTES 
 // ─────────────────────────────────────────────

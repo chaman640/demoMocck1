@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
-
+import HiddenQuestion from "../../models/HiddenQuestion.js"; // 👈 naya
 
 // ─────────────────────────────────────────────
 // PAGE 1 — FUNCTION 1
@@ -415,25 +415,17 @@ export const getSubjectAnalysis = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getTopicAnalysis = async (req, res) => {
   try {
-    // 👇 Const ko let kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName, topicName } = req.params;
 
-    // 👇 YEH LOGIC ADD KARNA ZAROORI HAI
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
-      userId = req.user._id; 
+      userId = req.user._id;
     }
-    // 👆 YEH LOGIC ADD KARNE KE BAAD HI MONGODB ERROR BAND HOGA
 
-    // ─────────────────────────────────────────────
-    // 1. LIFETIME ke saare mocks fetch karo
-    // ─────────────────────────────────────────────
-    const allTests = await Performance.find({ userId, examName })
-      .sort({ createdAt: -1 });
-    
-    // ... baaki ka purana code waisa hi rahega ...
+    const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
+
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
@@ -442,17 +434,10 @@ export const getTopicAnalysis = async (req, res) => {
       });
     }
 
-    // ─────────────────────────────────────────────
-    // 2. Sare mocks ke questionIds nikalo ek saath
-    // ─────────────────────────────────────────────
     const allQuestionIds = allTests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
-    // ─────────────────────────────────────────────
-    // 3. Sirf is topic + subject ke questions fetch karo — ek query
-    //    Pura question detail chahiye (sawaal, options, explanation)
-    // ─────────────────────────────────────────────
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
@@ -461,22 +446,19 @@ export const getTopicAnalysis = async (req, res) => {
       "_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName"
     );
 
-    // Lookup map: questionId → full question document
     const questionMap = {};
     for (const doc of questionDocs) {
       questionMap[doc._id.toString()] = doc;
     }
 
-    // ─────────────────────────────────────────────
-    // 4. Har mock ke har attempted question ko check karo
-    //    Agar wo is topic ka hai to uski entry banao
-    //    Same question multiple mocks mein aaya to teeno baar aayega (deduplicate nahi)
-    // ─────────────────────────────────────────────
-    const goodAtQuestions = [];    // isCorrect === true
-    const wrongQuestions = [];     // isCorrect === false
-    const unattemptedQuestions = []; // isCorrect === null
+    // Is user ne jo questions hide kiye hain unki list
+    const hiddenDocs = await HiddenQuestion.find({ userId }).select("questionId");
+    const hiddenQuestionIds = new Set(hiddenDocs.map((h) => h.questionId.toString()));
 
-    // Topic-level stats ke liye counters
+    const goodAtQuestions = [];
+    const wrongQuestions = [];
+    const unattemptedQuestions = [];
+
     let totalAttempted = 0;
     let totalCorrect = 0;
     let totalWrong = 0;
@@ -491,22 +473,16 @@ export const getTopicAnalysis = async (req, res) => {
         const qId = aq.questionId.toString();
         const qDoc = questionMap[qId];
 
-        // Sirf is topic ke questions process karo
-        if (!qDoc) continue;
+        // Is topic ka nahi hai, ya user ne hide kar diya hai — dono case mein skip
+        if (!qDoc || hiddenQuestionIds.has(qId)) continue;
 
         totalAttempted++;
 
-        // Time tracking
-        if (
-          typeof aq.timeTakenInSeconds === "number" &&
-          aq.timeTakenInSeconds >= 0
-        ) {
+        if (typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0) {
           totalTime += aq.timeTakenInSeconds;
           timedCount++;
         }
 
-        // Har entry mein performanceId bhi rakho taaki
-        // frontend track kar sake ye kaunse mock se hai
         const entry = {
           performanceId: test._id,
           mockDate: test.createdAt,
@@ -538,38 +514,23 @@ export const getTopicAnalysis = async (req, res) => {
       }
     }
 
-    // ─────────────────────────────────────────────
-    // 5. Topic-level summary calculate karo
-    // ─────────────────────────────────────────────
-    const efficiency =
-      totalAttempted === 0
-        ? 0
-        : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
+    const efficiency = totalAttempted === 0 ? 0 : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
+    const averageTimePerQuestion = timedCount === 0 ? 0 : Number((totalTime / timedCount).toFixed(2));
 
-    const averageTimePerQuestion =
-      timedCount === 0
-        ? 0
-        : Number((totalTime / timedCount).toFixed(2));
-
-    // ─────────────────────────────────────────────
-    // 6. Response
-    // ─────────────────────────────────────────────
     return res.status(200).json({
       success: true,
       data: {
         topicName,
         subjectName,
-        // Upar dikhayi jaane wali summary
         summary: {
-          efficiency,              // % sahi (correct / total * 100)
-          averageTimePerQuestion,  // sirf timed questions ka average
+          efficiency,
+          averageTimePerQuestion,
           totalAttempted,
           totalCorrect,
           totalWrong,
           totalUnattempted,
           totalMocksConsidered: allTests.length,
         },
-        // Teen sections — har ek mein pura sawaal + explanation
         goodAt: goodAtQuestions,
         wrong: wrongQuestions,
         unattempted: unattemptedQuestions,
@@ -583,7 +544,6 @@ export const getTopicAnalysis = async (req, res) => {
     });
   }
 };
-
 
 // ─────────────────────────────────────────────
 // Mock test list — user ke sare mocks
