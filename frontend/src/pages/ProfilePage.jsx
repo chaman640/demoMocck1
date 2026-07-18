@@ -7,7 +7,7 @@ const SkeletonBlock = ({ className = "" }) => (
 );
 
 const ProfileSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12 pb-24">
     <div className="max-w-lg mx-auto">
       <SkeletonBlock className="w-24 h-4 mb-6" />
       <div className="flex flex-col items-center mb-8">
@@ -33,6 +33,35 @@ const FIELD_LABELS = {
   address: "City / Address",
   exam: "Exam Category",
 };
+
+// 👇 NAYA: HomePage jaisa hi bottom nav — teeno pages ke button
+const navBtnClass =
+  "flex flex-col items-center justify-center gap-1 w-1/3 text-gray-300 active:text-[#A78BFA] transition-colors";
+
+const BottomNav = ({ navigate }) => (
+  <nav className="fixed bottom-0 left-0 w-full h-[70px] bg-[#111827] border-t border-gray-800 flex justify-around items-center z-50">
+    <button onClick={() => navigate('/MockTest')} className={navBtnClass}>
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+      <span className="text-xs font-medium">Mock Tests</span>
+    </button>
+
+    <button onClick={() => navigate('/UserAllAnalysis')} className={navBtnClass}>
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+      </svg>
+      <span className="text-xs font-medium">Analysis</span>
+    </button>
+
+    <button onClick={() => navigate('/ProfilePage')} className={navBtnClass}>
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+      <span className="text-xs font-medium">Profile</span>
+    </button>
+  </nav>
+);
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -168,7 +197,7 @@ const ProfilePage = () => {
 
   if (phase === "error") {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button
@@ -178,6 +207,7 @@ const ProfilePage = () => {
             Home Jaayein
           </button>
         </div>
+        <BottomNav navigate={navigate} />
       </div>
     );
   }
@@ -186,7 +216,8 @@ const ProfilePage = () => {
   const isEditing = phase === "editing" || phase === "saving";
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-10">
+    // 👇 NAYA: pb-24 add kiya taaki fixed bottom nav content ko overlap na kare
+    <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-10 pb-24">
       <div className="max-w-lg mx-auto">
         <button
           onClick={() => navigate("/HomePage")}
@@ -281,6 +312,9 @@ const ProfilePage = () => {
           </div>
         )}
       </div>
+
+      {/* 👇 NAYA: HomePage jaisa bottom navigation */}
+      <BottomNav navigate={navigate} />
     </div>
   );
 };
