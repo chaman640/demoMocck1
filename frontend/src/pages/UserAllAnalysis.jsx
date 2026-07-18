@@ -24,51 +24,55 @@ const SkeletonBlock = ({ className = "" }) => (
 
 const AnalysisPageSkeleton = () => (
   <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
-    <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+    <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-5xl mx-auto border-b border-gray-800">
       <div className="flex items-center gap-2">
         <SkeletonBlock className="w-8 h-8 rounded" />
-        <SkeletonBlock className="w-32 h-5" />
+        <SkeletonBlock className="w-28 h-5" />
       </div>
-      <SkeletonBlock className="w-24 h-4" />
+      <SkeletonBlock className="w-20 h-4" />
     </nav>
 
-    <div className="max-w-5xl mx-auto px-6 mt-10 space-y-8">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-6 sm:mt-10 space-y-6">
       <div className="space-y-2">
-        <SkeletonBlock className="w-64 h-8" />
-        <SkeletonBlock className="w-48 h-4" />
+        <SkeletonBlock className="w-56 h-7" />
+        <SkeletonBlock className="w-44 h-4" />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-          <SkeletonBlock className="w-36 h-3 mb-3" />
-          <SkeletonBlock className="w-20 h-9" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6">
+          <SkeletonBlock className="w-32 h-3 mb-3" />
+          <SkeletonBlock className="w-16 h-7" />
         </div>
-        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
-          <SkeletonBlock className="w-36 h-3 mb-3" />
-          <SkeletonBlock className="w-20 h-9" />
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6">
+          <SkeletonBlock className="w-32 h-3 mb-3" />
+          <SkeletonBlock className="w-16 h-7" />
         </div>
       </div>
 
       <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-800">
-          <SkeletonBlock className="w-40 h-4 mb-2" />
-          <SkeletonBlock className="w-56 h-3" />
+        <div className="px-4 sm:px-6 py-4">
+          <SkeletonBlock className="w-36 h-4 mb-2" />
+          <SkeletonBlock className="w-52 h-3" />
         </div>
-        <div className="p-6 space-y-4">
+        <div className="divide-y divide-gray-800">
           {[1, 2, 3].map((i) => (
-            <SkeletonBlock key={i} className="w-full h-10" />
+            <div key={i} className="px-4 py-2.5">
+              <SkeletonBlock className="w-full h-9 rounded-lg" />
+            </div>
           ))}
         </div>
       </div>
 
       <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
-        <div className="px-6 py-5 border-b border-gray-800">
+        <div className="px-4 sm:px-6 py-4">
           <SkeletonBlock className="w-32 h-4 mb-2" />
-          <SkeletonBlock className="w-56 h-3" />
+          <SkeletonBlock className="w-52 h-3" />
         </div>
-        <div className="p-6 space-y-4">
+        <div className="divide-y divide-gray-800">
           {[1, 2, 3, 4].map((i) => (
-            <SkeletonBlock key={i} className="w-full h-9" />
+            <div key={i} className="px-4 py-2.5">
+              <SkeletonBlock className="w-full h-9 rounded-lg" />
+            </div>
           ))}
         </div>
       </div>
@@ -77,20 +81,20 @@ const AnalysisPageSkeleton = () => (
 );
 
 const MockDetailSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12">
     <div className="max-w-2xl mx-auto space-y-6">
-      <SkeletonBlock className="w-40 h-4" />
+      <SkeletonBlock className="w-36 h-4" />
       <div className="space-y-2">
-        <SkeletonBlock className="w-56 h-6" />
-        <SkeletonBlock className="w-32 h-3" />
+        <SkeletonBlock className="w-52 h-6" />
+        <SkeletonBlock className="w-28 h-3" />
       </div>
-      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 flex flex-col items-center gap-3">
-        <SkeletonBlock className="w-24 h-10" />
-        <SkeletonBlock className="w-40 h-3" />
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 sm:p-8 flex flex-col items-center gap-3">
+        <SkeletonBlock className="w-24 h-9" />
+        <SkeletonBlock className="w-36 h-3" />
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         {[1, 2, 3].map((i) => (
-          <SkeletonBlock key={i} className="h-20 rounded-xl" />
+          <SkeletonBlock key={i} className="h-16 sm:h-20 rounded-xl" />
         ))}
       </div>
       <SkeletonBlock className="w-full h-12 rounded-lg" />
@@ -99,13 +103,69 @@ const MockDetailSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Test History ke Level-1 filter tabs
+// Test History ke Level-1 filter tabs
 // ──────────────────────────────────────────────
 const MOCK_TYPE_FILTERS = [
   { key: "all", label: "All" },
   { key: "Full", label: "Full Mock" },
   { key: "Mini", label: "Mini Mock" },
 ];
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Subject Analysis ki ek tap-able row — table ki jagah
+// ──────────────────────────────────────────────
+const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
+  const accuracyClass =
+    subject.averageAccuracy >= 70
+      ? "text-green-400 bg-green-500/10"
+      : subject.averageAccuracy >= 40
+      ? "text-yellow-400 bg-yellow-500/10"
+      : "text-red-400 bg-red-500/10";
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[#1F2937]/50 transition-colors"
+    >
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-200 truncate">{subject.subjectName}</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">
+          {formatDuration(totalTimeSeconds)}
+          {questionCount != null && ` · ${questionCount}Q`}
+        </p>
+      </div>
+      <span className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${accuracyClass}`}>
+        {subject.averageAccuracy}%
+      </span>
+      <span className="flex-shrink-0 text-xs font-medium text-[#A78BFA]">&rarr;</span>
+    </button>
+  );
+};
+
+// ──────────────────────────────────────────────
+// 👇 NAYA: Test History ki ek tap-able row — table ki jagah
+// ──────────────────────────────────────────────
+const HistoryRow = ({ entry, onClick }) => (
+  <button
+    onClick={onClick}
+    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-[#1F2937]/50 transition-colors"
+  >
+    <div className="min-w-0 flex-1">
+      <p className="text-sm font-medium text-gray-200 truncate">{entry.blueprintName || "—"}</p>
+      <p className="text-[11px] text-gray-500 mt-0.5">
+        {new Date(entry.date).toLocaleString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })}
+      </p>
+    </div>
+    <span className="flex-shrink-0 text-sm font-bold text-white">{entry.score}</span>
+    <span className="flex-shrink-0 text-xs font-medium text-[#A78BFA]">&rarr;</span>
+  </button>
+);
 
 const UserAllAnalysis = () => {
   const navigate = useNavigate();
@@ -117,10 +177,10 @@ const UserAllAnalysis = () => {
   // Subject-wise question count, blueprint se aata hai
   const [subjectQuestionCounts, setSubjectQuestionCounts] = useState({});
 
-  // 👇 NAYA: Poori blueprint list — Test History ko Mini/Full + subject se filter karne ke liye
+  // Poori blueprint list — Test History ko Mini/Full + subject se filter karne ke liye
   const [blueprints, setBlueprints] = useState([]);
 
-  // 👇 NAYA: Test History ke filter states
+  // Test History ke filter states
   const [mockTypeFilter, setMockTypeFilter] = useState("all"); // "all" | "Full" | "Mini"
   const [miniSubjectFilter, setMiniSubjectFilter] = useState("all"); // "all" | subjectName
 
@@ -147,7 +207,7 @@ const UserAllAnalysis = () => {
         setOverview(overviewRes.data.data);
 
         const blueprintList = blueprintsRes.data.data || [];
-        setBlueprints(blueprintList); // 👈 NAYA
+        setBlueprints(blueprintList);
 
         // Har subject ka questionCount map bana lo (pehla blueprint jisme wo subject mile)
         const countMap = {};
@@ -174,7 +234,7 @@ const UserAllAnalysis = () => {
     return [...overview.graphData].reverse();
   }, [overview]);
 
-  // 👇 NAYA: blueprintName → { mockType, subjectNames } lookup map
+  // blueprintName → { mockType, subjectNames } lookup map
   const blueprintMetaMap = useMemo(() => {
     const map = {};
     blueprints.forEach((bp) => {
@@ -186,7 +246,7 @@ const UserAllAnalysis = () => {
     return map;
   }, [blueprints]);
 
-  // 👇 NAYA: Level-1 tabs ke counts — All / Full / Mini
+  // Level-1 tabs ke counts — All / Full / Mini
   const mockTypeCounts = useMemo(() => {
     const counts = { all: sortedHistory.length, Full: 0, Mini: 0 };
     sortedHistory.forEach((g) => {
@@ -197,8 +257,7 @@ const UserAllAnalysis = () => {
     return counts;
   }, [sortedHistory, blueprintMetaMap]);
 
-  // 👇 NAYA: Mini Mock attempts mein jitne bhi alag subjects aaye — dynamically nikalte hain
-  // (Hindi/GK/GS/Maths/Reasoning jo bhi asal blueprint data mein ho, hardcode nahi kiya)
+  // Mini Mock attempts mein jitne bhi alag subjects aaye — dynamically nikalte hain
   const miniSubjects = useMemo(() => {
     const set = new Set();
     sortedHistory.forEach((g) => {
@@ -210,7 +269,7 @@ const UserAllAnalysis = () => {
     return Array.from(set).sort();
   }, [sortedHistory, blueprintMetaMap]);
 
-  // 👇 NAYA: Level-2 (Mini ke andar subject) tabs ke counts
+  // Level-2 (Mini ke andar subject) tabs ke counts
   const miniSubjectCounts = useMemo(() => {
     const counts = { all: 0 };
     sortedHistory.forEach((g) => {
@@ -224,7 +283,7 @@ const UserAllAnalysis = () => {
     return counts;
   }, [sortedHistory, blueprintMetaMap]);
 
-  // 👇 NAYA: Dono filters ke hisaab se final list
+  // Dono filters ke hisaab se final list
   const filteredHistory = useMemo(() => {
     return sortedHistory.filter((g) => {
       const meta = blueprintMetaMap[g.blueprintName];
@@ -237,7 +296,7 @@ const UserAllAnalysis = () => {
     });
   }, [sortedHistory, blueprintMetaMap, mockTypeFilter, miniSubjectFilter]);
 
-  // 👇 NAYA: Level-1 tab badalte hi subject filter reset — stale combo na bache
+  // Level-1 tab badalte hi subject filter reset — stale combo na bache
   const selectMockType = (type) => {
     setMockTypeFilter(type);
     setMiniSubjectFilter("all");
@@ -249,8 +308,8 @@ const UserAllAnalysis = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
-        <div className="bg-[#111827] border border-red-500/30 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4">
+        <div className="bg-[#111827] border border-red-500/30 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
             !
           </div>
@@ -258,7 +317,7 @@ const UserAllAnalysis = () => {
           <p className="text-gray-400 mb-6 text-sm">{error}</p>
           <button 
             onClick={() => navigate('/Login')}
-            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
           >
             Login Page Par Jaayein
           </button>
@@ -269,8 +328,8 @@ const UserAllAnalysis = () => {
 
   if (!overview) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-6">
-        <div className="bg-[#111827] border border-gray-800 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4">
+        <div className="bg-[#111827] border border-gray-800 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -280,7 +339,7 @@ const UserAllAnalysis = () => {
           <p className="text-gray-400 mb-6 text-sm">Aapne abhi tak {examName} ka koi mock test nahi diya hai.</p>
           <button 
             onClick={() => navigate('/MockTest')}
-            className="px-6 py-2 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
+            className="w-full sm:w-auto px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium"
           >
             Test Dena Shuru Karein
           </button>
@@ -302,116 +361,93 @@ const UserAllAnalysis = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white pb-16">
       
       {/* Navbar */}
-      <nav className="flex items-center justify-between px-6 py-5 max-w-7xl mx-auto border-b border-gray-800">
+      <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-5xl mx-auto border-b border-gray-800">
         <div onClick={() => navigate('/HomePage')} className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm">
+          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm flex-shrink-0">
             mt
           </div>
-          <span className="text-xl font-semibold tracking-wide">mockTest.in</span>
+          <span className="text-base sm:text-xl font-semibold tracking-wide">mockTest.in</span>
         </div>
         <button 
           onClick={() => navigate('/HomePage')}
-          className="text-sm font-medium text-gray-400 hover:text-white transition-colors"
+          className="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors flex-shrink-0"
         >
-          &larr; Back to Home
+          &larr; Home
         </button>
       </nav>
 
       {/* Main Container */}
-      <div className="max-w-5xl mx-auto px-6 mt-10 space-y-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 mt-6 sm:mt-10 space-y-6">
         
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Your Detailed Analysis</h1>
-          <p className="text-gray-400 mt-2 text-sm">Based on your performance in <span className="text-[#A78BFA] font-medium">{examName}</span> mocks.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Detailed Analysis</h1>
+          <p className="text-gray-400 mt-1.5 text-sm">
+            <span className="text-[#A78BFA] font-medium">{examName}</span> mocks ke aapke performance ke hisaab se
+          </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
             <p className="text-sm text-gray-500 font-medium mb-1">Average Score (Last 3)</p>
-            <p className="text-4xl font-bold text-[#A78BFA]">{overview.averageScore}%</p>
+            <p className="text-3xl sm:text-4xl font-bold text-[#A78BFA]">{overview.averageScore}%</p>
           </div>
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 shadow-lg">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
             <p className="text-sm text-gray-500 font-medium mb-1">Total Mocks Attempted</p>
-            <p className="text-4xl font-bold text-white">{overview.totalTestsGiven}</p>
+            <p className="text-3xl sm:text-4xl font-bold text-white">{overview.totalTestsGiven}</p>
           </div>
         </div>
 
-        {/* Subject-wise Analysis Table */}
+        {/* Subject-wise Analysis — ab tap-able rows, table nahi */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
-          <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
-            <h3 className="font-semibold text-lg">Subject Analysis</h3>
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
+            <h3 className="font-semibold text-base sm:text-lg">Subject Analysis</h3>
             <p className="text-xs text-gray-500 mt-1">Last 3 mocks ka average data</p>
           </div>
           
           {overview.subjectAnalysis?.length === 0 ? (
-            <div className="p-8 text-center text-yellow-500 bg-yellow-500/5">
+            <div className="p-6 text-center text-yellow-500 bg-yellow-500/5 text-sm">
               Subject analysis data khali hai. Apne agle mock ke baad check karein.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-6 py-4 font-medium">Subject Name</th>
-                    <th className="px-6 py-4 font-medium">Avg. Accuracy</th>
-                    <th className="px-6 py-4 font-medium">Total Time (Subject)</th>
-                    <th className="px-6 py-4 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {overview.subjectAnalysis?.map((s, i) => {
-                    const qCount = subjectQuestionCounts[s.subjectName];
-                    const totalTimeSeconds =
-                      qCount != null ? s.averageTimePerQuestion * qCount : null;
+            <div className="divide-y divide-gray-800">
+              {overview.subjectAnalysis?.map((s, i) => {
+                const qCount = subjectQuestionCounts[s.subjectName];
+                const totalTimeSeconds =
+                  qCount != null ? s.averageTimePerQuestion * qCount : null;
 
-                    return (
-                      <tr key={i} className="hover:bg-[#1F2937]/50 transition-colors">
-                        <td className="px-6 py-4 text-sm font-medium text-gray-200">{s.subjectName}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${s.averageAccuracy >= 70 ? 'bg-green-500/10 text-green-400' : s.averageAccuracy >= 40 ? 'bg-yellow-500/10 text-yellow-400' : 'bg-red-500/10 text-red-400'}`}>
-                            {s.averageAccuracy}%
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
-                          {formatDuration(totalTimeSeconds)}
-                          {qCount != null && (
-                            <span className="text-gray-600 text-xs ml-1">({qCount}Q)</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-400">
-                          <button 
-                            onClick={() => navigate('/UserSubjectAnallysis', { 
-                              state: { subjectName: s.subjectName, examName: examName } 
-                            })}
-                            className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs flex items-center gap-1"
-                          >
-                            View Deep &rarr;
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                return (
+                  <SubjectRow
+                    key={i}
+                    subject={s}
+                    totalTimeSeconds={totalTimeSeconds}
+                    questionCount={qCount}
+                    onClick={() =>
+                      navigate('/UserSubjectAnallysis', {
+                        state: { subjectName: s.subjectName, examName: examName },
+                      })
+                    }
+                  />
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Mock History — Mini/Full + subject filters ke sath, latest-first, clickable */}
+        {/* Mock History — ab tap-able rows, Mini/Full + subject filters ke sath */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
-          <div className="px-6 py-5 border-b border-gray-800 bg-[#1F2937]/30">
-            <h3 className="font-semibold text-lg">Test History</h3>
-            <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par click karke uska poora result dekhein</p>
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
+            <h3 className="font-semibold text-base sm:text-lg">Test History</h3>
+            <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par tap karke uska poora result dekhein</p>
           </div>
 
-          {/* 👇 NAYA: Level-1 filter — All / Full Mock / Mini Mock */}
-          <div className="px-6 pt-5 pb-4 border-b border-gray-800 space-y-3">
+          {/* Level-1 filter — All / Full Mock / Mini Mock */}
+          <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-800 space-y-3">
             <div className="flex gap-2 overflow-x-auto pb-1">
               {MOCK_TYPE_FILTERS.map((f) => (
                 <button
                   key={f.key}
                   onClick={() => selectMockType(f.key)}
-                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
                     mockTypeFilter === f.key
                       ? "bg-[#7C3AED] text-white"
                       : "bg-[#1F2937] border border-gray-800 text-gray-400 hover:text-gray-200"
@@ -422,12 +458,12 @@ const UserAllAnalysis = () => {
               ))}
             </div>
 
-            {/* 👇 NAYA: Level-2 filter — sirf Mini Mock ke andar, subject-wise */}
+            {/* Level-2 filter — sirf Mini Mock ke andar, subject-wise */}
             {mockTypeFilter === "Mini" && miniSubjects.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 <button
                   onClick={() => setMiniSubjectFilter("all")}
-                  className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                  className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${
                     miniSubjectFilter === "all"
                       ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
                       : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
@@ -439,7 +475,7 @@ const UserAllAnalysis = () => {
                   <button
                     key={subj}
                     onClick={() => setMiniSubjectFilter(subj)}
-                    className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors ${
+                    className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${
                       miniSubjectFilter === subj
                         ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40"
                         : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"
@@ -453,49 +489,18 @@ const UserAllAnalysis = () => {
           </div>
 
           {filteredHistory.length === 0 ? (
-            <p className="px-6 py-10 text-sm text-gray-400 text-center">
+            <p className="px-4 sm:px-6 py-8 text-sm text-gray-400 text-center">
               Is category mein koi mock nahi mila.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[#1A2235] text-gray-400 text-xs uppercase tracking-wider">
-                    <th className="px-6 py-4 font-medium">Date &amp; Time</th>
-                    <th className="px-6 py-4 font-medium">Mock</th>
-                    <th className="px-6 py-4 font-medium">Score</th>
-                    <th className="px-6 py-4 font-medium text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-800">
-                  {filteredHistory.map((g) => (
-                    <tr
-                      key={g.performanceId}
-                      onClick={() => setViewingMockId(g.performanceId)}
-                      className="hover:bg-[#1F2937]/50 transition-colors cursor-pointer"
-                    >
-                      <td className="px-6 py-4 text-sm text-gray-300">
-                        {new Date(g.date).toLocaleString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-400 max-w-[180px] truncate">
-                        {g.blueprintName || "—"}
-                      </td>
-                      <td className="px-6 py-4 text-sm font-bold text-white">{g.score}</td>
-                      <td className="px-6 py-4 text-sm text-right">
-                        <span className="text-[#8B5CF6] hover:text-white transition-colors font-medium text-xs">
-                          View Result &rarr;
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="divide-y divide-gray-800">
+              {filteredHistory.map((g) => (
+                <HistoryRow
+                  key={g.performanceId}
+                  entry={g}
+                  onClick={() => setViewingMockId(g.performanceId)}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -572,8 +577,8 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-        <div className="max-w-md text-center space-y-4">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-4">
+        <div className="max-w-md w-full text-center space-y-4">
           <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
           <button
             onClick={onBack}
@@ -590,11 +595,11 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   if (statusFilter) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
+      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-6 sm:py-8">
         <div className="max-w-3xl mx-auto">
           <button
             onClick={closeReview}
-            className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+            className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1"
           >
             &larr; Result par wapas jaayein
           </button>
@@ -605,7 +610,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
             <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
               <button
                 onClick={() => { setSubjectFilter("all"); setIndex(0); }}
-                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
                   subjectFilter === "all"
                     ? "bg-[#7C3AED] text-white"
                     : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
@@ -617,7 +622,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
                 <button
                   key={s}
                   onClick={() => { setSubjectFilter(s); setIndex(0); }}
-                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
                     subjectFilter === s
                       ? "bg-[#7C3AED] text-white"
                       : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
@@ -629,12 +634,12 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
             </div>
           )}
 
-          <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+          <div className="flex gap-2 mb-5 sm:mb-6 overflow-x-auto pb-1">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f.key}
                 onClick={() => { setStatusFilter(f.key); setIndex(0); }}
-                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors ${
+                className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${
                   statusFilter === f.key
                     ? "bg-[#7C3AED] text-white"
                     : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
@@ -682,43 +687,43 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12">
       <div className="max-w-2xl mx-auto">
         <button
           onClick={onBack}
-          className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
+          className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1"
         >
           &larr; Test History par wapas jaayein
         </button>
 
-        <h1 className="text-2xl font-bold mb-1">{overview.blueprintName}</h1>
-        <p className="text-gray-400 text-sm mb-8">{overview.examName}</p>
+        <h1 className="text-xl sm:text-2xl font-bold mb-1">{overview.blueprintName}</h1>
+        <p className="text-gray-400 text-sm mb-6 sm:mb-8">{overview.examName}</p>
 
-        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-6">
-          <p className="text-5xl font-bold text-[#A78BFA]">{overview.totalScore}</p>
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 sm:p-8 text-center mb-6">
+          <p className="text-4xl sm:text-5xl font-bold text-[#A78BFA]">{overview.totalScore}</p>
           <p className="text-sm text-gray-500 mt-1">Total Score &middot; {overview.accuracy}% Accuracy</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-8">
+        <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
           <button
             onClick={() => openReview("correct")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-green-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 hover:border-green-500/50 rounded-xl p-3 sm:p-4 text-center transition-colors"
           >
-            <p className="text-xl font-bold text-green-400">{overview.correct}</p>
+            <p className="text-lg sm:text-xl font-bold text-green-400">{overview.correct}</p>
             <p className="text-[11px] text-gray-500 mt-1">Correct</p>
           </button>
           <button
             onClick={() => openReview("wrong")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-red-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 hover:border-red-500/50 rounded-xl p-3 sm:p-4 text-center transition-colors"
           >
-            <p className="text-xl font-bold text-red-400">{overview.wrong}</p>
+            <p className="text-lg sm:text-xl font-bold text-red-400">{overview.wrong}</p>
             <p className="text-[11px] text-gray-500 mt-1">Wrong</p>
           </button>
           <button
             onClick={() => openReview("unattempted")}
-            className="bg-[#1F2937] border border-gray-800 hover:border-gray-500/50 rounded-xl p-4 text-center transition-colors"
+            className="bg-[#1F2937] border border-gray-800 hover:border-gray-500/50 rounded-xl p-3 sm:p-4 text-center transition-colors"
           >
-            <p className="text-xl font-bold text-gray-300">{overview.unattempted}</p>
+            <p className="text-lg sm:text-xl font-bold text-gray-300">{overview.unattempted}</p>
             <p className="text-[11px] text-gray-500 mt-1">Unattempted</p>
           </button>
         </div>
@@ -748,7 +753,7 @@ const QuestionDetailCard = ({ q }) => {
       : "text-gray-400 bg-gray-500/10 border-gray-500/30";
 
   return (
-    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4 gap-3">
         <span className="text-xs text-gray-500">{q.topicName}</span>
         <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
