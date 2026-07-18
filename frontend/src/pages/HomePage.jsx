@@ -3,8 +3,80 @@ import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 
+// ─────────────────────────────────────────────
+// Skeleton building blocks — baaki app mein jaisa pattern hai
+// ─────────────────────────────────────────────
+const SkeletonBlock = ({ className = "" }) => (
+  <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
+);
+
+// 👇 NAYA: Poore HomePage ka skeleton — spinner ki jagah
+const HomePageSkeleton = () => (
+  <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
+    {/* Header */}
+    <header className="flex items-center px-4 py-3.5 border-b border-gray-800">
+      <SkeletonBlock className="w-8 h-8 rounded-lg" />
+      <SkeletonBlock className="ml-2.5 w-28 h-4" />
+    </header>
+
+    <main className="px-4 py-5 max-w-lg mx-auto">
+      {/* Welcome */}
+      <section className="mb-5 space-y-2.5">
+        <SkeletonBlock className="w-52 h-7" />
+        <SkeletonBlock className="w-40 h-7" />
+        <SkeletonBlock className="w-60 h-4 mt-1" />
+      </section>
+
+      {/* Score Card */}
+      <section className="mb-5 rounded-2xl p-5 bg-[#111827] border border-gray-800 flex flex-col items-center">
+        <SkeletonBlock className="w-36 h-3 mb-3" />
+        <SkeletonBlock className="w-24 h-10 mb-2" />
+        <SkeletonBlock className="w-32 h-3 mb-4" />
+        <SkeletonBlock className="w-28 h-7 rounded-full" />
+      </section>
+
+      {/* Quick Actions row */}
+      <section className="mb-5">
+        <SkeletonBlock className="w-20 h-3 mb-2.5" />
+        <div className="flex gap-2">
+          <SkeletonBlock className="w-32 h-12 rounded-xl flex-shrink-0" />
+          <SkeletonBlock className="w-32 h-12 rounded-xl flex-shrink-0" />
+        </div>
+      </section>
+
+      {/* Main Actions grid */}
+      <section className="mb-5">
+        <SkeletonBlock className="w-24 h-3 mb-2.5" />
+        <div className="grid grid-cols-2 gap-2.5">
+          {[1, 2, 3, 4].map((i) => (
+            <SkeletonBlock key={i} className="h-24 rounded-2xl" />
+          ))}
+        </div>
+      </section>
+
+      {/* Rank Predictor placeholder */}
+      <section className="rounded-2xl p-4 bg-[#111827] border border-gray-800">
+        <SkeletonBlock className="w-28 h-4 mb-3" />
+        <SkeletonBlock className="w-40 h-7" />
+      </section>
+    </main>
+
+    {/* Bottom Nav */}
+    <nav className="fixed bottom-0 left-0 right-0 h-14 bg-[#0A0D14]/95 backdrop-blur-lg border-t border-gray-800 flex justify-around items-center z-50">
+      {[1, 2, 3, 4].map((i) => (
+        <SkeletonBlock key={i} className="w-6 h-6 rounded" />
+      ))}
+    </nav>
+  </div>
+);
+
 const HomePage = () => {
   const navigate = useNavigate();
+
+  // 👇 NAYA: 30 second staleTime — is duration ke andar agar user wapas
+  // Home page pe aata hai, to cache se turant purana data dikhega,
+  // dobara loading/spinner nahi dikhega. 30s ke baad background mein
+  // refresh ho jayega (data dikhte hue hi).
 
   // User data
   const { data: user, isLoading: userLoading, isError: userError } = useQuery({
@@ -13,6 +85,7 @@ const HomePage = () => {
       const res = await api.get("/me");
       return res.data.data;
     },
+    staleTime: 30 * 1000,
     retry: false,
   });
 
@@ -30,6 +103,7 @@ const HomePage = () => {
       return res.data.data;
     },
     enabled: !!examName,
+    staleTime: 30 * 1000,
     retry: false,
   });
 
@@ -44,6 +118,7 @@ const HomePage = () => {
       return res.data;
     },
     enabled: !!examName,
+    staleTime: 30 * 1000,
     retry: false,
   });
 
@@ -57,14 +132,13 @@ const HomePage = () => {
       return res.data.data;
     },
     enabled: !!examName && averageScore !== null && !!rankData,
+    staleTime: 30 * 1000,
     retry: false,
   });
 
   const isLoading = userLoading || overviewLoading;
 
-  // 👇 UPDATED: Quick actions row — Challenge yahan se hata diya (ab bade
-  // grid mein hai), uski jagah Current Affairs daal diya. Mini Mock bhi
-  // yahan se hata diya (ab bade grid mein Full Mock jaisa card hai).
+  // Quick actions — swipe row mein dikhne wale
   const quickActions = [
     {
       icon: "📰",
@@ -80,10 +154,7 @@ const HomePage = () => {
     },
   ];
 
-  // 👇 UPDATED: Main grid — Mini Mock add hua (Full Mock jaisa hi primary
-  // style), Current Affairs yahan se hata diya, uski jagah Challenge aaya
-  // (Prev. Papers jaisa secondary style, kyunki sirf dono mock-modes ko
-  // primary-highlight diya hai).
+  // Main grid — bade buttons
   const mainActions = [
     {
       icon: "📝",
@@ -115,7 +186,6 @@ const HomePage = () => {
     },
   ];
 
-  // 👇 UPDATED: Analysis add hui Test aur Profile ke saath
   const navItems = [
     { label: "Home", active: true, icon: "home" },
     { label: "Test", icon: "test", onClick: () => navigate('/MockTest') },
@@ -123,15 +193,9 @@ const HomePage = () => {
     { label: "Profile", icon: "profile", onClick: () => navigate('/ProfilePage') },
   ];
 
+  // 👇 UPDATED: spinner ki jagah ab skeleton layout dikhega
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Loading...</p>
-        </div>
-      </div>
-    );
+    return <HomePageSkeleton />;
   }
 
   return (
