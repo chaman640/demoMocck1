@@ -83,7 +83,7 @@ const Singup = () => {
       });
 
       if (response.data.success) {
-        navigate('/');
+        navigate('/MockTest');
       }
     } catch (err) {
       const errorMessage = err.response?.data?.message || "Signup mein gadbadi hui.";

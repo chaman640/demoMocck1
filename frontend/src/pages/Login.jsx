@@ -59,7 +59,7 @@ const Login = () => {
       if (response.data.success) {
         setToastMsg("Login Successful! Redirecting...");
         setTimeout(() => {
-          navigate('/');
+          navigate('/MockTest');
         }, 1500);
       }
     } catch (err) {
