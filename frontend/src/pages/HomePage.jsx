@@ -108,6 +108,7 @@ const HomePage = () => {
   });
 
   const averageScore = overview?.averageScore ?? null;
+  const averageScoreOutOf = overview?.averageScoreOutOf ?? null; // 👈 NAYA
   const totalTests = overview?.totalTestsGiven ?? 0;
 
   // Rank predictor
@@ -231,7 +232,11 @@ const HomePage = () => {
             Aapka Average Score
           </p>
           <p className="text-[44px] font-extrabold text-white mb-1 relative z-10 leading-none">
-            {averageScore !== null ? `${averageScore}%` : "--"}
+            {averageScore === null
+              ? "--"
+              : averageScoreOutOf
+              ? `${averageScore}/${averageScoreOutOf}`
+              : averageScore}
           </p>
           <p className="text-xs text-[#C4B5FD] mb-3 relative z-10">
             {totalTests > 0 ? `${totalTests} test diye hain` : "Abhi koi test nahi diya"}
@@ -309,7 +314,7 @@ const HomePage = () => {
                   #{autoRank.rankRangeLow?.toLocaleString("en-IN")} – {autoRank.rankRangeHigh?.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  Aapke {averageScore}% score ke hisaab se
+                  Aapke {averageScoreOutOf ? `${averageScore}/${averageScoreOutOf}` : averageScore} score ke hisaab se
                 </p>
                 {autoRank.selectionChance && (
                   <p className={`text-[11px] mt-1.5 font-medium ${

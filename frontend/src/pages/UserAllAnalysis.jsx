@@ -112,7 +112,7 @@ const MOCK_TYPE_FILTERS = [
 ];
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Subject Analysis ki ek tap-able row — table ki jagah
+// Subject Analysis ki ek tap-able row — table ki jagah
 // ──────────────────────────────────────────────
 const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
   const accuracyClass =
@@ -121,6 +121,11 @@ const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
       : subject.averageAccuracy >= 40
       ? "text-yellow-400 bg-yellow-500/10"
       : "text-red-400 bg-red-500/10";
+
+  // 👇 NAYA: % ki jagah fixed number — accuracy % ko is subject ke
+  // total questions (blueprint se) se multiply karke "correct/total" banaya
+  const correctOutOf =
+    questionCount != null ? Math.round((subject.averageAccuracy / 100) * questionCount) : null;
 
   return (
     <button
@@ -135,7 +140,7 @@ const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
         </p>
       </div>
       <span className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${accuracyClass}`}>
-        {subject.averageAccuracy}%
+        {correctOutOf != null ? `${correctOutOf}/${questionCount}` : `${subject.averageAccuracy}%`}
       </span>
       <span className="flex-shrink-0 text-xs font-medium text-[#A78BFA]">&rarr;</span>
     </button>
@@ -143,7 +148,7 @@ const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
 };
 
 // ──────────────────────────────────────────────
-// 👇 NAYA: Test History ki ek tap-able row — table ki jagah
+// Test History ki ek tap-able row — table ki jagah
 // ──────────────────────────────────────────────
 const HistoryRow = ({ entry, onClick }) => (
   <button
@@ -389,7 +394,11 @@ const UserAllAnalysis = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
             <p className="text-sm text-gray-500 font-medium mb-1">Average Score (Last 3)</p>
-            <p className="text-3xl sm:text-4xl font-bold text-[#A78BFA]">{overview.averageScore}%</p>
+            <p className="text-3xl sm:text-4xl font-bold text-[#A78BFA]">
+              {overview.averageScoreOutOf
+                ? `${overview.averageScore}/${overview.averageScoreOutOf}`
+                : overview.averageScore}
+            </p>
           </div>
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 sm:p-6 shadow-lg">
             <p className="text-sm text-gray-500 font-medium mb-1">Total Mocks Attempted</p>

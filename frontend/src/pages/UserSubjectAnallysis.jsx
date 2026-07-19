@@ -83,9 +83,11 @@ const SubjectAnalysisSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 👇 UPDATED: Topic name aur efficiency badge ab ek hi line pe —
-// row patli ho gayi hai, isliye ek screen pe zyada rows fit ho
-// jaate hain bina scroll kiye
+// 👇 UPDATED: efficiency % ki jagah ab "correct/attempted" fixed number.
+// topicList ke items mein correctCount/totalAttempted seedha backend se
+// aata hai. weakTopics mein ye fields nahi aate — unke liye topic ke naam
+// se topicList se lookup karke merge kiya jaata hai (parent component mein).
+// Agar kabhi stats na milein to purana % fallback ke tor pe dikh jayega.
 // ──────────────────────────────────────────────
 const TopicRow = ({ topic, tone = "default", onClick }) => {
   const efficiencyClass =
@@ -108,7 +110,9 @@ const TopicRow = ({ topic, tone = "default", onClick }) => {
       <span
         className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold ${efficiencyClass}`}
       >
-        {topic.efficiency}%
+        {topic.totalAttempted != null
+          ? `${topic.correctCount}/${topic.totalAttempted}`
+          : `${topic.efficiency}%`}
       </span>
       <span
         className={`flex-shrink-0 text-xs font-medium ${
@@ -176,6 +180,17 @@ const UserSubjectAnallysis = () => {
     const totalAttempts = data.topicList.reduce((sum, t) => sum + (t.totalAttempted || 0), 0);
     const questionsPerMock = totalAttempts / data.totalTestsConsidered;
     return data.averageTimePerQuestion * questionsPerMock;
+  }, [data]);
+
+  // 👇 NAYA: topicName → {correctCount, totalAttempted} lookup — weakTopics
+  // mein ye fields backend se nahi aate, isliye topicList se nikal ke,
+  // render karte waqt merge karte hain (koi backend change nahi kiya)
+  const topicStatsMap = useMemo(() => {
+    const map = {};
+    (data?.topicList || []).forEach((t) => {
+      map[t.topicName] = { correctCount: t.correctCount, totalAttempted: t.totalAttempted };
+    });
+    return map;
   }, [data]);
 
   const goToTopic = (topicName) => {
@@ -302,7 +317,7 @@ const UserSubjectAnallysis = () => {
               {data.weakTopics?.map((t, i) => (
                 <TopicRow
                   key={i}
-                  topic={t}
+                  topic={{ ...t, ...(topicStatsMap[t.topicName] || {}) }}
                   tone="weak"
                   onClick={() => goToTopic(t.topicName)}
                 />
