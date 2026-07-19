@@ -2,10 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
-// top imports mein
-import BottomNav from "../components/BottomNav";
 
-// file ke neeche jo "const BottomNav = (...) => (...)" wala block tha, use PURA delete kar do
 // ──────────────────────────────────────────────
 // Seconds ko readable "Xm Ys" format me convert karta hai
 // ──────────────────────────────────────────────
@@ -816,7 +813,7 @@ const QuestionDetailCard = ({ q }) => {
           <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
         </div>
       )}
-       <BottomNav />
+      
     </div>
   );
 };
