@@ -2,7 +2,10 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+// 👆 top imports mein add karo
+import BottomNav from "../components/BottomNav";
 
+// ... HomePage function ke andar, navItems array aur uska use pura hata do ...
 // ─────────────────────────────────────────────
 // Skeleton building blocks — baaki app mein jaisa pattern hai
 // ─────────────────────────────────────────────
@@ -334,9 +337,7 @@ const HomePage = () => {
       </main>
 
       {/* Bottom Navigation */}
-       <nav className="fixed bottom-0 left-0 right-0 h-14 ...">
-        {navItems.map((item) => ( ... ))}
-      </nav>
+      <BottomNav />
     </div>
   );
 };
