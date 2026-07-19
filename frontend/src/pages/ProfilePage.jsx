@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import BottomNav from "../components/BottomNav";
+
+
+
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -408,8 +412,7 @@ const ProfilePage = () => {
         )}
       </div>
 
-      {/* 👇 UPDATED: 4-button bottom nav with Home */}
-      <BottomNav navigate={navigate} activePage="profile" />
+      <BottomNav />
     </div>
   );
 };
