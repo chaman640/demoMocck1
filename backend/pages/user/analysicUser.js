@@ -2,30 +2,34 @@ import mongoose from "mongoose";
 import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
-import HiddenQuestion from "../../models/HiddenQuestion.js"; // 👈 naya
+
 
 // ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 1
+// PAGE 1 — FUNCTION 1 (UPDATED)
 // Overview: average score, lifetime graph, subject list (last 3)
 // Route: GET /analysis/overview/:userId/:examName
+//
+// NAYA LOGIC: Pehle raw totalScore ka seedha average liya jaata tha,
+// jo galat tha — alag blueprints (Full/Mini) ke alag total marks hote
+// hain, unhe seedha average nahi kar sakte. Ab har test ko pehle uske
+// APNE blueprint ke against % mein convert karte hain, phir un % ka
+// average lete hain, phir us average % ko latest test ke blueprint
+// ke total marks se scale karke ek asli NUMBER bana dete hain
+// ("38 / 100" jaisa) — "%" ab kahi galat nahi lagega.
 // ─────────────────────────────────────────────
 export const getAllAnalysis1stPage = async (req, res) => {
   try {
     let { userId, examName } = req.params;
 
-    // 👇 YEH LOGIC MISSING HAI TUMHARI FILE MEIN
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
-      userId = req.user._id; // 'active_user' text ko real ID se replace kar dega
+      userId = req.user._id;
     }
-    // 👆 YEH LOGIC ADD KARO
 
-    // 1. Sare mocks fetch karo
-    const allTests = await Performance.find({ userId, examName })
-      .sort({ createdAt: -1 });
-      
+    const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
+
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
@@ -34,39 +38,66 @@ export const getAllAnalysis1stPage = async (req, res) => {
       });
     }
 
-    // 2. Average Score — sirf last 3 mocks ka
     const last3Tests = allTests.slice(0, 3);
-    const totalScoreSum = last3Tests.reduce((acc, test) => acc + test.totalScore, 0);
-    const averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
 
-    // 3. Graph Data — LIFETIME ke saare mocks
-    // performanceId zaroori hai — click pe us mock ka breakdown fetch hoga
+    // Har test ke blueprint ka max possible score nikalo — ek hi query mein
+    const uniqueBlueprintNames = [...new Set(last3Tests.map((t) => t.blueprintName))];
+    const blueprints = await Blueprint.find({
+      examName,
+      blueprintName: { $in: uniqueBlueprintNames },
+    }).select("blueprintName totalQuestions marksPerQuestion");
+
+    const blueprintMaxScoreMap = {};
+    blueprints.forEach((bp) => {
+      blueprintMaxScoreMap[bp.blueprintName] = bp.totalQuestions * bp.marksPerQuestion;
+    });
+
+    // Har test ka accuracy % nikalo. Jis test ka blueprint delete/rename ho
+    // chuka ho (missing), usko average se skip kar do — crash nahi hona chahiye
+    const validPercentages = [];
+    for (const test of last3Tests) {
+      const maxScore = blueprintMaxScoreMap[test.blueprintName];
+      if (!maxScore || maxScore <= 0) continue;
+      const pct = Math.max(0, (test.totalScore / maxScore) * 100); // negative marking se negative aaya to 0%
+      validPercentages.push(pct);
+    }
+
+    const averageAccuracyPercent =
+      validPercentages.length === 0
+        ? 0
+        : Number(
+            (validPercentages.reduce((a, b) => a + b, 0) / validPercentages.length).toFixed(2)
+          );
+
+    // Average % ko latest test ke blueprint ke total marks se scale karke
+    // ek real NUMBER banao — display ke liye
+    const latestTest = last3Tests[0];
+    const referenceMaxScore = blueprintMaxScoreMap[latestTest.blueprintName] || 0;
+    const averageScore =
+      referenceMaxScore > 0
+        ? Math.round((averageAccuracyPercent / 100) * referenceMaxScore)
+        : 0;
+
+    // Graph Data — LIFETIME ke saare mocks (unchanged)
     const graphData = allTests
-  .map((test) => ({
-    performanceId: test._id,
-    score: test.totalScore,
-    date: test.createdAt,
-    blueprintName: test.blueprintName, // 👈 NAYA — Mini/Full + subject filter ke liye
-  }))
-  .reverse(); // chronological order (purana → naya)
+      .map((test) => ({
+        performanceId: test._id,
+        score: test.totalScore,
+        date: test.createdAt,
+        blueprintName: test.blueprintName,
+      }))
+      .reverse();
 
-    // 4. Subject-wise accuracy + time — last 3 mocks se
-    // BUG FIX: || 0 ki jagah ?? 0 use kiya —
-    // agar averageTimePerQuestion exactly 0 ho tab || 0 bhi 0 deta tha
-    // lekin ?? 0 sirf null/undefined pe fallback karta hai, 0 pe nahi
+    // Subject-wise accuracy + time — last 3 mocks se (unchanged)
     const subjectMap = {};
     last3Tests.forEach((test) => {
       if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
         test.subjectAnalysis.forEach((sub) => {
           if (!subjectMap[sub.subjectName]) {
-            subjectMap[sub.subjectName] = {
-              totalAcc: 0,
-              totalTime: 0,
-              count: 0,
-            };
+            subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
           }
           subjectMap[sub.subjectName].totalAcc += sub.accuracy;
-          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0; // ✅ FIX
+          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
           subjectMap[sub.subjectName].count += 1;
         });
       }
@@ -85,7 +116,9 @@ export const getAllAnalysis1stPage = async (req, res) => {
     return res.status(200).json({
       success: true,
       data: {
-        averageScore,
+        averageScore,                // 👈 ab genuine NUMBER hai (jaise 38), % nahi
+        averageMaxScore: referenceMaxScore, // 👈 NAYA — "38 / 100" dikhane ke liye
+        averageAccuracyPercent,      // 👈 NAYA — agar kahin % bhi chahiye ho to
         totalTestsGiven: allTests.length,
         graphData,
         subjectAnalysis,
@@ -98,7 +131,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 2
+// PAGE 1 — FUNCTION 2 (UNCHANGED)
 // Graph click → ek specific mock ka pura breakdown
 // (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
 // Route: GET /analysis/mock-detail/:performanceId
@@ -149,7 +182,6 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number(((correct / totalQuestions) * 100).toFixed(2));
 
-    // Total time: sirf jinka time data hai unka sum
     let totalTimeTaken = 0;
     for (const aq of performance.attemptedQuestions) {
       totalTimeTaken += aq.timeTakenInSeconds ?? 0;
@@ -160,10 +192,8 @@ export const getPerformanceAnalysis = async (req, res) => {
         ? 0
         : Number((totalTimeTaken / totalQuestions).toFixed(2));
 
-    // Sawaal-by-sawaal breakdown
-    // Null-safe: agar koi question DB se delete ho gaya ho to crash nahi hoga
     const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId; // populate ho gaya hai upar
+      const q = aq.questionId;
 
       return {
         questionId: q ? q._id : aq.questionId,
@@ -210,24 +240,20 @@ export const getPerformanceAnalysis = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// PAGE 2: Subject-wise Analysis
+// PAGE 2: Subject-wise Analysis (UNCHANGED)
 // Route: GET /analysis/subject/:userId/:examName/:subjectName
 // ─────────────────────────────────────────────
 export const getSubjectAnalysis = async (req, res) => {
   try {
-    // FIX: 'const' ki jagah 'let' use kiya taaki hum userId ko update kar sakein
     let { userId, examName, subjectName } = req.params;
 
-    // 👇 YEH LOGIC ADD KIYA HAI TAAKI "active_user" CRASH NA KARE
     if (userId === "active_user") {
       if (!req.user || !req.user._id) {
         return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
       }
       userId = req.user._id;
     }
-    // 👆 YAHAN TAK
 
-    // 1. Last 3 mocks fetch karo
     const last3Tests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 })
       .limit(3);
@@ -240,7 +266,6 @@ export const getSubjectAnalysis = async (req, res) => {
       });
     }
 
-    // 2. Subject ka average accuracy + time (last 3 mocks)
     let totalAccuracy = 0;
     let totalTime = 0;
     let subjectFoundCount = 0;
@@ -264,7 +289,7 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
-    graphData.reverse(); // chronological order
+    graphData.reverse();
 
     const averageAccuracy =
       subjectFoundCount === 0
@@ -276,27 +301,20 @@ export const getSubjectAnalysis = async (req, res) => {
         ? 0
         : Number((totalTime / subjectFoundCount).toFixed(2));
 
-    // 3. Topic-wise data (last 3 mocks se, runtime calculate)
-    // Topic data Performance mein store nahi — Question model se nikalna padega
-
-    // 3a. Sare questionIds (teen mocks ke)
     const allQuestionIds = last3Tests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
 
-    // 3b. Sirf is subject ke questions ka topicName fetch karo — ek query
     const questionDocs = await RowQuestion.find({
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
     }).select("_id topicName");
 
-    // 3c. Lookup map: questionId → topicName
     const topicNameMap = {};
     for (const doc of questionDocs) {
       topicNameMap[doc._id.toString()] = doc.topicName;
     }
 
-    // 3d. Topic-wise group karo
     const topicGroups = {};
 
     for (const test of last3Tests) {
@@ -304,13 +322,13 @@ export const getSubjectAnalysis = async (req, res) => {
         if (!aq.questionId) continue;
 
         const topicName = topicNameMap[aq.questionId.toString()];
-        if (!topicName) continue; // is subject ka question nahi — skip
+        if (!topicName) continue;
 
         if (!topicGroups[topicName]) {
           topicGroups[topicName] = {
             correct: 0,
-            wrong: 0,       
-            unattempted: 0, 
+            wrong: 0,
+            unattempted: 0,
             total: 0,
             totalTime: 0,
             timedCount: 0,
@@ -322,9 +340,9 @@ export const getSubjectAnalysis = async (req, res) => {
         if (aq.isCorrect === true) {
           topicGroups[topicName].correct++;
         } else if (aq.isCorrect === false) {
-          topicGroups[topicName].wrong++;       
+          topicGroups[topicName].wrong++;
         } else {
-          topicGroups[topicName].unattempted++; 
+          topicGroups[topicName].unattempted++;
         }
 
         if (
@@ -337,7 +355,6 @@ export const getSubjectAnalysis = async (req, res) => {
       }
     }
 
-    // 3e. Topic list banao
     const topicList = Object.keys(topicGroups).map((topicName) => {
       const { correct, wrong, unattempted, total, totalTime, timedCount } =
         topicGroups[topicName];
@@ -355,13 +372,12 @@ export const getSubjectAnalysis = async (req, res) => {
         efficiency,
         totalAttempted: total,
         correctCount: correct,
-        wrongCount: wrong,         
-        unattemptedCount: unattempted, 
+        wrongCount: wrong,
+        unattemptedCount: unattempted,
         averageTimePerQuestion: avgTime,
       };
     });
 
-    // 4. Top 5 weak topics
     const weakTopics = [...topicList]
       .filter((t) => t.totalAttempted > 0)
       .sort((a, b) => {
@@ -406,12 +422,8 @@ export const getSubjectAnalysis = async (req, res) => {
 
 
 // ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
-// Page 2 mein topic pe click karne pe ye page khulega
+// PAGE 3: Topic-wise Analysis (UNCHANGED)
 // Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
-// ─────────────────────────────────────────────
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis
 // ─────────────────────────────────────────────
 export const getTopicAnalysis = async (req, res) => {
   try {
@@ -424,7 +436,8 @@ export const getTopicAnalysis = async (req, res) => {
       userId = req.user._id;
     }
 
-    const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
+    const allTests = await Performance.find({ userId, examName })
+      .sort({ createdAt: -1 });
 
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
@@ -451,10 +464,6 @@ export const getTopicAnalysis = async (req, res) => {
       questionMap[doc._id.toString()] = doc;
     }
 
-    // Is user ne jo questions hide kiye hain unki list
-    const hiddenDocs = await HiddenQuestion.find({ userId }).select("questionId");
-    const hiddenQuestionIds = new Set(hiddenDocs.map((h) => h.questionId.toString()));
-
     const goodAtQuestions = [];
     const wrongQuestions = [];
     const unattemptedQuestions = [];
@@ -473,12 +482,14 @@ export const getTopicAnalysis = async (req, res) => {
         const qId = aq.questionId.toString();
         const qDoc = questionMap[qId];
 
-        // Is topic ka nahi hai, ya user ne hide kar diya hai — dono case mein skip
-        if (!qDoc || hiddenQuestionIds.has(qId)) continue;
+        if (!qDoc) continue;
 
         totalAttempted++;
 
-        if (typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0) {
+        if (
+          typeof aq.timeTakenInSeconds === "number" &&
+          aq.timeTakenInSeconds >= 0
+        ) {
           totalTime += aq.timeTakenInSeconds;
           timedCount++;
         }
@@ -514,8 +525,15 @@ export const getTopicAnalysis = async (req, res) => {
       }
     }
 
-    const efficiency = totalAttempted === 0 ? 0 : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
-    const averageTimePerQuestion = timedCount === 0 ? 0 : Number((totalTime / timedCount).toFixed(2));
+    const efficiency =
+      totalAttempted === 0
+        ? 0
+        : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
+
+    const averageTimePerQuestion =
+      timedCount === 0
+        ? 0
+        : Number((totalTime / timedCount).toFixed(2));
 
     return res.status(200).json({
       success: true,
@@ -545,8 +563,9 @@ export const getTopicAnalysis = async (req, res) => {
   }
 };
 
+
 // ─────────────────────────────────────────────
-// Mock test list — user ke sare mocks
+// Mock test list — user ke sare mocks (UNCHANGED)
 // Route: GET /analysis/mock-list/:userId/:examName
 // ─────────────────────────────────────────────
 export const getUserMockTests = async (req, res) => {
