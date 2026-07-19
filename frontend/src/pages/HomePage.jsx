@@ -108,18 +108,7 @@ const HomePage = () => {
   });
 
   const averageScore = overview?.averageScore ?? null;
-  // 👇 NAYA: backend ab blueprint ke total marks bhi bhejta hai, isse
-  // "38/100" jaisa asli number banega, "%" nahi
-  const averageMaxScore = overview?.averageMaxScore ?? 0;
   const totalTests = overview?.totalTestsGiven ?? 0;
-
-  // 👇 NAYA: score ko "38/100" format mein dikhane ke liye helper.
-  // Agar maxScore na mile (koi valid blueprint reference nahi mila)
-  // to seedha "--" dikha do, "0/0" jaisa ajeeb number nahi
-  const scoreDisplay =
-    averageScore !== null && averageMaxScore > 0
-      ? `${averageScore}/${averageMaxScore}`
-      : "--";
 
   // Rank predictor
   const { data: rankPredictor, isLoading: rankLoading } = useQuery({
@@ -242,7 +231,7 @@ const HomePage = () => {
             Aapka Average Score
           </p>
           <p className="text-[44px] font-extrabold text-white mb-1 relative z-10 leading-none">
-            {scoreDisplay}
+            {averageScore !== null ? `${averageScore}%` : "--"}
           </p>
           <p className="text-xs text-[#C4B5FD] mb-3 relative z-10">
             {totalTests > 0 ? `${totalTests} test diye hain` : "Abhi koi test nahi diya"}
@@ -320,7 +309,7 @@ const HomePage = () => {
                   #{autoRank.rankRangeLow?.toLocaleString("en-IN")} – {autoRank.rankRangeHigh?.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  Aapke {scoreDisplay} score ke hisaab se
+                  Aapke {averageScore}% score ke hisaab se
                 </p>
                 {autoRank.selectionChance && (
                   <p className={`text-[11px] mt-1.5 font-medium ${
