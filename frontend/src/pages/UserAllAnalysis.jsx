@@ -25,7 +25,7 @@ const SkeletonBlock = ({ className = "" }) => (
 );
 
 const AnalysisPageSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white pb-16">
+  <div className="min-h-screen bg-[#0A0D14] text-white pb-20">
     <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-5xl mx-auto border-b border-gray-800">
       <div className="flex items-center gap-2">
         <SkeletonBlock className="w-8 h-8 rounded" />
@@ -79,11 +79,13 @@ const AnalysisPageSkeleton = () => (
         </div>
       </div>
     </div>
+
+    <BottomNav />
   </div>
 );
 
 const MockDetailSkeleton = () => (
-  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12">
+  <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12 pb-24">
     <div className="max-w-2xl mx-auto space-y-6">
       <SkeletonBlock className="w-36 h-4" />
       <div className="space-y-2">
@@ -101,6 +103,7 @@ const MockDetailSkeleton = () => (
       </div>
       <SkeletonBlock className="w-full h-12 rounded-lg" />
     </div>
+    <BottomNav />
   </div>
 );
 
@@ -124,7 +127,7 @@ const SubjectRow = ({ subject, totalTimeSeconds, questionCount, onClick }) => {
       ? "text-yellow-400 bg-yellow-500/10"
       : "text-red-400 bg-red-500/10";
 
-  // 👇 NAYA: % ki jagah fixed number — accuracy % ko is subject ke
+  // 👇 % ki jagah fixed number — accuracy % ko is subject ke
   // total questions (blueprint se) se multiply karke "correct/total" banaya
   const correctOutOf =
     questionCount != null ? Math.round((subject.averageAccuracy / 100) * questionCount) : null;
@@ -315,7 +318,7 @@ const UserAllAnalysis = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4 pb-20">
         <div className="bg-[#111827] border border-red-500/30 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">
             !
@@ -329,13 +332,14 @@ const UserAllAnalysis = () => {
             Login Page Par Jaayein
           </button>
         </div>
+        <BottomNav />
       </div>
     );
   }
 
   if (!overview) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4 pb-20">
         <div className="bg-[#111827] border border-gray-800 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -351,6 +355,7 @@ const UserAllAnalysis = () => {
             Test Dena Shuru Karein
           </button>
         </div>
+        <BottomNav />
       </div>
     );
   }
@@ -365,7 +370,7 @@ const UserAllAnalysis = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white pb-16">
+    <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white pb-20">
       
       {/* Navbar */}
       <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-5xl mx-auto border-b border-gray-800">
@@ -517,6 +522,8 @@ const UserAllAnalysis = () => {
         </div>
 
       </div>
+
+      <BottomNav />
     </div>
   );
 };
@@ -588,7 +595,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   if (isError || !data) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-4 pb-20">
         <div className="max-w-md w-full text-center space-y-4">
           <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
           <button
@@ -598,6 +605,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
             Wapas Jaayein
           </button>
         </div>
+        <BottomNav />
       </div>
     );
   }
@@ -606,7 +614,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 
   if (statusFilter) {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-6 sm:py-8">
+      <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-6 sm:py-8 pb-24">
         <div className="max-w-3xl mx-auto">
           <button
             onClick={closeReview}
@@ -693,12 +701,13 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
             </>
           )}
         </div>
+        <BottomNav />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12">
+    <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12 pb-24">
       <div className="max-w-2xl mx-auto">
         <button
           onClick={onBack}
@@ -746,6 +755,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
           Sabhi Sawaal Dekhein
         </button>
       </div>
+      <BottomNav />
     </div>
   );
 };
@@ -815,7 +825,7 @@ const QuestionDetailCard = ({ q }) => {
           <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
         </div>
       )}
-      <BottomNav />
+      
     </div>
   );
 };
