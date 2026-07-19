@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import BottomNav from "../components/BottomNav";
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -519,7 +520,7 @@ const MockTest = () => {
 
   if (phase === "select") {
     return (
-      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
+      <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12 pb-24">
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl font-bold mb-1">Mock Test Chuniye</h1>
           <p className="text-gray-400 text-sm mb-8">{examName} ke liye ye tests available hain</p>
@@ -544,6 +545,7 @@ const MockTest = () => {
             ))}
           </div>
         </div>
+        <BottomNav />
       </div>
     );
   }
