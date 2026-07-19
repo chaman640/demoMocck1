@@ -5,7 +5,7 @@ export const allExamName = async (req, res) => {
         // Aapki exam names ki list (Future me aap yahan aur exams add kar sakte hain)
         const exams = [
             "UP Police Constable",
-            "SSC Gd",
+            "SSC GD",
             "SSC CGL"
         ];
 
