@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+// 👆 top imports mein add karo
+import BottomNav from "../components/BottomNav";
 
+// ... HomePage function ke andar, navItems array aur uska use pura hata do ...
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
 );
@@ -408,8 +411,7 @@ const ProfilePage = () => {
         )}
       </div>
 
-      {/* 👇 UPDATED: 4-button bottom nav with Home */}
-      <BottomNav navigate={navigate} activePage="profile" />
+       <BottomNav />
     </div>
   );
 };

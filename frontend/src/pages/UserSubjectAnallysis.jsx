@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/api";
+// top imports mein
+import BottomNav from "../components/BottomNav";
 
+// file ke neeche jo "const BottomNav = (...) => (...)" wala block tha, use PURA delete kar do
 // ──────────────────────────────────────────────
 // Seconds ko readable "Xm Ys" format me convert karta hai
 // ──────────────────────────────────────────────
@@ -327,6 +330,7 @@ const UserSubjectAnallysis = () => {
         </div>
 
       </div>
+      <BottomNav />
     </div>
   );
 };
