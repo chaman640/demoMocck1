@@ -54,6 +54,10 @@ import { getMyCoupons } from "../controllers/getMyCoupons.js";
 import { inviteSubTeacher } from "../controllers/inviteSubTeacher.js";
 import { acceptInvite } from "../controllers/acceptInvite.js";
 
+import { getMySubTeachers } from "../controllers/getMySubTeachers.js";
+import { removeSubTeacher } from "../controllers/removeSubTeacher.js";
+import { assignCouponAccess, revokeCouponAccess } from "../controllers/manageCouponAccess.js";
+import { switchActiveCoupon } from "../controllers/switchActiveCoupon.js";
 
 // ── Analysis functions ────────────────────────
 import {
@@ -104,6 +108,10 @@ router.post("/create-coupon", teacherInfo, createCoupon);
 router.post("/invite-sub-teacher", teacherInfo, inviteSubTeacher); // sirf Main Teacher call kar sakta hai
 router.post("/accept-invite", acceptInvite); // PUBLIC — koi login nahi chahiye
 
+router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, removeSubTeacher);
+router.post("/manage-coupon-access/assign", teacherInfo, assignCouponAccess);
+router.post("/manage-coupon-access/revoke", teacherInfo, revokeCouponAccess);
+router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -167,5 +175,7 @@ router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQui
 router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
 
 router.get("/my-coupons", teacherInfo, getMyCoupons);
+
+router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
 
 export default router;
