@@ -45,7 +45,7 @@ import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
 
 import { addTeacher } from "../controllers/addTeacher.js";
-import { loginTeacher } from "../controllers/teacherAuthentication.js";
+// import { loginTeacher } from "../controllers/teacherAuthentication.js";
 import { teacherInfo } from "../middlewares/teacherInfo.js";
 
 import { createCoupon } from "../controllers/createCoupon.js";
