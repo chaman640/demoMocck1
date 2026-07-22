@@ -3,10 +3,9 @@ import mongoose from "mongoose";
 import { rowQuestionConnection } from "../config/rowQuestion.js";
 
 // ─────────────────────────────────────────────
-// Ek question ka poora data — admin khud sab kuchh
-// yahin manually daalega. Koi Question pool se link
-// nahi hai, kyunki ye REAL purane paper ke EXACT
-// sawaal hain, permanently fixed.
+// Ek question ka poora data — admin/teacher khud sab kuchh
+// manually daalega. Koi Question pool se link nahi hai, kyunki
+// ye REAL purane paper ke EXACT sawaal hain, permanently fixed.
 // ─────────────────────────────────────────────
 const pyqQuestionSchema = new mongoose.Schema(
   {
@@ -35,34 +34,30 @@ const pyqSubjectSchema = new mongoose.Schema(
   {
     subjectName: { type: String, required: true },
     questions: [pyqQuestionSchema],
+    // 👇 NAYA: sirf blueprint-shell (teacher-created) papers ke liye
+    // meaningful — batata hai ki is subject ka quota poora bhar gaya
+    filled: { type: Boolean, default: false },
   },
   { _id: false }
 );
 
 const previousYearTestSchema = new mongoose.Schema(
   {
-    // Kis exam ka hai — "UP Police Constable", "SSC Gd" waghera
     examName: {
       type: String,
       required: [true, "Exam ka naam zaroori hai"],
       trim: true,
       index: true,
     },
-
-    // Display naam — e.g. "UP Police Constable 2018"
     testName: {
       type: String,
       required: [true, "Test ka naam zaroori hai"],
       trim: true,
     },
-
-    // Kis saal ka paper hai — home page pe isi se sort/dikhega
     year: {
       type: Number,
       required: [true, "Saal (year) batana zaroori hai"],
     },
-
-    // Optional extra info — jaise "Shift 1", "Re-exam", "Tier 1"
     description: {
       type: String,
       trim: true,
@@ -84,22 +79,81 @@ const previousYearTestSchema = new mongoose.Schema(
       required: [true, "Duration (minutes) batana zaroori hai"],
     },
 
-    // Auto-calculate hoga save karte waqt
     totalQuestions: { type: Number, default: 0 },
-
-    // Admin isse false karke test ko user se hide kar sakta hai
-    // bina delete kiye (agar galti se draft publish ho jaaye)
     isActive: { type: Boolean, default: true },
+
+    // ─────────────────────────────────────────────
+    // 👇 NAYA: Teacher-section — Blueprint-Shell model
+    // ─────────────────────────────────────────────
+
+    // null = global default paper (sabhi students ko dikhega, jab
+    // unke coupon-specific papers khatam ho jaayein — jaisa spec point
+    // 3.5 mein hai). Non-null = specific coupon/group ke liye bana
+    // teacher-created paper.
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+      index: true,
+    },
+
+    // Shell kis Main Teacher ne banaya (global admin papers ke liye null)
+    createdByTeacher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Teacher",
+      default: null,
+    },
+
+    // Sirf teacher-created shell papers mein use hota hai — kis subject
+    // ke kitne questions target hain. Global admin papers ke liye khaali []
+    blueprint: {
+      type: [
+        {
+          subjectName: { type: String, required: true },
+          questionCount: { type: Number, required: true },
+        },
+      ],
+      default: [],
+      _id: false,
+    },
+
+    // Global papers hamesha "complete" (admin ek-sath sab daalta hai,
+    // koi incremental-fill concept nahi). Teacher-created shell papers
+    // "draft" se shuru hote hain, jab tak blueprint ke saare subjects
+    // ka quota poora na bhar jaaye.
+    status: {
+      type: String,
+      enum: ["draft", "complete"],
+      default: "complete",
+    },
   },
   { timestamps: true }
 );
 
-// Save hone se pehle totalQuestions auto-calculate kar do
+// Save hone se pehle totalQuestions auto-calculate karo. Agar blueprint-shell
+// wala paper hai (blueprint.length > 0), to per-subject "filled" aur poore
+// paper ka "status" bhi yahin calculate ho jata hai.
 previousYearTestSchema.pre("save", function (next) {
   this.totalQuestions = this.subjects.reduce(
     (sum, subj) => sum + (subj.questions?.length || 0),
     0
   );
+
+  if (this.blueprint && this.blueprint.length > 0) {
+    let allFilled = true;
+
+    for (const bp of this.blueprint) {
+      const subj = this.subjects.find((s) => s.subjectName === bp.subjectName);
+      const filledCount = subj ? subj.questions.length : 0;
+      const isFilled = filledCount >= bp.questionCount;
+
+      if (subj) subj.filled = isFilled;
+      if (!isFilled) allFilled = false;
+    }
+
+    this.status = allFilled ? "complete" : "draft";
+  }
+
   next();
 });
 

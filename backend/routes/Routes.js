@@ -44,6 +44,17 @@ import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAt
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
 
+import { addTeacher } from "../controllers/addTeacher.js";
+import { loginTeacher } from "../controllers/teacherAuthentication.js";
+import { teacherInfo } from "../middlewares/teacherInfo.js";
+
+import { createCoupon } from "../controllers/createCoupon.js";
+import { getMyCoupons } from "../controllers/getMyCoupons.js";
+
+import { inviteSubTeacher } from "../controllers/inviteSubTeacher.js";
+import { acceptInvite } from "../controllers/acceptInvite.js";
+
+
 // ── Analysis functions ────────────────────────
 import {
   getAllAnalysis1stPage,   
@@ -85,6 +96,15 @@ router.post("/logout", logoutUser);
 router.post("/analysis/hide-question", userInfo, hideQuestion);
 
 
+router.post("/teacher-signup", addTeacher);
+router.post("/teacher-login", loginTeacher);
+
+router.post("/create-coupon", teacherInfo, createCoupon);
+
+router.post("/invite-sub-teacher", teacherInfo, inviteSubTeacher); // sirf Main Teacher call kar sakta hai
+router.post("/accept-invite", acceptInvite); // PUBLIC — koi login nahi chahiye
+
+
 // ─────────────────────────────────────────────
 // GET ROUTES 
 // ─────────────────────────────────────────────
@@ -107,6 +127,10 @@ router.get("/blueprints/:examName", userInfo, async (req, res) => {
     } catch (error) {
         res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
     }
+});
+
+router.get("/teacher-me", teacherInfo, (req, res) => {
+  res.status(200).json({ success: true, data: req.teacher });
 });
 
 router.get("/analysis/mock-list/:userId/:examName", userInfo, getUserMockTests);
@@ -141,5 +165,7 @@ router.get("/current-affair/:examName", userInfo, getCurrentAffair);
 router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
 router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
 router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
+
+router.get("/my-coupons", teacherInfo, getMyCoupons);
 
 export default router;
