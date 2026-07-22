@@ -1,7 +1,10 @@
 // controllers/inviteSubTeacher.js
 // Sirf MAIN TEACHER hi naya sub-teacher invite kar sakta hai.
-// Teacher sirf PHONE NUMBER aur ASSIGNMENTS (Array of coupon & subject) dalta hai.
-import mongoose from "mongoose";
+// Teacher phone number ke saath-saath ek ya zyada coupons/subjects bhi
+// yahin decide kar sakta hai — sub-teacher ka access invite ke waqt hi
+// tay ho jaata hai. Exam alag se nahi chunna padta, kyunki har coupon
+// khud apne exam se bound hota hai — coupon assign karte hi exam bhi
+// automatically saath aa jata hai.
 import crypto from "crypto";
 import Teacher from "../models/Teacher.js";
 import Coupon from "../models/Coupon.js";
@@ -22,10 +25,9 @@ export const inviteSubTeacher = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1: Validation — Phone aur Assignments Array
+    // STEP 1: Validation — sirf phone zaroori hai
     // ─────────────────────────────────────────────
-    const { phone, assignments } = req.body; 
-    // assignments format expect kar rahe hain: [{ couponId: "...", subject: "..." }, ...]
+    const { phone, assignments } = req.body;
 
     if (!phone) {
       return res.status(400).json({
@@ -33,7 +35,6 @@ export const inviteSubTeacher = async (req, res) => {
         message: "Phone number zaroori hai!",
       });
     }
-
     if (!/^\d{10}$/.test(phone)) {
       return res.status(400).json({
         success: false,
@@ -41,52 +42,67 @@ export const inviteSubTeacher = async (req, res) => {
       });
     }
 
-    if (assignments && !Array.isArray(assignments)) {
-      return res.status(400).json({
-        success: false,
-        message: "Assignments ek array (list) hona chahiye!",
-      });
+    // ─────────────────────────────────────────────
+    // STEP 2: assignments validate + normalize karo
+    // Format: [{ couponId, subjects: ["Hindi", "Maths"] }, ...]
+    // Optional hai — bina assignments ke bhi invite bhej sakte hain
+    // ─────────────────────────────────────────────
+    const normalizedAssignments = [];
+
+    if (assignments !== undefined) {
+      if (!Array.isArray(assignments)) {
+        return res.status(400).json({
+          success: false,
+          message: "assignments ek array hona chahiye!",
+        });
+      }
+
+      for (const a of assignments) {
+        if (!a || !a.couponId || !Array.isArray(a.subjects) || a.subjects.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Har assignment mein couponId aur kam se kam ek subject hona zaroori hai!",
+          });
+        }
+
+        const cleanSubjects = a.subjects
+          .map((s) => (typeof s === "string" ? s.trim() : ""))
+          .filter(Boolean);
+
+        if (cleanSubjects.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Subject naam khali nahi ho sakta!",
+          });
+        }
+
+        normalizedAssignments.push({ couponId: a.couponId, subjects: cleanSubjects });
+      }
     }
 
     // ─────────────────────────────────────────────
-    // STEP 2: Saare Coupons Verify karo ki wo is Main Teacher ke hi hain
+    // STEP 3: Diye gaye sabhi coupons is Main Teacher ke hi hain, verify karo
+    // (ek hi query mein — teacher kisi doosre teacher ka coupon assign na kar sake)
     // ─────────────────────────────────────────────
-    if (assignments && assignments.length > 0) {
-      const uniqueCouponIds = new Set();
+    let validCoupons = [];
+    if (normalizedAssignments.length > 0) {
+      const couponIds = [...new Set(normalizedAssignments.map((a) => a.couponId))];
 
-      for (const item of assignments) {
-        if (!item.couponId || !item.subject) {
-          return res.status(400).json({
-            success: false,
-            message: "Har assignment mein couponId aur subject dono zaroori hain!",
-          });
-        }
-        if (!mongoose.Types.ObjectId.isValid(item.couponId)) {
-          return res.status(400).json({
-            success: false,
-            message: `Invalid Coupon ID format: ${item.couponId}`,
-          });
-        }
-        uniqueCouponIds.add(item.couponId);
-      }
-
-      // Main Teacher ke database mein in IDs ko verify karna
-      const couponIdsArray = Array.from(uniqueCouponIds);
-      const validCouponsCount = await Coupon.countDocuments({
-        _id: { $in: couponIdsArray },
+      validCoupons = await Coupon.find({
+        _id: { $in: couponIds },
         mainTeacher: req.teacher._id,
       });
 
-      if (validCouponsCount !== couponIdsArray.length) {
+      if (validCoupons.length !== couponIds.length) {
         return res.status(404).json({
           success: false,
-          message: "Ek ya usse zyada coupons invalid hain ya aapke nahi hain!",
+          message: "Ek ya zyada coupons nahi mile ya aapke nahi hain!",
         });
       }
     }
 
     // ─────────────────────────────────────────────
-    // STEP 3: Is phone number ka teacher pehle se hai kya, check karo
+    // STEP 4: Is phone number ka teacher pehle se hai kya, check karo
     // ─────────────────────────────────────────────
     let teacher = await Teacher.findOne({ phone });
 
@@ -97,12 +113,8 @@ export const inviteSubTeacher = async (req, res) => {
       });
     }
 
-    // Naya invite token — 3 din ke liye valid
     const inviteToken = crypto.randomBytes(32).toString("hex");
     const inviteTokenExpiry = new Date(Date.now() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000);
-
-    // Extract all unique subjects from assignments to update 'assignedSubjects'
-    const subjectsToAssign = assignments ? [...new Set(assignments.map(a => a.subject.trim()))] : [];
 
     if (teacher) {
       // ── Pehle se "pending" ya "removed" teacher hai — invite refresh karo ──
@@ -110,14 +122,6 @@ export const inviteSubTeacher = async (req, res) => {
       teacher.inviteToken = inviteToken;
       teacher.inviteTokenExpiry = inviteTokenExpiry;
       teacher.parentTeacher = req.teacher._id;
-
-      // Update assigned subjects directly in Teacher Document
-      subjectsToAssign.forEach(sub => {
-        if (!teacher.assignedSubjects.includes(sub)) {
-          teacher.assignedSubjects.push(sub);
-        }
-      });
-
       await teacher.save();
     } else {
       // ── Bilkul naya sub-teacher — placeholder name/email ke sath banao ──
@@ -128,8 +132,6 @@ export const inviteSubTeacher = async (req, res) => {
         role: "sub",
         status: "pending",
         parentTeacher: req.teacher._id,
-        examName: req.teacher.examName, // Main teacher ka examName assign kiya
-        assignedSubjects: subjectsToAssign, // Direct array save kiya
         inviteToken,
         inviteTokenExpiry,
       });
@@ -137,23 +139,31 @@ export const inviteSubTeacher = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 4: Har assignment ke liye CouponAccess record banao
+    // STEP 5: Har assignment ke har subject ke liye CouponAccess bana do
+    // (upsert — dobara invite karne par duplicate na bane)
     // ─────────────────────────────────────────────
-    let totalAssignmentsDone = 0;
-    if (assignments && assignments.length > 0) {
-      // Loop chala kar sabhi coupon + subject combinations ko insert karenge
-      for (const item of assignments) {
+    const assignedSummary = [];
+
+    for (const { couponId, subjects } of normalizedAssignments) {
+      for (const subject of subjects) {
         await CouponAccess.findOneAndUpdate(
-          { coupon: item.couponId, subTeacher: teacher._id, subject: item.subject.trim() },
-          { $setOnInsert: { coupon: item.couponId, subTeacher: teacher._id, subject: item.subject.trim() } },
+          { coupon: couponId, subTeacher: teacher._id, subject },
+          { $setOnInsert: { coupon: couponId, subTeacher: teacher._id, subject } },
           { upsert: true, new: true }
         );
       }
-      totalAssignmentsDone = assignments.length;
+
+      const couponDoc = validCoupons.find((c) => c._id.toString() === couponId);
+      assignedSummary.push({
+        couponId,
+        couponName: couponDoc?.name,
+        exam: couponDoc?.exam, // 👈 exam yahin se aa gaya, coupon ke through
+        subjects,
+      });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 5: Response
+    // STEP 6: Response — sirf token bhejte hain, poora link FRONTEND banayega
     // ─────────────────────────────────────────────
     return res.status(201).json({
       success: true,
@@ -163,7 +173,7 @@ export const inviteSubTeacher = async (req, res) => {
         phone: teacher.phone,
         inviteToken,
         inviteTokenExpiry,
-        assignmentsAdded: totalAssignmentsDone,
+        assignedCoupons: assignedSummary,
       },
     });
   } catch (error) {
