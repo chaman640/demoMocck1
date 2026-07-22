@@ -6,6 +6,7 @@
 // khud apne exam se bound hota hai — coupon assign karte hi exam bhi
 // automatically saath aa jata hai.
 import crypto from "crypto";
+import mongoose from "mongoose"; // 👈 NAYA: ObjectId format validate karne ke liye
 import Teacher from "../models/Teacher.js";
 import Coupon from "../models/Coupon.js";
 import CouponAccess from "../models/CouponAccess.js";
@@ -65,6 +66,16 @@ export const inviteSubTeacher = async (req, res) => {
           });
         }
 
+        // 👇 BUG FIX 2: couponId ka format valid ObjectId hai ya nahi, pehle
+        // hi check karo — warna DB query crash karke generic 500 error
+        // de deta tha, ab clean 400 milega
+        if (!mongoose.Types.ObjectId.isValid(a.couponId)) {
+          return res.status(400).json({
+            success: false,
+            message: "couponId ka format galat hai.",
+          });
+        }
+
         const cleanSubjects = a.subjects
           .map((s) => (typeof s === "string" ? s.trim() : ""))
           .filter(Boolean);
@@ -82,7 +93,6 @@ export const inviteSubTeacher = async (req, res) => {
 
     // ─────────────────────────────────────────────
     // STEP 3: Diye gaye sabhi coupons is Main Teacher ke hi hain, verify karo
-    // (ek hi query mein — teacher kisi doosre teacher ka coupon assign na kar sake)
     // ─────────────────────────────────────────────
     let validCoupons = [];
     if (normalizedAssignments.length > 0) {
@@ -106,18 +116,38 @@ export const inviteSubTeacher = async (req, res) => {
     // ─────────────────────────────────────────────
     let teacher = await Teacher.findOne({ phone });
 
-    if (teacher && teacher.status === "active") {
-      return res.status(400).json({
-        success: false,
-        message: "Is phone number se ek active teacher account pehle se maujood hai!",
-      });
+    if (teacher) {
+      if (teacher.status === "active") {
+        return res.status(400).json({
+          success: false,
+          message: "Is phone number se ek active teacher account pehle se maujood hai!",
+        });
+      }
+
+      // 👇 BUG FIX 1: agar ye phone number "pending" status mein kisi AUR
+      // Main Teacher ke invite se already juda hai, to hijack na hone do —
+      // sirf wahi Main Teacher jisne pehle invite kiya tha, dobara
+      // invite/refresh kar sakta hai. "removed" status pe ye restriction
+      // nahi lagti — koi bhi Main Teacher ek removed teacher ko dobara
+      // hire kar sakta hai, wo intended hai.
+      if (
+        teacher.status === "pending" &&
+        teacher.parentTeacher &&
+        teacher.parentTeacher.toString() !== req.teacher._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Ye phone number pehle se kisi aur Main Teacher ke pending invite mein hai.",
+        });
+      }
     }
 
     const inviteToken = crypto.randomBytes(32).toString("hex");
     const inviteTokenExpiry = new Date(Date.now() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000);
 
     if (teacher) {
-      // ── Pehle se "pending" ya "removed" teacher hai — invite refresh karo ──
+      // ── Pehle se "pending" (isi Main Teacher ka) ya "removed" teacher
+      // hai — invite refresh karo ──
       teacher.status = "pending";
       teacher.inviteToken = inviteToken;
       teacher.inviteTokenExpiry = inviteTokenExpiry;
@@ -140,7 +170,6 @@ export const inviteSubTeacher = async (req, res) => {
 
     // ─────────────────────────────────────────────
     // STEP 5: Har assignment ke har subject ke liye CouponAccess bana do
-    // (upsert — dobara invite karne par duplicate na bane)
     // ─────────────────────────────────────────────
     const assignedSummary = [];
 
@@ -157,13 +186,13 @@ export const inviteSubTeacher = async (req, res) => {
       assignedSummary.push({
         couponId,
         couponName: couponDoc?.name,
-        exam: couponDoc?.exam, // 👈 exam yahin se aa gaya, coupon ke through
+        exam: couponDoc?.exam,
         subjects,
       });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 6: Response — sirf token bhejte hain, poora link FRONTEND banayega
+    // STEP 6: Response
     // ─────────────────────────────────────────────
     return res.status(201).json({
       success: true,
