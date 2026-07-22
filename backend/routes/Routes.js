@@ -101,7 +101,7 @@ router.post("/analysis/hide-question", userInfo, hideQuestion);
 
 
 router.post("/teacher-signup", addTeacher);
-router.post("/teacher-login", addTeacher);
+// router.post("/teacher-login", loginTeacher);
 
 router.post("/create-coupon", teacherInfo, createCoupon);
 
