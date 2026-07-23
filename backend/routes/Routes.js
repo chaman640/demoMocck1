@@ -45,7 +45,7 @@ import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
 
 import { addTeacher } from "../controllers/addTeacher.js";
-// import { loginTeacher } from "../controllers/teacherAuthentication.js";
+import { loginTeacher } from "../controllers/teacherAuthentication.js";
 import { teacherInfo } from "../middlewares/teacherInfo.js";
 
 import { createCoupon } from "../controllers/createCoupon.js";
@@ -59,6 +59,8 @@ import { removeSubTeacher } from "../controllers/removeSubTeacher.js";
 import { assignCouponAccess, revokeCouponAccess } from "../controllers/manageCouponAccess.js";
 import { switchActiveCoupon } from "../controllers/switchActiveCoupon.js";
 
+import { redeemCoupon } from "../controllers/redeemCoupon.js";
+import { getMyBatch } from "../controllers/getMyBatch.js";
 // ── Analysis functions ────────────────────────
 import {
   getAllAnalysis1stPage,   
@@ -69,6 +71,9 @@ import {
 } from "../pages/user/analysicUser.js";
 import { logoutUser } from "../controllers/logoutUser.js";
 import { hideQuestion } from "../controllers/hideQuestion.js";
+
+import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQuestion.js";
+import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js";
 
 const router = express.Router();
 
@@ -101,7 +106,7 @@ router.post("/analysis/hide-question", userInfo, hideQuestion);
 
 
 router.post("/teacher-signup", addTeacher);
-// router.post("/teacher-login", loginTeacher);
+router.post("/teacher-login", loginTeacher);
 
 router.post("/create-coupon", teacherInfo, createCoupon);
 
@@ -112,6 +117,9 @@ router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, removeSubTeacher);
 router.post("/manage-coupon-access/assign", teacherInfo, assignCouponAccess);
 router.post("/manage-coupon-access/revoke", teacherInfo, revokeCouponAccess);
 router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
+
+router.post("/redeem-coupon", userInfo, redeemCoupon);
+router.post("/teacher/add-question",teacherInfo, processTeacherQuestionMiddleware, addTeacherQuestion );
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -177,5 +185,7 @@ router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurre
 router.get("/my-coupons", teacherInfo, getMyCoupons);
 
 router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
+
+router.get("/my-batch", userInfo, getMyBatch);
 
 export default router;

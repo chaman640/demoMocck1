@@ -2,6 +2,8 @@
 import mongoose from "mongoose";
 import Blueprint from "../models/bluePrint.js";
 import Performance from "../models/Performance.js";
+import User from "../models/User.js"; // 👈 NAYA — activeCoupon nikalne ke liye
+import Coupon from "../models/Coupon.js"; // 👈 NAYA — coupon ka exam verify karne ke liye
 import { Question } from "../models/rowQuestionSchema.js";
 
 // ─────────────────────────────────────────────
@@ -45,6 +47,13 @@ export const addMocktest = async (req, res) => {
       });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId.",
+      });
+    }
+
     // ─────────────────────────────────────────────
     // STEP 1: Blueprint dhundo — dono fields se exact match
     // ─────────────────────────────────────────────
@@ -59,6 +68,40 @@ export const addMocktest = async (req, res) => {
         message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
       });
     }
+
+    // ─────────────────────────────────────────────
+    // STEP 1.5: 👇 NAYA — User ka activeCoupon nikalo, coupon-aware
+    // question-pool filter banao.
+    //
+    // Logic:
+    // - Agar student kisi batch (coupon) mein enrolled hai AUR us coupon
+    //   ka exam wahi hai jo abhi request kiya gaya hai → sirf usi batch
+    //   ke exclusive questions milenge (coupon: activeCouponId).
+    // - Agar student kisi batch mein nahi hai, YA uska activeCoupon kisi
+    //   dusre exam ka hai (jaise beech mein exam badal liya lekin batch
+    //   nahi chhoda) → global/free pool use hoga (coupon: null), taaki
+    //   mock test kabhi khaali na aaye.
+    // ─────────────────────────────────────────────
+    const user = await User.findById(userId).select("activeCoupon");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User nahi mila!",
+      });
+    }
+
+    let activeCouponId = null;
+    if (user.activeCoupon) {
+      const coupon = await Coupon.findById(user.activeCoupon).select("exam");
+      if (coupon && coupon.exam === examName) {
+        activeCouponId = coupon._id;
+      }
+    }
+
+    // Ye object har Question query ke $match mein spread hoga
+    const couponFilter = activeCouponId
+      ? { coupon: activeCouponId }
+      : { coupon: null };
 
     // ─────────────────────────────────────────────
     // STEP 2: Past attempts nikalo + populate
@@ -137,6 +180,7 @@ export const addMocktest = async (req, res) => {
             examName: { $in: [examName] },
             subjectName: subjectName,
             _id: { $nin: usedIdsArray },
+            ...couponFilter, // 👈 NAYA — batch-scoped ya free-pool
           },
         },
         {
@@ -176,6 +220,7 @@ export const addMocktest = async (req, res) => {
       const allTopicsDistinct = await Question.distinct("topicName", {
         examName: { $in: [examName] },
         subjectName: subjectName,
+        ...couponFilter, // 👈 NAYA
       });
 
       if (allTopicsDistinct.length === 0) continue; // is subject mein koi question hi nahi
@@ -193,6 +238,7 @@ export const addMocktest = async (req, res) => {
               examName: { $in: [examName] },
               subjectName: subjectName,
               topicName: { $in: topicsWithNoUnused },
+              ...couponFilter, // 👈 NAYA
             },
           },
           {
@@ -436,6 +482,7 @@ export const addMocktest = async (req, res) => {
         totalQuestionsExpected: blueprint.totalQuestions,
         totalQuestionsActual: totalActualQuestions,
         isPersonalized: !isNewUser,
+        isBatchContent: !!activeCouponId, // 👈 NAYA — frontend chahe to "batch-exclusive" badge dikha sakta hai
         subjects: finalMockSubjects,
       },
     });

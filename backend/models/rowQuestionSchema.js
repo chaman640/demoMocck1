@@ -19,6 +19,16 @@ const questionSchema = new mongoose.Schema(
     answerExplainWithPhoto: { type: String, required: false },
     subjectName: { type: String, required: true },
     examName: { type: [String], required: true }, 
+    coupon: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Coupon",
+  default: null, // null = purana/global/free question
+},
+addedByTeacher: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Teacher",
+  default: null,
+}
   },
   { timestamps: true }
 );
