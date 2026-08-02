@@ -74,6 +74,7 @@ import { hideQuestion } from "../controllers/hideQuestion.js";
 
 import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQuestion.js";
 import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js";
+import { createPreviousYearPaperShell } from "../controllers/createPreviousYearPaperShell.js";
 
 const router = express.Router();
 
@@ -120,6 +121,8 @@ router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
 
 router.post("/redeem-coupon", userInfo, redeemCoupon);
 router.post("/teacher/add-question",teacherInfo, processTeacherQuestionMiddleware, addTeacherQuestion );
+
+router.post("/teacher/previous-year-paper/create-shell", teacherInfo, createPreviousYearPaperShell);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 

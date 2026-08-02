@@ -44,6 +44,7 @@ backend/
   config/
     rowQuestion.js
   controllers/
+    acceptInvite.js
     addBlluePrient.js
     addCurrentAffair.js
     addCurrentAffairQuiz.js
@@ -52,10 +53,13 @@ backend/
     addPreviousYearTest.js
     addQuestion.js
     addRankPredictorData.js
+    addTeacher.js
+    addTeacherQuestion.js
     addUser.js
     allExamName.js
     authentication.js
     createChallenge.js
+    createCoupon.js
     getAllPreviousYearTests.js
     getChallenge.js
     getChallengeAttemptDetail.js
@@ -63,19 +67,30 @@ backend/
     getCurrentAffair.js
     getCurrentAffairAttemptDetail.js
     getCurrentAffairQuiz.js
+    getMyBatch.js
     getMyChallenges.js
+    getMyCoupons.js
+    getMySubTeachers.js
     getPreviousYearAttemptDetail.js
     getPreviousYearTest.js
     getRankPredictorData.js
     hideQuestion.js
+    inviteSubTeacher.js
     logoutUser.js
+    manageCouponAccess.js
     predictRank.js
+    redeemCoupon.js
+    removeSubTeacher.js
     submitChallenge.js
     submitCurrentAffairQuiz.js
     submitPreviousYearTest.js
+    switchActiveCoupon.js
+    teacherAuthentication.js
     updateSutf.js
   middlewares/
     processQuestion.js
+    processTeacherQuestion.js
+    teacherInfo.js
     userInfo.js
   models/
     bluePrint.js
@@ -93,7 +108,6 @@ backend/
     PreviousYearAttempt.js
     PreviousYearTest.js
     RankPredictorData.js
-    repomix-output.xml
     rowQuestionSchema.js
     Teacher.js
     User.js
@@ -103,6 +117,7 @@ backend/
   routes/
     Routes.js
   utils/
+    checkCouponAccess.js
     dateHelpers.js
   .env
   .gitignore
@@ -155,1425 +170,6 @@ analysise.txt
 <files>
 This section contains the contents of the repository's files.
 
-<file path="backend/models/Coupon.js">
-// models/Coupon.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const couponSchema = new mongoose.Schema(
-  {
-    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
-    name: { type: String, required: true, trim: true }, // teacher ke liye readable label, switch-dropdown mein dikhega
-    exam: { type: String, required: true },
-
-    mainTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
-    isDefault: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
-
-const Coupon = rowQuestionConnection.model("Coupon", couponSchema);
-export default Coupon;
-</file>
-
-<file path="backend/models/CouponAccess.js">
-// models/CouponAccess.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const couponAccessSchema = new mongoose.Schema(
-  {
-    coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-    subTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
-    subject: { type: String, required: true },
-  },
-  { timestamps: true }
-);
-
-// Same (coupon, teacher, subject) combo dobara na bane
-couponAccessSchema.index({ coupon: 1, subTeacher: 1, subject: 1 }, { unique: true });
-
-const CouponAccess = rowQuestionConnection.model("CouponAccess", couponAccessSchema);
-export default CouponAccess;
-</file>
-
-<file path="backend/models/CustomTest.js">
-// models/CustomTest.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const customTestQuestionSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
-    questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
-    correctOption: { type: Number, required: [true, "Correct option (1-4) zaroori hai"], min: 1, max: 4 },
-    answerExplain: { type: String, default: "" },
-    topicName: { type: String, default: "General" },
-    subjectName: { type: String, required: true },
-  },
-  { _id: true } // attempt track karne ke liye har question ki apni _id
-);
-
-const customTestSchema = new mongoose.Schema(
-  {
-    testName: { type: String, required: [true, "Test ka naam zaroori hai"], trim: true },
-    examName: { type: String, required: true, trim: true, index: true },
-
-    // Hamesha ek specific coupon/group ke liye — Previous Year Paper ke
-    // ulta, isme koi "global default" concept nahi hai
-    couponId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      required: [true, "Custom test hamesha kisi coupon/group se linked hona chahiye"],
-      index: true,
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      required: [true, "Kis teacher ne banaya, ye zaroori hai"],
-    },
-
-    // MVP: simple hai — koi blueprint/quota nahi, jo bhi subject/question
-    // teacher daale wahi seedha add ho jata hai (PYQ ke shell-fill jaisa
-    // complex nahi hai, jaisa spec point 4 mein bola gaya hai)
-    subjects: {
-      type: [
-        {
-          subjectName: { type: String, required: true },
-          questions: [customTestQuestionSchema],
-        },
-      ],
-      validate: {
-        validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
-      },
-    },
-
-    marksPerQuestion: { type: Number, required: true, default: 1 },
-    negativeMarking: { type: Number, required: true, default: 0 },
-    durationMinutes: { type: Number, required: [true, "Duration batana zaroori hai"] },
-
-    totalQuestions: { type: Number, default: 0 },
-    isActive: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-
-customTestSchema.pre("save", function (next) {
-  this.totalQuestions = this.subjects.reduce(
-    (sum, subj) => sum + (subj.questions?.length || 0),
-    0
-  );
-  next();
-});
-
-const CustomTest = rowQuestionConnection.model("CustomTest", customTestSchema);
-export default CustomTest;
-</file>
-
-<file path="backend/models/CustomTestAttempt.js">
-// models/CustomTestAttempt.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const customTestAttemptSchema = new mongoose.Schema(
-  {
-    testId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "CustomTest",
-      required: [true, "Test ID zaroori hai"],
-      index: true,
-    },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-      index: true,
-    },
-
-    // Denormalized — list dikhane ke liye baar-baar populate na karna pade
-    examName: { type: String, required: true },
-    testName: { type: String, required: true },
-    couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-
-    attemptedQuestions: [
-      {
-        questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        userAnswer: { type: String, default: null },
-        isCorrect: { type: Boolean, default: null },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-      },
-    ],
-
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-    totalTimeTakenInSeconds: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-// PreviousYearAttempt.js jaisa hi pattern — MULTIPLE attempts allowed
-// (practice/retake ke liye), isliye Challenge jaisa unique index nahi hai
-customTestAttemptSchema.index({ testId: 1, userId: 1, createdAt: -1 });
-
-const CustomTestAttempt = rowQuestionConnection.model(
-  "CustomTestAttempt",
-  customTestAttemptSchema
-);
-
-export default CustomTestAttempt;
-</file>
-
-<file path="backend/models/repomix-output.xml">
-This file is a merged representation of the entire codebase, combined into a single document by Repomix.
-
-<file_summary>
-This section contains a summary of this file.
-
-<purpose>
-This file contains a packed representation of the entire repository's contents.
-It is designed to be easily consumable by AI systems for analysis, code review,
-or other automated processes.
-</purpose>
-
-<file_format>
-The content is organized as follows:
-1. This summary section
-2. Repository information
-3. Directory structure
-4. Repository files (if enabled)
-5. Multiple file entries, each consisting of:
-  - File path as an attribute
-  - Full contents of the file
-</file_format>
-
-<usage_guidelines>
-- This file should be treated as read-only. Any changes should be made to the
-  original repository files, not this packed version.
-- When processing this file, use the file path to distinguish
-  between different files in the repository.
-- Be aware that this file may contain sensitive information. Handle it with
-  the same level of security as you would the original repository.
-</usage_guidelines>
-
-<notes>
-- Some files may have been excluded based on .gitignore rules and Repomix's configuration
-- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
-- Files matching patterns in .gitignore are excluded
-- Files matching default ignore patterns are excluded
-- Files are sorted by Git change count (files with more changes are at the bottom)
-</notes>
-
-</file_summary>
-
-<directory_structure>
-bluePrint.js
-Challenge.js
-ChallengeAttempt.js
-Coupon.js
-CouponAccess.js
-CurrentAffair.js
-CurrentAffairAttempt.js
-CurrentAffairQuiz.js
-CustomTest.js
-CustomTestAttempt.js
-HiddenQuestion.js
-Performance.js
-PreviousYearAttempt.js
-PreviousYearTest.js
-RankPredictorData.js
-rowQuestionSchema.js
-Teacher.js
-User.js
-</directory_structure>
-
-<files>
-This section contains the contents of the repository's files.
-
-<file path="bluePrint.js">
-// models/Blueprint.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js"; // Aapka shared connection
-
-const blueprintSchema = new mongoose.Schema(
-  {
-    // Mock Test ka naam (e.g., "UP Police Constable Full Mock" ya "Hindi Mini Mock")
-    blueprintName: {
-      type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
-      trim: true,
-    },
-    examName: {
-      type: String, 
-      required: [true, "Kis exam ka blueprint hai, ye batana zaroori hai (e.g., UP Constable)"],
-      trim: true,
-    },
-    // Total Questions
-    totalQuestions: {
-      type: Number,
-      required: [true, "Total questions batana zaroori hai"],
-    },
-
-    // Har sahi jawab ke liye kitne marks milenge
-    marksPerQuestion: {
-      type: Number,
-      required: [true, "Marks per question dena zaroori hai"],
-    },
-
-    // Negative marking (e.g., 0.5 ya 0.25)
-    negativeMarking: {
-      type: Number,
-      required: [true, "Negative marking batana zaroori hai. (0 likhein agar nahi hai)"],
-      default: 0,
-    },
-    durationMinutes: {
-     type: Number,
-     default: 0, // 0 ka matlab "auto-calculate karo"
-    },
-
-    // Yeh array aapko Mini aur Full mock dono banane me madad karega
-    subjects: [
-      {
-        subjectName: {
-          type: String, // e.g., "Hindi", "Maths", "Reasoning"
-          required: true,
-        },
-        questionCount: {
-          type: Number, // Is subject se kitne questions aayenge
-          required: true,
-        },
-        importantTopics: [ // 👈 YAHAN IMPORTANT TOPICS ADD KIYA HAI
-          { type: String }
-        ]
-      }
-    ],
-
-    // Yeh field optional hai, bas aasani ke liye (Mini ya Full)
-    mockType: {
-      type: String,
-      enum: ["Mini", "Full"], 
-      default: "Full",
-    }
-  },
-  {
-    timestamps: true, // Kab banaya gaya yeh blueprint, save ho jayega
-  }
-);
-
-// MOCKTEST database ke andar 'blueprints' naam ka collection ban jayega
-const Blueprint = rowQuestionConnection.model("Blueprint", blueprintSchema);
-
-export default Blueprint;
-</file>
-
-<file path="Challenge.js">
-// models/Challenge.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const challengeSchema = new mongoose.Schema(
-  {
-    // Challenge kisne banaya — dost ko challenge bhejne wala user
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Challenge banane wale user ki ID zaroori hai"],
-    },
-
-    // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-    },
-    blueprintName: {
-      type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
-      trim: true,
-    },
-
-    // Unique short code jisse shareable link banega (e.g. "AB3X9K")
-    // Isi code se dost challenge open karega: yourapp.com/#/Challenge/AB3X9K
-    challengeCode: {
-      type: String,
-      required: true,
-      unique: true,
-      index: true, // fast lookup ke liye — har baar /challenge/:code pe query hogi
-    },
-
-    // ─────────────────────────────────────────────
-    // FROZEN QUESTIONS — Ye sabse important part hai.
-    // Jab challenge banta hai, tab ek baar mock-jaisa
-    // question set generate karke yahan PERMANENTLY save
-    // kar diya jata hai. Isse fark nahi padta ki 5 log
-    // alag-alag din pe attempt karein — sabko EXACT same
-    // questions milenge, isliye comparison fair rahega.
-    //
-    // Note: Yahan hum poora question object store kar rahe
-    // hain (sirf ID nahi) — taaki agar original Question
-    // document baad mein edit/delete ho jaye, challenge
-    // fir bhi kaam kare aur data consistent rahe.
-    // ─────────────────────────────────────────────
-    subjects: [
-      {
-        subjectName: { type: String, required: true },
-        questions: [
-          {
-            _id: false, // yahan hum apna khud ka sub-_id nahi chahte, original questionId use karenge
-            questionId: {
-              type: mongoose.Schema.Types.ObjectId,
-              required: true,
-            },
-            question: { type: String, required: true },
-            option1: { type: String, required: true },
-            option2: { type: String, required: true },
-            option3: { type: String, required: true },
-            option4: { type: String, required: true },
-            correctOption: { type: Number, required: true },
-            answerExplain: { type: String },
-            topicName: { type: String },
-            subjectName: { type: String },
-            questionNumber: { type: Number },
-          },
-        ],
-      },
-    ],
-     createdByName: {
-      type: String,
-      required: [true, "Challenge banane wale ka naam zaroori hai"],
-      },
-    // Scoring rules bhi freeze kar rahe hain challenge ke waqt
-    // (agar baad mein blueprint ke marks/negative marking badal jaye,
-    // is challenge ke purane attempts ka scoring change nahi hona chahiye)
-    marksPerQuestion: {
-      type: Number,
-      required: true,
-    },
-    negativeMarking: {
-      type: Number,
-      required: true,
-      default: 0,
-    },
-    durationMinutes: {
-      type: Number,
-      required: true,
-    },
-    totalQuestions: {
-      type: Number,
-      required: true,
-    },
-
-    // Challenge kab expire hoga — is date ke baad naya attempt allow nahi
-    // (purane challenges DB mein clutter na banayein, isliye expiry zaroori hai)
-    expiresAt: {
-      type: Date,
-      required: true,
-    },
-  },
-  {
-    timestamps: true, // createdAt / updatedAt apne aap aa jayenge
-  }
-);
-
-// ─────────────────────────────────────────────
-// TTL INDEX — MongoDB khud is document ko expiresAt ke
-// 0 seconds baad automatically delete kar dega.
-// Isse humein manual cron job nahi likhni padegi purane
-// challenges saaf karne ke liye.
-// ─────────────────────────────────────────────
-challengeSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
-
-const Challenge = rowQuestionConnection.model("Challenge", challengeSchema);
-
-export default Challenge;
-</file>
-
-<file path="ChallengeAttempt.js">
-// models/ChallengeAttempt.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const challengeAttemptSchema = new mongoose.Schema(
-  {
-    // Kis challenge ka attempt hai — Challenge document ki reference
-    challengeId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Challenge",
-      required: [true, "Challenge ID zaroori hai"],
-      index: true, // leaderboard fetch karte waqt is field pe query hogi baar-baar
-    },
-
-    // Kisne attempt diya
-    userId: {
-  type: mongoose.Schema.Types.ObjectId,
-  ref: "User",
-  required: [true, "User ID zaroori hai"],
-  index: true,   // 👈 naya
-},
-
-    // Leaderboard mein naam dikhane ke liye — har baar User collection
-    // populate karne ki jagah yahin bhi save kar rahe hain (denormalized).
-    // Isse leaderboard query fast rahegi aur agar user apna naam badal
-    // le baad mein, purana attempt ka naam consistent rahega.
-    userName: {
-      type: String,
-      required: [true, "User ka naam zaroori hai"],
-    },
-
-    attemptedQuestions: [
-      {
-        questionId: {
-          type: mongoose.Schema.Types.ObjectId,
-          required: true,
-        },
-        userAnswer: {
-          type: String,
-          default: null, // unattempted questions ke liye null
-        },
-        isCorrect: {
-          type: Boolean,
-          default: null, // true/false/null (null = unattempted)
-        },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-      },
-    ],
-     challengeCode: { type: String, required: true },
-     examName: { type: String, required: true },
-     blueprintName: { type: String, required: true },
-     createdByName: { type: String, required: true },
-    // Score summary — Performance.js jaisa hi pattern
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-
-    // Total time liya poore challenge mein (leaderboard pe "fastest" 
-    // dikhane ke liye future mein kaam aa sakta hai — same score par
-    // kam time lene wala upar aa sakta hai)
-    totalTimeTakenInSeconds: {
-      type: Number,
-      default: 0,
-    },
-  },
-  {
-    timestamps: true, // submittedAt ke liye createdAt hi use karenge
-  }
-);
-
-// ─────────────────────────────────────────────
-// COMPOUND UNIQUE INDEX — Ek user ek challenge ko
-// sirf EK BAAR attempt kar sake. Agar dobara submit
-// karne ki koshish kare, DB level pe hi block ho jayega
-// (application-level check ke sath-sath ye extra safety hai).
-// ─────────────────────────────────────────────
-challengeAttemptSchema.index({ challengeId: 1, userId: 1 }, { unique: true });
-
-const ChallengeAttempt = rowQuestionConnection.model(
-  "ChallengeAttempt",
-  challengeAttemptSchema
-);
-
-export default ChallengeAttempt;
-</file>
-
-<file path="Coupon.js">
-// models/Coupon.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const couponSchema = new mongoose.Schema(
-  {
-    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
-    name: { type: String, required: true, trim: true }, // teacher ke liye readable label, switch-dropdown mein dikhega
-    exam: { type: String, required: true },
-
-    mainTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
-    isDefault: { type: Boolean, default: false },
-  },
-  { timestamps: true }
-);
-
-const Coupon = rowQuestionConnection.model("Coupon", couponSchema);
-export default Coupon;
-</file>
-
-<file path="CouponAccess.js">
-// models/CouponAccess.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const couponAccessSchema = new mongoose.Schema(
-  {
-    coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-    subTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
-    subject: { type: String, required: true },
-  },
-  { timestamps: true }
-);
-
-// Same (coupon, teacher, subject) combo dobara na bane
-couponAccessSchema.index({ coupon: 1, subTeacher: 1, subject: 1 }, { unique: true });
-
-const CouponAccess = rowQuestionConnection.model("CouponAccess", couponAccessSchema);
-export default CouponAccess;
-</file>
-
-<file path="CurrentAffair.js">
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const currentAffairItemSchema = new mongoose.Schema(
-  {
-    headline: { type: String, required: true, trim: true },
-    content: { type: String, required: true },
-    category: { type: String, trim: true, default: "General" },
-    imageUrl: { type: String },
-    source: { type: String },
-  },
-  { _id: false }
-);
-
-const currentAffairSchema = new mongoose.Schema(
-  {
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-      index: true,
-    },
-    date: {
-      type: String, // "YYYY-MM-DD" — IST date key
-      required: [true, "Date zaroori hai"],
-      trim: true,
-    },
-    title: { type: String, trim: true },
-    items: [currentAffairItemSchema],
-  },
-  { timestamps: true }
-);
-
-// Ek exam ke liye ek din mein sirf ek hi entry ho
-currentAffairSchema.index({ examName: 1, date: 1 }, { unique: true });
-
-const CurrentAffair = rowQuestionConnection.model("CurrentAffair", currentAffairSchema);
-export default CurrentAffair;
-</file>
-
-<file path="CurrentAffairAttempt.js">
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const currentAffairAttemptSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    examName: { type: String, required: true, trim: true },
-    date: { type: String, required: true, trim: true }, // kis din ka quiz tha
-
-    attemptedQuestions: [
-      {
-        questionId: { type: mongoose.Schema.Types.ObjectId, required: true }, // CurrentAffairQuiz.questions._id
-        userAnswer: { type: String, default: null },
-        isCorrect: { type: Boolean, default: null },
-      },
-    ],
-
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-// Ek user ek din ka quiz sirf ek baar de sake (usi exam ke liye)
-currentAffairAttemptSchema.index({ userId: 1, examName: 1, date: 1 }, { unique: true });
-
-const CurrentAffairAttempt = rowQuestionConnection.model(
-  "CurrentAffairAttempt",
-  currentAffairAttemptSchema
-);
-export default CurrentAffairAttempt;
-</file>
-
-<file path="CurrentAffairQuiz.js">
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const caQuizQuestionSchema = new mongoose.Schema({
-  question: { type: String, required: true },
-  option1: { type: String, required: true },
-  option2: { type: String, required: true },
-  option3: { type: String, required: true },
-  option4: { type: String, required: true },
-  correctOption: { type: Number, required: true },
-  answerExplain: { type: String },
-});
-// _id: false NAHI lagaya — har question ko apna khud ka auto _id milega,
-// isi se attempt mein answer track hoga (Challenge.js ke questions jaisa pattern)
-
-const currentAffairQuizSchema = new mongoose.Schema(
-  {
-    examName: { type: String, required: true, trim: true, index: true },
-    date: { type: String, required: true, trim: true },
-    questions: [caQuizQuestionSchema],
-  },
-  { timestamps: true }
-);
-
-currentAffairQuizSchema.index({ examName: 1, date: 1 }, { unique: true });
-
-const CurrentAffairQuiz = rowQuestionConnection.model("CurrentAffairQuiz", currentAffairQuizSchema);
-export default CurrentAffairQuiz;
-</file>
-
-<file path="CustomTest.js">
-// models/CustomTest.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const customTestQuestionSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
-    questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
-    correctOption: { type: Number, required: [true, "Correct option (1-4) zaroori hai"], min: 1, max: 4 },
-    answerExplain: { type: String, default: "" },
-    topicName: { type: String, default: "General" },
-    subjectName: { type: String, required: true },
-  },
-  { _id: true } // attempt track karne ke liye har question ki apni _id
-);
-
-const customTestSchema = new mongoose.Schema(
-  {
-    testName: { type: String, required: [true, "Test ka naam zaroori hai"], trim: true },
-    examName: { type: String, required: true, trim: true, index: true },
-
-    // Hamesha ek specific coupon/group ke liye — Previous Year Paper ke
-    // ulta, isme koi "global default" concept nahi hai
-    couponId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      required: [true, "Custom test hamesha kisi coupon/group se linked hona chahiye"],
-      index: true,
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      required: [true, "Kis teacher ne banaya, ye zaroori hai"],
-    },
-
-    // MVP: simple hai — koi blueprint/quota nahi, jo bhi subject/question
-    // teacher daale wahi seedha add ho jata hai (PYQ ke shell-fill jaisa
-    // complex nahi hai, jaisa spec point 4 mein bola gaya hai)
-    subjects: {
-      type: [
-        {
-          subjectName: { type: String, required: true },
-          questions: [customTestQuestionSchema],
-        },
-      ],
-      validate: {
-        validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
-      },
-    },
-
-    marksPerQuestion: { type: Number, required: true, default: 1 },
-    negativeMarking: { type: Number, required: true, default: 0 },
-    durationMinutes: { type: Number, required: [true, "Duration batana zaroori hai"] },
-
-    totalQuestions: { type: Number, default: 0 },
-    isActive: { type: Boolean, default: true },
-  },
-  { timestamps: true }
-);
-
-customTestSchema.pre("save", function (next) {
-  this.totalQuestions = this.subjects.reduce(
-    (sum, subj) => sum + (subj.questions?.length || 0),
-    0
-  );
-  next();
-});
-
-const CustomTest = rowQuestionConnection.model("CustomTest", customTestSchema);
-export default CustomTest;
-</file>
-
-<file path="CustomTestAttempt.js">
-// models/CustomTestAttempt.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const customTestAttemptSchema = new mongoose.Schema(
-  {
-    testId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "CustomTest",
-      required: [true, "Test ID zaroori hai"],
-      index: true,
-    },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-      index: true,
-    },
-
-    // Denormalized — list dikhane ke liye baar-baar populate na karna pade
-    examName: { type: String, required: true },
-    testName: { type: String, required: true },
-    couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-
-    attemptedQuestions: [
-      {
-        questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        userAnswer: { type: String, default: null },
-        isCorrect: { type: Boolean, default: null },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-      },
-    ],
-
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-    totalTimeTakenInSeconds: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-// PreviousYearAttempt.js jaisa hi pattern — MULTIPLE attempts allowed
-// (practice/retake ke liye), isliye Challenge jaisa unique index nahi hai
-customTestAttemptSchema.index({ testId: 1, userId: 1, createdAt: -1 });
-
-const CustomTestAttempt = rowQuestionConnection.model(
-  "CustomTestAttempt",
-  customTestAttemptSchema
-);
-
-export default CustomTestAttempt;
-</file>
-
-<file path="HiddenQuestion.js">
-// models/HiddenQuestion.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const hiddenQuestionSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-      index: true,
-    },
-    questionId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: true,
-    },
-  },
-  { timestamps: true }
-);
-
-// Ek user ek question ko sirf ek baar hide kar sake — duplicate na bane
-hiddenQuestionSchema.index({ userId: 1, questionId: 1 }, { unique: true });
-
-const HiddenQuestion = rowQuestionConnection.model("HiddenQuestion", hiddenQuestionSchema);
-export default HiddenQuestion;
-</file>
-
-<file path="Performance.js">
-// models/Performance.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const performanceSchema = new mongoose.Schema(
-  {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-    },
-
-    attemptedQuestions: [
-      {
-        questionId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Question",
-          required: true,
-        },
-        userAnswer: {
-          type: String,
-          // BUG FIX: required: true hata diya —
-          // unattempted questions mein userAnswer null/empty hoga
-          // required: true se puri performance save fail ho jaati thi
-          default: null,
-        },
-        isCorrect: {
-          type: Boolean,
-          default: null,
-        },
-        // Frontend se aayega — student ne kitne seconds mein answer diya
-        // null allowed hai — agar frontend ne nahi bheja (unattempted questions)
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-        isMarkedForReview: {
-          type: Boolean,
-          default: false,
-        },
-      },
-    ],
-
-    examName: {
-      type: String,
-      required: [true, "Main exam ka naam zaroori hai (e.g., UP Constable)"],
-      trim: true,
-    },
-    blueprintName: {
-      type: String,
-      required: [true, "Specific test ka naam zaroori hai (e.g., UP Constable Full Mock 1)"],
-      trim: true,
-    },
-
-    // Analytics fields (backend calculate karta hai)
-    totalScore:       { type: Number, default: 0 },
-    correctCount:     { type: Number, default: 0 },
-    wrongCount:       { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-
-    subjectAnalysis: [
-      {
-        subjectName:    String,
-        accuracy:       Number,
-        correctCount:   Number,
-        // BUG FIX: ye dono fields schema mein missing the —
-        // addPerformence.js save karta tha but Mongoose silently drop kar deta tha
-        // Ab schema mein add kiya — ab sahi se save honge
-        wrongCount:       { type: Number, default: 0 },
-        unattemptedCount: { type: Number, default: 0 },
-        totalQuestions:   Number,
-        // Subject-wise time tracking ke liye
-        totalTimeTaken:          { type: Number, default: 0 },
-        averageTimePerQuestion:  { type: Number, default: 0 },
-        
-      },
-    ],
-  },
-  {
-    timestamps: true,
-  }
-);
-
-const Performance = rowQuestionConnection.model("Performance", performanceSchema);
-
-export default Performance;
-</file>
-
-<file path="PreviousYearAttempt.js">
-// models/PreviousYearAttempt.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const previousYearAttemptSchema = new mongoose.Schema(
-  {
-    testId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "PreviousYearTest",
-      required: [true, "Test ID zaroori hai"],
-      index: true,
-    },
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "User ID zaroori hai"],
-      index: true,
-    },
-
-    // Denormalized — baar baar populate na karna pade list dikhane ke liye
-    examName: { type: String, required: true },
-    testName: { type: String, required: true },
-    year: { type: Number, required: true },
-
-    attemptedQuestions: [
-      {
-        questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
-        userAnswer: { type: String, default: null },
-        isCorrect: { type: Boolean, default: null },
-        timeTakenInSeconds: {
-          type: Number,
-          default: null,
-          min: [0, "Time negative nahi ho sakta"],
-        },
-      },
-    ],
-
-    totalScore: { type: Number, default: 0 },
-    correctCount: { type: Number, default: 0 },
-    wrongCount: { type: Number, default: 0 },
-    unattemptedCount: { type: Number, default: 0 },
-    totalTimeTakenInSeconds: { type: Number, default: 0 },
-  },
-  { timestamps: true }
-);
-
-// Ek user ek test ko MULTIPLE baar de sakta hai (retake/practice ke liye) —
-// isliye Challenge jaisa unique index yahan NAHI hai. Har attempt alag
-// document banega, taaki user apna improvement track kar sake.
-previousYearAttemptSchema.index({ testId: 1, userId: 1, createdAt: -1 });
-
-const PreviousYearAttempt = rowQuestionConnection.model(
-  "PreviousYearAttempt",
-  previousYearAttemptSchema
-);
-
-export default PreviousYearAttempt;
-</file>
-
-<file path="PreviousYearTest.js">
-// models/PreviousYearTest.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-// ─────────────────────────────────────────────
-// Ek question ka poora data — admin/teacher khud sab kuchh
-// manually daalega. Koi Question pool se link nahi hai, kyunki
-// ye REAL purane paper ke EXACT sawaal hain, permanently fixed.
-// ─────────────────────────────────────────────
-const pyqQuestionSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
-    questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
-    correctOption: {
-      type: Number,
-      required: [true, "Correct option (1-4) zaroori hai"],
-      min: 1,
-      max: 4,
-    },
-    answerExplain: { type: String, default: "" },
-    answerExplainWithPhoto: { type: String, default: null },
-    topicName: { type: String, default: "General" },
-    subjectName: { type: String, required: [true, "Subject ka naam zaroori hai"] },
-    questionNumber: { type: Number },
-  },
-  { _id: true } // har question ki apni _id — attempt track karne ke liye
-);
-
-const pyqSubjectSchema = new mongoose.Schema(
-  {
-    subjectName: { type: String, required: true },
-    questions: [pyqQuestionSchema],
-    // 👇 NAYA: sirf blueprint-shell (teacher-created) papers ke liye
-    // meaningful — batata hai ki is subject ka quota poora bhar gaya
-    filled: { type: Boolean, default: false },
-  },
-  { _id: false }
-);
-
-const previousYearTestSchema = new mongoose.Schema(
-  {
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-      index: true,
-    },
-    testName: {
-      type: String,
-      required: [true, "Test ka naam zaroori hai"],
-      trim: true,
-    },
-    year: {
-      type: Number,
-      required: [true, "Saal (year) batana zaroori hai"],
-    },
-    description: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    subjects: {
-      type: [pyqSubjectSchema],
-      validate: {
-        validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
-      },
-    },
-
-    marksPerQuestion: { type: Number, required: true, default: 1 },
-    negativeMarking: { type: Number, required: true, default: 0 },
-    durationMinutes: {
-      type: Number,
-      required: [true, "Duration (minutes) batana zaroori hai"],
-    },
-
-    totalQuestions: { type: Number, default: 0 },
-    isActive: { type: Boolean, default: true },
-
-    // ─────────────────────────────────────────────
-    // 👇 NAYA: Teacher-section — Blueprint-Shell model
-    // ─────────────────────────────────────────────
-
-    // null = global default paper (sabhi students ko dikhega, jab
-    // unke coupon-specific papers khatam ho jaayein — jaisa spec point
-    // 3.5 mein hai). Non-null = specific coupon/group ke liye bana
-    // teacher-created paper.
-    couponId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      default: null,
-      index: true,
-    },
-
-    // Shell kis Main Teacher ne banaya (global admin papers ke liye null)
-    createdByTeacher: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      default: null,
-    },
-
-    // Sirf teacher-created shell papers mein use hota hai — kis subject
-    // ke kitne questions target hain. Global admin papers ke liye khaali []
-    blueprint: {
-      type: [
-        {
-          subjectName: { type: String, required: true },
-          questionCount: { type: Number, required: true },
-        },
-      ],
-      default: [],
-      _id: false,
-    },
-
-    // Global papers hamesha "complete" (admin ek-sath sab daalta hai,
-    // koi incremental-fill concept nahi). Teacher-created shell papers
-    // "draft" se shuru hote hain, jab tak blueprint ke saare subjects
-    // ka quota poora na bhar jaaye.
-    status: {
-      type: String,
-      enum: ["draft", "complete"],
-      default: "complete",
-    },
-  },
-  { timestamps: true }
-);
-
-// Save hone se pehle totalQuestions auto-calculate karo. Agar blueprint-shell
-// wala paper hai (blueprint.length > 0), to per-subject "filled" aur poore
-// paper ka "status" bhi yahin calculate ho jata hai.
-previousYearTestSchema.pre("save", function (next) {
-  this.totalQuestions = this.subjects.reduce(
-    (sum, subj) => sum + (subj.questions?.length || 0),
-    0
-  );
-
-  if (this.blueprint && this.blueprint.length > 0) {
-    let allFilled = true;
-
-    for (const bp of this.blueprint) {
-      const subj = this.subjects.find((s) => s.subjectName === bp.subjectName);
-      const filledCount = subj ? subj.questions.length : 0;
-      const isFilled = filledCount >= bp.questionCount;
-
-      if (subj) subj.filled = isFilled;
-      if (!isFilled) allFilled = false;
-    }
-
-    this.status = allFilled ? "complete" : "draft";
-  }
-
-  next();
-});
-
-const PreviousYearTest = rowQuestionConnection.model(
-  "PreviousYearTest",
-  previousYearTestSchema
-);
-
-export default PreviousYearTest;
-</file>
-
-<file path="RankPredictorData.js">
-// models/RankPredictorData.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const rankPredictorDataSchema = new mongoose.Schema(
-  {
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-      index: true,
-    },
-
-    // Kis saal/attempt ka data hai — future mein multiple years support
-    // karne ke liye (abhi ke liye ek hi "current" wala use hoga)
-    year: {
-      type: Number,
-      required: true,
-    },
-
-    // Reference points — score aur uske corresponding rank
-    // Frontend/backend isi array ko sort karke interpolate karega
-    dataPoints: [
-      {
-        score: { type: Number, required: true },
-        rank: { type: Number, required: true },
-      },
-    ],
-
-    // Total kitne candidates ne exam diya tha (context ke liye)
-    totalCandidates: {
-      type: Number,
-    },
-
-    // Total vacancies — "selection chance" dikhane ke liye
-    totalVacancies: {
-      type: Number,
-    },
-
-    // Kya ye data currently active hai (predictor mein use hoga)
-    // Agar naya saal ka data aaye, purana inactive kar denge
-    isActive: {
-      type: Boolean,
-      default: true,
-    },
-  },
-  { timestamps: true }
-);
-
-// Ek exam ke liye ek hi "active" year ka data ho — duplicate active entries na banein
-rankPredictorDataSchema.index({ examName: 1, isActive: 1 });
-
-const RankPredictorData = rowQuestionConnection.model(
-  "RankPredictorData",
-  rankPredictorDataSchema
-);
-
-export default RankPredictorData;
-</file>
-
-<file path="rowQuestionSchema.js">
-import mongoose from "mongoose";
-// ⚡ Sahi export naam (rowQuestionConnection) ko import kiya
-import { rowQuestionConnection } from "../config/rowQuestion.js"; 
-
-const questionSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: true },
-    questionPhoto: { type: String, required: false },
-    option1: { type: String, required: true },
-    option2: { type: String, required: true },
-    option3: { type: String, required: true },
-    option4: { type: String, required: true }, 
-    correctOption: { type: Number, required: true }, 
-    questionNumber: { type: Number },
-    topicName: { type: String, required: true },
-    
-    // Spelling thik kar di: 'answerExplain'
-    answerExplain: { type: String, required: true },
-    answerExplainWithPhoto: { type: String, required: false },
-    subjectName: { type: String, required: true },
-    examName: { type: [String], required: true }, 
-  },
-  { timestamps: true }
-);
-
-// ⚡ Is specific connection ka use karke model ko compile aur export kiya
-export const Question = rowQuestionConnection.model("Question", questionSchema);
-</file>
-
-<file path="Teacher.js">
-// models/Teacher.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const teacherSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, unique: true, trim: true },
-    password: { type: String },
-
-    role: { type: String, enum: ["main", "sub"], required: true },
-    examName: [{ type: String }], // teacher jis exam(o) ke liye kaam karta hai
-
-    // ---- Sub-teacher-only ----
-    parentTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", default: null },
-    assignedSubjects: [{ type: String }],
-
-    // ---- Main-teacher-only ----
-    subTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Teacher" }],
-
-    // ---- Invite / activation flow ----
-    status: { type: String, enum: ["pending", "active", "removed"], default: "pending" },
-    inviteToken: { type: String, default: null },
-    inviteTokenExpiry: { type: Date, default: null },
-
-    // ---- Group (coupon) context ----
-    activeCoupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
-    coupons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Coupon" }],
-  },
-  { timestamps: true }
-);
-
-const Teacher = rowQuestionConnection.model("Teacher", teacherSchema);
-export default Teacher;
-</file>
-
-<file path="User.js">
-// models/User.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const userSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Name zaroori hai"],
-      trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, "Email zaroori hai"],
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
-    phone: {
-      type: String,
-      required: [true, "Phone number zaroori hai"],
-      unique: true,
-      trim: true,
-    },
-    password: {
-      type: String,
-      required: [true, "Password zaroori hai"],
-      minlength: [6, "Password kam se kam 6 characters ka hona chahiye"],
-    },
-    address: {
-      type: String,
-      required: [true, "Address zaroori hai"],
-      trim: true,
-    },
-    exam: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-    },
-
-    // ─────────────────────────────────────────────
-    // 👇 NAYA: Teacher-section ke liye — coupon/group linkage.
-    // exam-change wale pattern jaisa hi hai: ek waqt me sirf
-    // ek active coupon, purana switch karne par delete nahi hota.
-    // ─────────────────────────────────────────────
-    activeCoupon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      default: null,
-    },
-
-    // Poori history — coupon switch karte waqt purana entry ka
-    // leftAt set ho jata hai, naya entry push hota hai. Purana
-    // data kabhi delete nahi hota, sirf context badalta hai.
-    couponHistory: [
-      {
-        coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-        examNameAtJoin: { type: String }, // us waqt kaunsa exam tha, reference ke liye
-        joinedAt: { type: Date, default: Date.now },
-        leftAt: { type: Date, default: null }, // null = abhi bhi active
-      },
-    ],
-  },
-  {
-    timestamps: true,
-  }
-);
-
-const User = rowQuestionConnection.model("User", userSchema);
-
-export default User;
-</file>
-
-</files>
-</file>
-
-<file path="backend/models/Teacher.js">
-// models/Teacher.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-const teacherSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-    phone: { type: String, required: true, unique: true, trim: true },
-    password: { type: String },
-
-    role: { type: String, enum: ["main", "sub"], required: true },
-    examName: [{ type: String }], // teacher jis exam(o) ke liye kaam karta hai
-
-    // ---- Sub-teacher-only ----
-    parentTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", default: null },
-    assignedSubjects: [{ type: String }],
-
-    // ---- Main-teacher-only ----
-    subTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Teacher" }],
-
-    // ---- Invite / activation flow ----
-    status: { type: String, enum: ["pending", "active", "removed"], default: "pending" },
-    inviteToken: { type: String, default: null },
-    inviteTokenExpiry: { type: Date, default: null },
-
-    // ---- Group (coupon) context ----
-    activeCoupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
-    coupons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Coupon" }],
-  },
-  { timestamps: true }
-);
-
-const Teacher = rowQuestionConnection.model("Teacher", teacherSchema);
-export default Teacher;
-</file>
-
 <file path="backend/config/rowQuestion.js">
 // config/rowQuestion.js
 import mongoose from "mongoose";
@@ -1601,6 +197,143 @@ rowQuestionConnection.on("connected", () => {
 rowQuestionConnection.on("error", (err) => {
   console.error("❌ ROWQUESTION_URI connection error:", err.message);
 });
+</file>
+
+<file path="backend/controllers/acceptInvite.js">
+// controllers/acceptInvite.js
+// PUBLIC route — sub-teacher ke paas abhi tak koi account/session nahi hai,
+// isliye ye teacherInfo middleware ke BINA chalega.
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import Teacher from "../models/Teacher.js";
+
+export const acceptInvite = async (req, res) => {
+  try {
+    const { token, name, email, password } = req.body;
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Validation
+    // ─────────────────────────────────────────────
+    if (!token) {
+      return res.status(400).json({
+        success: false,
+        message: "Invite token zaroori hai!",
+      });
+    }
+    if (!name || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Naam, email aur password bharna zaroori hai!",
+      });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password kam se kam 6 characters ka hona chahiye!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Token se teacher dhundo
+    // ─────────────────────────────────────────────
+    const teacher = await Teacher.findOne({ inviteToken: token });
+
+    if (!teacher) {
+      return res.status(400).json({
+        success: false,
+        message: "Ye invite link invalid hai.",
+      });
+    }
+
+    if (teacher.status !== "pending") {
+      return res.status(400).json({
+        success: false,
+        message: "Ye invite link already use ho chuka hai.",
+      });
+    }
+
+    if (!teacher.inviteTokenExpiry || teacher.inviteTokenExpiry < new Date()) {
+      return res.status(410).json({
+        success: false,
+        message: "Ye invite link expire ho chuka hai. Apne Main Teacher se naya link mangwayein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Email kisi aur teacher ke paas to nahi hai, check karo
+    // (khud ka placeholder email chhodkar)
+    // ─────────────────────────────────────────────
+    const emailTaken = await Teacher.findOne({
+      email: email.toLowerCase().trim(),
+      _id: { $ne: teacher._id },
+    });
+    if (emailTaken) {
+      return res.status(400).json({
+        success: false,
+        message: "Ye email pehle se kisi aur teacher account se juda hai!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Password hash karke teacher ko activate karo
+    // ─────────────────────────────────────────────
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    teacher.name = name.trim();
+    teacher.email = email.toLowerCase().trim();
+    teacher.password = hashedPassword;
+    teacher.status = "active";
+    teacher.inviteToken = null;
+    teacher.inviteTokenExpiry = null; // 👈 link ab dobara kabhi use nahi ho sakta
+
+    await teacher.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Auto-login — JWT + cookie (addTeacher.js jaisa hi pattern)
+    // ─────────────────────────────────────────────
+    const jwtToken = jwt.sign(
+      { teacherId: teacher._id },
+      process.env.JWT_SECRET || "mera_super_secret_key",
+      { expiresIn: "7d" }
+    );
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    return res.status(200)
+      .cookie("teacherToken", jwtToken, cookieOptions)
+      .json({
+        success: true,
+        message: "Account activate ho gaya! Aap login ho chuke hain.",
+        data: {
+          _id: teacher._id,
+          name: teacher.name,
+          email: teacher.email,
+          phone: teacher.phone,
+          role: teacher.role,
+          parentTeacher: teacher.parentTeacher,
+        },
+      });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Ye email pehle se registered hai.",
+      });
+    }
+    console.error("acceptInvite error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya account activate karte waqt.",
+      error: error.message,
+    });
+  }
+};
 </file>
 
 <file path="backend/controllers/addCurrentAffair.js">
@@ -1929,6 +662,289 @@ export const addRankPredictorData = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server mein error aa gaya data save karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/addTeacherQuestion.js">
+// controllers/addTeacherQuestion.js
+import mongoose from "mongoose";
+import { Question } from "../models/rowQuestionSchema.js";
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+export const addTeacherQuestion = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: couponId nikalo, questions ki list banao.
+    // Do shapes support: (a) Bulk JSON { couponId, questions: [...] }
+    // (b) Single multipart (image ke saath) — fields seedhe req.body mein
+    // ─────────────────────────────────────────────
+    const { couponId } = req.body;
+
+    if (!couponId || !mongoose.Types.ObjectId.isValid(couponId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid couponId zaroori hai!",
+      });
+    }
+
+    let questionsData;
+    if (Array.isArray(req.body.questions)) {
+      questionsData = req.body.questions;
+    } else {
+      const { couponId: _drop, questions: _drop2, ...singleQuestion } = req.body;
+      questionsData = [singleQuestion];
+    }
+
+    if (!Array.isArray(questionsData) || questionsData.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Kam se kam ek question dena zaroori hai.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Coupon dhundo — examName YAHIN se derive hoga.
+    // Client jo bhi examName bheje wo IGNORE karte hain, taaki galat
+    // exam ka question galat coupon mein kabhi na ja sake.
+    // ─────────────────────────────────────────────
+    const coupon = await Coupon.findById(couponId);
+    if (!coupon) {
+      return res.status(404).json({ success: false, message: "Ye coupon/group nahi mila." });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Access control
+    // ─────────────────────────────────────────────
+    const uniqueSubjects = [...new Set(questionsData.map((q) => q.subjectName).filter(Boolean))];
+
+    if (uniqueSubjects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Har question ka subjectName dena zaroori hai.",
+      });
+    }
+
+    if (req.teacher.role === "main") {
+      if (String(coupon.mainTeacher) !== String(req.teacher._id)) {
+        return res.status(403).json({
+          success: false,
+          message: "Ye coupon aapka nahi hai — aap isme content add nahi kar sakte.",
+        });
+      }
+    } else if (req.teacher.role === "sub") {
+      const accessRecords = await CouponAccess.find({
+        coupon: couponId,
+        subTeacher: req.teacher._id,
+        subject: { $in: uniqueSubjects },
+      });
+      const authorizedSubjects = new Set(accessRecords.map((r) => r.subject));
+      const unauthorized = uniqueSubjects.filter((s) => !authorizedSubjects.has(s));
+
+      if (unauthorized.length > 0) {
+        return res.status(403).json({
+          success: false,
+          message: `Aap is coupon mein in subjects ke liye authorized nahi hain: ${unauthorized.join(", ")}`,
+        });
+      }
+    } else {
+      return res.status(403).json({ success: false, message: "Aapki teacher role valid nahi hai." });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Har question validate karo save() se PEHLE — taaki batch
+    // ka aadha save na ho aur aadha error de ("sab ya koi nahi")
+    // ─────────────────────────────────────────────
+    const validationErrors = [];
+    questionsData.forEach((q, idx) => {
+      if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
+        validationErrors.push(`Question ${idx + 1}: sabhi options aur question text zaroori hain.`);
+        return;
+      }
+      const correctOpt = Number(q.correctOption);
+      if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
+        validationErrors.push(`Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`);
+        return;
+      }
+      if (!q.subjectName || !q.topicName) {
+        validationErrors.push(`Question ${idx + 1}: subjectName aur topicName zaroori hain.`);
+        return;
+      }
+      if (!q.answerExplain) {
+        validationErrors.push(`Question ${idx + 1}: answerExplain zaroori hai.`);
+      }
+    });
+
+    if (validationErrors.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Kuch questions mein validation errors hain, koi bhi save nahi hua:",
+        errors: validationErrors,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: questionNumber auto-numbering — coupon + subject + topic
+    // ke hisaab se scoped (global pool se alag), taaki har batch ka
+    // apna clean sequential numbering rahe. Isi request ke andar agar
+    // same subject/topic ke multiple naye questions hain, unko bhi
+    // sahi order mein number milega (sirf DB count pe nahi rukte).
+    // ─────────────────────────────────────────────
+    const counterMap = {};
+    const docsToInsert = [];
+
+    for (const q of questionsData) {
+      const key = `${q.subjectName}|||${q.topicName}`;
+
+      if (!(key in counterMap)) {
+        const existingCount = await Question.countDocuments({
+          coupon: couponId,
+          subjectName: q.subjectName,
+          topicName: q.topicName,
+        });
+        counterMap[key] = existingCount;
+      }
+      counterMap[key] += 1;
+
+      docsToInsert.push({
+        question: q.question,
+        questionPhoto: q.questionPhoto || null,
+        option1: q.option1,
+        option2: q.option2,
+        option3: q.option3,
+        option4: q.option4,
+        correctOption: Number(q.correctOption),
+        answerExplain: q.answerExplain,
+        answerExplainWithPhoto: q.answerExplainWithPhoto || null,
+        subjectName: q.subjectName,
+        topicName: q.topicName,
+        questionNumber: counterMap[key],
+        examName: [coupon.exam], // 👈 client se aaya examName ignore — coupon se derive
+        coupon: coupon._id,
+        addedByTeacher: req.teacher._id,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Save
+    // ─────────────────────────────────────────────
+    const savedQuestions = await Question.insertMany(docsToInsert);
+
+    return res.status(201).json({
+      success: true,
+      message: `🎉 ${savedQuestions.length} question(s) successfully add ho gaye "${coupon.name}" ke liye!`,
+      data: savedQuestions,
+    });
+  } catch (error) {
+    console.error("addTeacherQuestion error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya question add karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/createCoupon.js">
+// controllers/createCoupon.js
+// Sirf MAIN TEACHER naya coupon/group bana sakta hai.
+import Coupon from "../models/Coupon.js";
+
+// ─────────────────────────────────────────────
+// HELPER: Unique coupon code generate karo
+// createChallenge.js ke generateChallengeCode() jaisa hi pattern —
+// confusing chars (0,O,1,I) hataye taaki student aasaani se type kar sake
+// ─────────────────────────────────────────────
+const generateCouponCode = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return code;
+};
+
+export const createCoupon = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Sirf Main Teacher hi coupon bana sakta hai
+    // ─────────────────────────────────────────────
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi naya coupon/group bana sakta hai!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Validation
+    // ─────────────────────────────────────────────
+    const { name, exam } = req.body;
+
+    if (!name || !exam) {
+      return res.status(400).json({
+        success: false,
+        message: "name aur exam dono zaroori hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Unique code generate karo (collision-safe retry loop)
+    // ─────────────────────────────────────────────
+    let code;
+    let isUnique = false;
+    let attempts = 0;
+
+    while (!isUnique && attempts < 5) {
+      code = generateCouponCode();
+      const existing = await Coupon.findOne({ code });
+      if (!existing) isUnique = true;
+      attempts++;
+    }
+
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: "Coupon code generate karne mein dikkat aa rahi hai, dobara try karein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Coupon save karo — mainTeacher hamesha logged-in teacher hi hoga
+    // ─────────────────────────────────────────────
+    const newCoupon = new Coupon({
+      code,
+      name: name.trim(),
+      exam: exam.trim(),
+      mainTeacher: req.teacher._id,
+    });
+
+    await newCoupon.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Response
+    // ─────────────────────────────────────────────
+    return res.status(201).json({
+      success: true,
+      message: "Coupon/Group successfully ban gaya!",
+      data: newCoupon,
+    });
+  } catch (error) {
+    // Agar duplicate-key error aaye (unique index se), rare race-condition case
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Ye coupon code pehle se maujood hai, dobara try karein.",
+      });
+    }
+    console.error("createCoupon error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya coupon banate waqt.",
       error: error.message,
     });
   }
@@ -2489,6 +1505,96 @@ export const getCurrentAffairQuiz = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/getMyBatch.js">
+// controllers/getMyBatch.js
+// Student ko apne current batch (coupon) ki details deta hai — batch naam,
+// exam, aur transparency ke liye "kaunsa subject kis teacher ne cover kiya"
+// ki list. Route: GET /my-batch (userInfo middleware ke peeche)
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
+import Teacher from "../models/Teacher.js";
+
+export const getMyBatch = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 1: Student kisi batch mein hai hi nahi to seedha bata do
+    // ─────────────────────────────────────────────
+    if (!req.user.activeCoupon) {
+      return res.status(200).json({
+        success: true,
+        enrolled: false,
+        data: null,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Coupon dhundo
+    // ─────────────────────────────────────────────
+    const coupon = await Coupon.findById(req.user.activeCoupon).populate(
+      "mainTeacher",
+      "name"
+    );
+
+    // Safety: agar coupon kisi wajah se DB se delete ho chuka ho,
+    // lekin student ki activeCoupon reference abhi bhi purani ho
+    if (!coupon) {
+      return res.status(200).json({
+        success: true,
+        enrolled: false,
+        data: null,
+        message: "Aapka pehle wala batch ab available nahi hai.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Is coupon ke sabhi sub-teachers ka subject-wise breakdown
+    // (CouponAccess se) — transparency ke liye student ko dikhega
+    // "kaunsa subject kis teacher ne cover kiya hai"
+    // ─────────────────────────────────────────────
+    const accessRecords = await CouponAccess.find({ coupon: coupon._id }).populate(
+      "subTeacher",
+      "name status"
+    );
+
+    // Sirf "active" sub-teachers dikhao — removed teacher ka naam
+    // student ko dikhane ka koi matlab nahi
+    const subjectTeacherMap = accessRecords
+      .filter((r) => r.subTeacher && r.subTeacher.status === "active")
+      .map((r) => ({
+        subject: r.subject,
+        teacherName: r.subTeacher.name,
+      }));
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Response
+    // ─────────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      enrolled: true,
+      data: {
+        _id: coupon._id,
+        name: coupon.name,
+        code: coupon.code,
+        exam: coupon.exam,
+        mainTeacherName: coupon.mainTeacher?.name || null,
+        subjectCoverage: subjectTeacherMap,
+        joinedAt:
+          req.user.couponHistory.find(
+            (h) => h.coupon.toString() === coupon._id.toString() && h.leftAt === null
+          )?.joinedAt || null,
+      },
+    });
+  } catch (error) {
+    console.error("getMyBatch error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Batch details fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/getMyChallenges.js">
 import ChallengeAttempt from "../models/ChallengeAttempt.js";
 
@@ -2520,6 +1626,148 @@ export const getMyChallenges = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Challenges list fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getMyCoupons.js">
+// controllers/getMyCoupons.js
+// Dropdown ke liye — kaunse coupons/groups is teacher ko dikhne chahiye.
+// Main Teacher: apne banaye sabhi coupons.
+// Sub Teacher: sirf unhi coupons jinke liye CouponAccess record maujood hai
+// (spec point 2A — "sub-teacher ki dropdown sirf authorized coupons dikhayegi").
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+export const getMyCoupons = async (req, res) => {
+  try {
+    const teacher = req.teacher;
+
+    // ─────────────────────────────────────────────
+    // CASE 1: Main Teacher — koi restriction nahi, wo coupon ka owner hai
+    // ─────────────────────────────────────────────
+    if (teacher.role === "main") {
+      const coupons = await Coupon.find({ mainTeacher: teacher._id }).sort({ createdAt: -1 });
+
+      return res.status(200).json({
+        success: true,
+        role: "main",
+        totalCoupons: coupons.length,
+        data: coupons,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // CASE 2: Sub Teacher — sirf authorized coupons, CouponAccess se
+    // ─────────────────────────────────────────────
+    const accessRecords = await CouponAccess.find({ subTeacher: teacher._id })
+      .populate("coupon")
+      .sort({ createdAt: -1 });
+
+    // Ek hi coupon ke andar teacher ko multiple subjects mil sakte hain
+    // (jaise Hindi + Maths dono ek hi group ke liye) — isliye coupon ke
+    // hisaab se group karke duplicate coupons na bhejein, subjects ek
+    // array mein daal ke bhejein.
+    const couponMap = {};
+    for (const record of accessRecords) {
+      if (!record.coupon) continue; // safety — agar coupon kabhi delete ho chuka ho
+
+      const couponId = record.coupon._id.toString();
+
+      if (!couponMap[couponId]) {
+        couponMap[couponId] = {
+          ...record.coupon.toObject(),
+          subjects: [],
+        };
+      }
+      couponMap[couponId].subjects.push(record.subject);
+    }
+
+    const data = Object.values(couponMap);
+
+    return res.status(200).json({
+      success: true,
+      role: "sub",
+      totalCoupons: data.length,
+      data,
+    });
+  } catch (error) {
+    console.error("getMyCoupons error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Coupons fetch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/getMySubTeachers.js">
+// controllers/getMySubTeachers.js
+import Teacher from "../models/Teacher.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+export const getMySubTeachers = async (req, res) => {
+  try {
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi apne sub-teachers dekh sakta hai!",
+      });
+    }
+
+    const subTeachers = await Teacher.find({ parentTeacher: req.teacher._id })
+      .select("-password -inviteToken")
+      .sort({ createdAt: -1 });
+
+    if (subTeachers.length === 0) {
+      return res.status(200).json({ success: true, totalSubTeachers: 0, data: [] });
+    }
+
+    const subTeacherIds = subTeachers.map((t) => t._id);
+
+    const accessRecords = await CouponAccess.find({
+      subTeacher: { $in: subTeacherIds },
+    }).populate("coupon", "name code exam");
+
+    // subTeacherId -> { couponId: { couponName, exam, subjects: [...] } }
+    const accessMap = {};
+    for (const record of accessRecords) {
+      if (!record.coupon) continue; // safety — agar coupon kabhi delete ho chuka ho
+      const subId = record.subTeacher.toString();
+      if (!accessMap[subId]) accessMap[subId] = {};
+
+      const couponId = record.coupon._id.toString();
+      if (!accessMap[subId][couponId]) {
+        accessMap[subId][couponId] = {
+          couponId,
+          couponName: record.coupon.name,
+          couponCode: record.coupon.code,
+          exam: record.coupon.exam,
+          subjects: [],
+        };
+      }
+      accessMap[subId][couponId].subjects.push(record.subject);
+    }
+
+    const data = subTeachers.map((t) => ({
+      _id: t._id,
+      name: t.name,
+      email: t.email,
+      phone: t.phone,
+      status: t.status,
+      createdAt: t.createdAt,
+      coupons: accessMap[t._id.toString()] ? Object.values(accessMap[t._id.toString()]) : [],
+    }));
+
+    return res.status(200).json({ success: true, totalSubTeachers: data.length, data });
+  } catch (error) {
+    console.error("getMySubTeachers error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sub-teachers fetch karte waqt error aaya.",
       error: error.message,
     });
   }
@@ -2859,6 +2107,171 @@ export const logoutUser = (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/manageCouponAccess.js">
+// controllers/manageCouponAccess.js
+// Existing sub-teacher (already invited/active) ko baad mein additional
+// coupons/subjects assign karna, ya unka access revoke karna — invite
+// ke baad bhi Main Teacher access manage kar sake.
+import mongoose from "mongoose";
+import Teacher from "../models/Teacher.js";
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+// ─────────────────────────────────────────────
+// POST /manage-coupon-access/assign
+// Body: { subTeacherId, couponId, subjects: ["Hindi", "Maths"] }
+// ─────────────────────────────────────────────
+export const assignCouponAccess = async (req, res) => {
+  try {
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi access assign kar sakta hai!",
+      });
+    }
+
+    const { subTeacherId, couponId, subjects } = req.body;
+
+    if (!subTeacherId || !couponId || !Array.isArray(subjects) || subjects.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "subTeacherId, couponId aur kam se kam ek subject zaroori hai!",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(subTeacherId) ||
+      !mongoose.Types.ObjectId.isValid(couponId)
+    ) {
+      return res.status(400).json({ success: false, message: "Invalid ID format." });
+    }
+
+    // Sub-teacher is Main Teacher ka hi ho, verify karo
+    const subTeacher = await Teacher.findOne({
+      _id: subTeacherId,
+      parentTeacher: req.teacher._id,
+      role: "sub",
+    });
+    if (!subTeacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye sub-teacher nahi mila ya aapka nahi hai!",
+      });
+    }
+    if (subTeacher.status === "removed") {
+      return res.status(400).json({
+        success: false,
+        message: "Ye sub-teacher remove ho chuka hai, pehle use dobara invite karein.",
+      });
+    }
+
+    // Coupon is Main Teacher ka hi ho, verify karo
+    const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye coupon nahi mila ya aapka nahi hai!",
+      });
+    }
+
+    const cleanSubjects = subjects
+      .map((s) => (typeof s === "string" ? s.trim() : ""))
+      .filter(Boolean);
+
+    if (cleanSubjects.length === 0) {
+      return res.status(400).json({ success: false, message: "Subject naam khali nahi ho sakta!" });
+    }
+
+    for (const subject of cleanSubjects) {
+      await CouponAccess.findOneAndUpdate(
+        { coupon: coupon._id, subTeacher: subTeacher._id, subject },
+        { $setOnInsert: { coupon: coupon._id, subTeacher: subTeacher._id, subject } },
+        { upsert: true, new: true }
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `${subTeacher.name} ko '${coupon.name}' ke liye ${cleanSubjects.join(", ")} access mil gaya.`,
+    });
+  } catch (error) {
+    console.error("assignCouponAccess error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Access assign karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+
+// ─────────────────────────────────────────────
+// POST /manage-coupon-access/revoke
+// Body: { subTeacherId, couponId, subject }
+// Ek waqt me ek subject ka access hataya jaata hai — sab hatane ho to
+// frontend multiple bar call kar sakta hai.
+// ─────────────────────────────────────────────
+export const revokeCouponAccess = async (req, res) => {
+  try {
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi access revoke kar sakta hai!",
+      });
+    }
+
+    const { subTeacherId, couponId, subject } = req.body;
+
+    if (!subTeacherId || !couponId || !subject) {
+      return res.status(400).json({
+        success: false,
+        message: "subTeacherId, couponId aur subject zaroori hain!",
+      });
+    }
+
+    if (
+      !mongoose.Types.ObjectId.isValid(subTeacherId) ||
+      !mongoose.Types.ObjectId.isValid(couponId)
+    ) {
+      return res.status(400).json({ success: false, message: "Invalid ID format." });
+    }
+
+    // Coupon is Main Teacher ka hi ho, verify karo
+    const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye coupon nahi mila ya aapka nahi hai!",
+      });
+    }
+
+    const deleted = await CouponAccess.findOneAndDelete({
+      coupon: couponId,
+      subTeacher: subTeacherId,
+      subject: subject.trim(),
+    });
+
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye access record nahi mila.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `'${subject}' ka access revoke ho gaya.`,
+    });
+  } catch (error) {
+    console.error("revokeCouponAccess error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Access revoke karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/predictRank.js">
 // controllers/predictRank.js
 import RankPredictorData from "../models/RankPredictorData.js";
@@ -2990,6 +2403,175 @@ export const predictRank = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server mein error aa gaya rank predict karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/redeemCoupon.js">
+// controllers/redeemCoupon.js
+// Student coupon code dalke apne batch (teacher-group) mein enroll hota hai.
+// Route: POST /redeem-coupon (userInfo middleware ke peeche)
+import Coupon from "../models/Coupon.js";
+
+export const redeemCoupon = async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code || !code.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: "Coupon code zaroori hai!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Coupon dhundo
+    // ─────────────────────────────────────────────
+    const coupon = await Coupon.findOne({ code: code.trim().toUpperCase() });
+    if (!coupon) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye coupon code nahi mila. Sahi code check karein.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Exam match check — coupon jis exam ke liye bana hai,
+    // student ka current exam wahi hona chahiye
+    // ─────────────────────────────────────────────
+    if (coupon.exam !== req.user.exam) {
+      return res.status(400).json({
+        success: false,
+        message: `Ye coupon '${coupon.exam}' exam ke liye hai, lekin aapka current exam '${req.user.exam}' hai.`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Already isi coupon mein enrolled hai to dobara redeem block karo
+    // ─────────────────────────────────────────────
+    if (req.user.activeCoupon && req.user.activeCoupon.toString() === coupon._id.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: "Aap pehle se is batch mein enrolled hain!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Agar pehle se koi active coupon tha, uska history-entry
+    // close karo (leftAt set karo) — purana data delete nahi hota,
+    // sirf current context badalta hai (exam-change wala hi pattern).
+    // ─────────────────────────────────────────────
+    if (req.user.activeCoupon) {
+      const currentEntry = req.user.couponHistory.find(
+        (h) => h.coupon.toString() === req.user.activeCoupon.toString() && h.leftAt === null
+      );
+      if (currentEntry) {
+        currentEntry.leftAt = new Date();
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Naya coupon active karo + history mein naya entry push karo
+    // ─────────────────────────────────────────────
+    req.user.activeCoupon = coupon._id;
+    req.user.couponHistory.push({
+      coupon: coupon._id,
+      examNameAtJoin: req.user.exam,
+      joinedAt: new Date(),
+      leftAt: null,
+    });
+
+    await req.user.save();
+
+    // ─────────────────────────────────────────────
+    // STEP 6: Response
+    // ─────────────────────────────────────────────
+    return res.status(200).json({
+      success: true,
+      message: `'${coupon.name}' batch mein successfully enroll ho gaye!`,
+      data: {
+        activeCoupon: {
+          _id: coupon._id,
+          name: coupon.name,
+          code: coupon.code,
+          exam: coupon.exam,
+        },
+      },
+    });
+  } catch (error) {
+    console.error("redeemCoupon error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya coupon redeem karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/removeSubTeacher.js">
+// controllers/removeSubTeacher.js
+// Sub-teacher ko remove karna — content (questions, tests) delete NAHI
+// hota, sirf access revoke hota hai (status=removed + CouponAccess clear).
+import mongoose from "mongoose";
+import Teacher from "../models/Teacher.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+export const removeSubTeacher = async (req, res) => {
+  try {
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi sub-teacher remove kar sakta hai!",
+      });
+    }
+
+    const { subTeacherId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(subTeacherId)) {
+      return res.status(400).json({ success: false, message: "Invalid subTeacherId." });
+    }
+
+    const subTeacher = await Teacher.findOne({
+      _id: subTeacherId,
+      parentTeacher: req.teacher._id,
+    });
+
+    if (!subTeacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Ye sub-teacher nahi mila ya aapka nahi hai!",
+      });
+    }
+
+    if (subTeacher.status === "removed") {
+      return res.status(400).json({
+        success: false,
+        message: "Ye sub-teacher pehle se hi removed hai.",
+      });
+    }
+
+    subTeacher.status = "removed";
+    subTeacher.inviteToken = null;
+    subTeacher.inviteTokenExpiry = null;
+    subTeacher.activeCoupon = null;
+    await subTeacher.save();
+
+    // Access revoke — sub-teacher ka bana hua content (questions/tests)
+    // seedha createdBy se link hai, CouponAccess se nahi — isliye wo safe rahega
+    await CouponAccess.deleteMany({ subTeacher: subTeacher._id });
+
+    return res.status(200).json({
+      success: true,
+      message: `${subTeacher.name} ko remove kar diya gaya. Unka bana hua content safe hai.`,
+    });
+  } catch (error) {
+    console.error("removeSubTeacher error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Sub-teacher remove karte waqt error aaya.",
       error: error.message,
     });
   }
@@ -3236,6 +2818,51 @@ export const submitPreviousYearTest = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/switchActiveCoupon.js">
+// controllers/switchActiveCoupon.js
+// Main ya Sub Teacher apna "active group" (coupon) switch karta hai —
+// jis coupon ke context mein wo abhi kaam karna chahta hai. Switch
+// karne se purana koi data delete nahi hota, sirf working-context badalta hai.
+import mongoose from "mongoose";
+import Teacher from "../models/Teacher.js";
+import { checkCouponAccess } from "../utils/checkCouponAccess.js";
+
+export const switchActiveCoupon = async (req, res) => {
+  try {
+    const { couponId } = req.body;
+
+    if (!couponId) {
+      return res.status(400).json({ success: false, message: "couponId zaroori hai!" });
+    }
+    if (!mongoose.Types.ObjectId.isValid(couponId)) {
+      return res.status(400).json({ success: false, message: "Invalid couponId." });
+    }
+
+    // subject = null — yahan sirf coupon-level access chahiye
+    const { allowed, coupon, reason } = await checkCouponAccess(req.teacher, couponId, null);
+
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: reason || "Access denied." });
+    }
+
+    await Teacher.findByIdAndUpdate(req.teacher._id, { activeCoupon: coupon._id });
+
+    return res.status(200).json({
+      success: true,
+      message: `Active group '${coupon.name}' set ho gaya.`,
+      data: { activeCoupon: coupon },
+    });
+  } catch (error) {
+    console.error("switchActiveCoupon error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Active coupon switch karte waqt error aaya.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/controllers/updateSutf.js">
 // controllers/updateUserInfo.js
 import User from "../models/User.js";
@@ -3414,6 +3041,185 @@ export const processQuestionMiddleware = (req, res, next) => {
 };
 </file>
 
+<file path="backend/middlewares/processTeacherQuestion.js">
+// middlewares/processTeacherQuestion.js
+import multer from "multer";
+import cloudinaryPackage from "cloudinary";
+import sharp from "sharp";
+import fs from "fs";
+import path from "path";
+
+const cloudinary = cloudinaryPackage.v2;
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = multer.memoryStorage();
+const uploadFields = multer({
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+}).fields([
+  { name: "questionPhoto", maxCount: 1 },
+  { name: "answerExplainWithPhoto", maxCount: 1 },
+]);
+
+const uploadToCloudinary = async (localFilePath) => {
+  try {
+    const response = await cloudinary.uploader.upload(localFilePath, {
+      folder: "teacher_question_photos",
+      resource_type: "image",
+    });
+    return response.secure_url;
+  } catch (error) {
+    throw new Error("Cloudinary upload failed: " + error.message);
+  }
+};
+
+// ─────────────────────────────────────────────
+// Do tarah ke requests handle karta hai:
+// 1. Bulk / text-only (Content-Type: application/json) — koi file
+//    upload nahi, seedha next(). Controller khud array/single sambhal lega.
+// 2. Single question WITH image (multipart/form-data, Postman "form-data"
+//    tab se) — file uthao, Cloudinary pe upload karo, URL req.body mein
+//    daal do, phir next().
+// ─────────────────────────────────────────────
+export const processTeacherQuestionMiddleware = (req, res, next) => {
+  if (!req.is("multipart/form-data")) {
+    return next();
+  }
+
+  uploadFields(req, res, async function (err) {
+    if (err) {
+      return res.status(400).json({ success: false, message: "Multer Error: " + err.message });
+    }
+
+    try {
+      const {
+        question,
+        option1,
+        option2,
+        option3,
+        option4,
+        correctOption,
+        subjectName,
+        topicName,
+        answerExplain,
+      } = req.body;
+
+      if (
+        !question ||
+        !option1 ||
+        !option2 ||
+        !option3 ||
+        !option4 ||
+        !subjectName ||
+        !topicName ||
+        !answerExplain
+      ) {
+        return res.status(400).json({ success: false, message: "❌ Sabhi fields zaroori hain!" });
+      }
+      if (!correctOption || correctOption < 1 || correctOption > 4) {
+        return res
+          .status(400)
+          .json({ success: false, message: "❌ correctOption 1 se 4 ke beech hona chahiye!" });
+      }
+
+      const tempDir = "./public/temp";
+      if (!fs.existsSync(tempDir)) {
+        fs.mkdirSync(tempDir, { recursive: true });
+      }
+
+      const fileFields = ["questionPhoto", "answerExplainWithPhoto"];
+
+      for (const field of fileFields) {
+        if (req.files && req.files[field] && req.files[field][0]) {
+          const fileBuffer = req.files[field][0].buffer;
+          const uniqueName = `${field}-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpeg`;
+          const localOutputPath = path.join(tempDir, uniqueName);
+
+          await sharp(fileBuffer).jpeg({ quality: 60 }).toFile(localOutputPath);
+
+          const cloudinaryUrl = await uploadToCloudinary(localOutputPath);
+          req.body[field] = cloudinaryUrl;
+
+          if (fs.existsSync(localOutputPath)) {
+            fs.unlinkSync(localOutputPath);
+          }
+        } else {
+          req.body[field] = null;
+        }
+      }
+
+      next();
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "❌ Middleware mein processing error aaya",
+        error: error.message,
+      });
+    }
+  });
+};
+</file>
+
+<file path="backend/middlewares/teacherInfo.js">
+// middlewares/teacherInfo.js
+import jwt from "jsonwebtoken";
+import Teacher from "../models/Teacher.js";
+
+export const teacherInfo = async (req, res, next) => {
+  try {
+    // 1. Cookie se token nikalna — ⚠️ naam "teacherToken" hai, "token" NAHI
+    const token = req.cookies.teacherToken;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Aap logged in nahi hain. Kripya pehle login karein!",
+      });
+    }
+
+    // 2. Token verify karna
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "mera_super_secret_key");
+    // ⚠️ decoded ke andar key "teacherId" hai, "userId" NAHI
+
+    // 3. Database se teacher ka data nikalna
+    const teacher = await Teacher.findById(decoded.teacherId).select("-password");
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Account nahi mila ya delete ho chuka hai!",
+      });
+    }
+
+    // 4. Extra safety — beech mein hi remove ho gaya teacher ka token
+    //    abhi bhi valid ho sakta hai, isliye yahan bhi check
+    if (teacher.status !== "active") {
+  return res.status(403).json({
+    success: false,
+    message: "Ye account abhi active nahi hai.",
+  });
+}
+    // 5. Teacher data ko 'req' object mein attach karna
+    //    ⚠️ req.user mein NAHI daalna — student aur teacher context alag rehne chahiye
+    req.teacher = teacher;
+
+    // 6. Aage badho
+    next();
+  } catch (error) {
+    console.error("Teacher Auth Error:", error.message);
+    return res.status(401).json({
+      success: false,
+      message: "Session expire ho gaya hai ya token galat hai. Phir se login karein.",
+    });
+  }
+};
+</file>
+
 <file path="backend/middlewares/userInfo.js">
 // middlewares/authMiddleware.js (Ya jahan bhi aap userInfo rakhna chahein)
 import jwt from "jsonwebtoken";
@@ -3464,6 +3270,48 @@ export const userInfo = async (req, res, next) => {
         });
     }
 };
+</file>
+
+<file path="backend/models/Coupon.js">
+// models/Coupon.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const couponSchema = new mongoose.Schema(
+  {
+    code: { type: String, required: true, unique: true, uppercase: true, trim: true },
+    name: { type: String, required: true, trim: true }, // teacher ke liye readable label, switch-dropdown mein dikhega
+    exam: { type: String, required: true },
+
+    mainTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
+    isDefault: { type: Boolean, default: false },
+  },
+  { timestamps: true }
+);
+
+const Coupon = rowQuestionConnection.model("Coupon", couponSchema);
+export default Coupon;
+</file>
+
+<file path="backend/models/CouponAccess.js">
+// models/CouponAccess.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const couponAccessSchema = new mongoose.Schema(
+  {
+    coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
+    subTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
+    subject: { type: String, required: true },
+  },
+  { timestamps: true }
+);
+
+// Same (coupon, teacher, subject) combo dobara na bane
+couponAccessSchema.index({ coupon: 1, subTeacher: 1, subject: 1 }, { unique: true });
+
+const CouponAccess = rowQuestionConnection.model("CouponAccess", couponAccessSchema);
+export default CouponAccess;
 </file>
 
 <file path="backend/models/CurrentAffair.js">
@@ -3579,6 +3427,144 @@ const CurrentAffairQuiz = rowQuestionConnection.model("CurrentAffairQuiz", curre
 export default CurrentAffairQuiz;
 </file>
 
+<file path="backend/models/CustomTest.js">
+// models/CustomTest.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const customTestQuestionSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: [true, "Question likhna zaroori hai"] },
+    questionPhoto: { type: String, default: null },
+    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
+    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
+    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
+    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
+    correctOption: { type: Number, required: [true, "Correct option (1-4) zaroori hai"], min: 1, max: 4 },
+    answerExplain: { type: String, default: "" },
+    topicName: { type: String, default: "General" },
+    subjectName: { type: String, required: true },
+  },
+  { _id: true } // attempt track karne ke liye har question ki apni _id
+);
+
+const customTestSchema = new mongoose.Schema(
+  {
+    testName: { type: String, required: [true, "Test ka naam zaroori hai"], trim: true },
+    examName: { type: String, required: true, trim: true, index: true },
+
+    // Hamesha ek specific coupon/group ke liye — Previous Year Paper ke
+    // ulta, isme koi "global default" concept nahi hai
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      required: [true, "Custom test hamesha kisi coupon/group se linked hona chahiye"],
+      index: true,
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Teacher",
+      required: [true, "Kis teacher ne banaya, ye zaroori hai"],
+    },
+
+    // MVP: simple hai — koi blueprint/quota nahi, jo bhi subject/question
+    // teacher daale wahi seedha add ho jata hai (PYQ ke shell-fill jaisa
+    // complex nahi hai, jaisa spec point 4 mein bola gaya hai)
+    subjects: {
+      type: [
+        {
+          subjectName: { type: String, required: true },
+          questions: [customTestQuestionSchema],
+        },
+      ],
+      validate: {
+        validator: (arr) => Array.isArray(arr) && arr.length > 0,
+        message: "Kam se kam ek subject ke questions hone chahiye",
+      },
+    },
+
+    marksPerQuestion: { type: Number, required: true, default: 1 },
+    negativeMarking: { type: Number, required: true, default: 0 },
+    durationMinutes: { type: Number, required: [true, "Duration batana zaroori hai"] },
+
+    totalQuestions: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+  },
+  { timestamps: true }
+);
+
+customTestSchema.pre("save", function (next) {
+  this.totalQuestions = this.subjects.reduce(
+    (sum, subj) => sum + (subj.questions?.length || 0),
+    0
+  );
+  next();
+});
+
+const CustomTest = rowQuestionConnection.model("CustomTest", customTestSchema);
+export default CustomTest;
+</file>
+
+<file path="backend/models/CustomTestAttempt.js">
+// models/CustomTestAttempt.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const customTestAttemptSchema = new mongoose.Schema(
+  {
+    testId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "CustomTest",
+      required: [true, "Test ID zaroori hai"],
+      index: true,
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: [true, "User ID zaroori hai"],
+      index: true,
+    },
+
+    // Denormalized — list dikhane ke liye baar-baar populate na karna pade
+    examName: { type: String, required: true },
+    testName: { type: String, required: true },
+    couponId: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
+
+    attemptedQuestions: [
+      {
+        questionId: { type: mongoose.Schema.Types.ObjectId, required: true },
+        userAnswer: { type: String, default: null },
+        isCorrect: { type: Boolean, default: null },
+        timeTakenInSeconds: {
+          type: Number,
+          default: null,
+          min: [0, "Time negative nahi ho sakta"],
+        },
+      },
+    ],
+
+    totalScore: { type: Number, default: 0 },
+    correctCount: { type: Number, default: 0 },
+    wrongCount: { type: Number, default: 0 },
+    unattemptedCount: { type: Number, default: 0 },
+    totalTimeTakenInSeconds: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+// PreviousYearAttempt.js jaisa hi pattern — MULTIPLE attempts allowed
+// (practice/retake ke liye), isliye Challenge jaisa unique index nahi hai
+customTestAttemptSchema.index({ testId: 1, userId: 1, createdAt: -1 });
+
+const CustomTestAttempt = rowQuestionConnection.model(
+  "CustomTestAttempt",
+  customTestAttemptSchema
+);
+
+export default CustomTestAttempt;
+</file>
+
 <file path="backend/models/HiddenQuestion.js">
 // models/HiddenQuestion.js
 import mongoose from "mongoose";
@@ -3667,174 +3653,6 @@ const PreviousYearAttempt = rowQuestionConnection.model(
 export default PreviousYearAttempt;
 </file>
 
-<file path="backend/models/PreviousYearTest.js">
-// models/PreviousYearTest.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
-
-// ─────────────────────────────────────────────
-// Ek question ka poora data — admin/teacher khud sab kuchh
-// manually daalega. Koi Question pool se link nahi hai, kyunki
-// ye REAL purane paper ke EXACT sawaal hain, permanently fixed.
-// ─────────────────────────────────────────────
-const pyqQuestionSchema = new mongoose.Schema(
-  {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
-    questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
-    correctOption: {
-      type: Number,
-      required: [true, "Correct option (1-4) zaroori hai"],
-      min: 1,
-      max: 4,
-    },
-    answerExplain: { type: String, default: "" },
-    answerExplainWithPhoto: { type: String, default: null },
-    topicName: { type: String, default: "General" },
-    subjectName: { type: String, required: [true, "Subject ka naam zaroori hai"] },
-    questionNumber: { type: Number },
-  },
-  { _id: true } // har question ki apni _id — attempt track karne ke liye
-);
-
-const pyqSubjectSchema = new mongoose.Schema(
-  {
-    subjectName: { type: String, required: true },
-    questions: [pyqQuestionSchema],
-    // 👇 NAYA: sirf blueprint-shell (teacher-created) papers ke liye
-    // meaningful — batata hai ki is subject ka quota poora bhar gaya
-    filled: { type: Boolean, default: false },
-  },
-  { _id: false }
-);
-
-const previousYearTestSchema = new mongoose.Schema(
-  {
-    examName: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-      index: true,
-    },
-    testName: {
-      type: String,
-      required: [true, "Test ka naam zaroori hai"],
-      trim: true,
-    },
-    year: {
-      type: Number,
-      required: [true, "Saal (year) batana zaroori hai"],
-    },
-    description: {
-      type: String,
-      trim: true,
-      default: "",
-    },
-
-    subjects: {
-      type: [pyqSubjectSchema],
-      validate: {
-        validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
-      },
-    },
-
-    marksPerQuestion: { type: Number, required: true, default: 1 },
-    negativeMarking: { type: Number, required: true, default: 0 },
-    durationMinutes: {
-      type: Number,
-      required: [true, "Duration (minutes) batana zaroori hai"],
-    },
-
-    totalQuestions: { type: Number, default: 0 },
-    isActive: { type: Boolean, default: true },
-
-    // ─────────────────────────────────────────────
-    // 👇 NAYA: Teacher-section — Blueprint-Shell model
-    // ─────────────────────────────────────────────
-
-    // null = global default paper (sabhi students ko dikhega, jab
-    // unke coupon-specific papers khatam ho jaayein — jaisa spec point
-    // 3.5 mein hai). Non-null = specific coupon/group ke liye bana
-    // teacher-created paper.
-    couponId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      default: null,
-      index: true,
-    },
-
-    // Shell kis Main Teacher ne banaya (global admin papers ke liye null)
-    createdByTeacher: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Teacher",
-      default: null,
-    },
-
-    // Sirf teacher-created shell papers mein use hota hai — kis subject
-    // ke kitne questions target hain. Global admin papers ke liye khaali []
-    blueprint: {
-      type: [
-        {
-          subjectName: { type: String, required: true },
-          questionCount: { type: Number, required: true },
-        },
-      ],
-      default: [],
-      _id: false,
-    },
-
-    // Global papers hamesha "complete" (admin ek-sath sab daalta hai,
-    // koi incremental-fill concept nahi). Teacher-created shell papers
-    // "draft" se shuru hote hain, jab tak blueprint ke saare subjects
-    // ka quota poora na bhar jaaye.
-    status: {
-      type: String,
-      enum: ["draft", "complete"],
-      default: "complete",
-    },
-  },
-  { timestamps: true }
-);
-
-// Save hone se pehle totalQuestions auto-calculate karo. Agar blueprint-shell
-// wala paper hai (blueprint.length > 0), to per-subject "filled" aur poore
-// paper ka "status" bhi yahin calculate ho jata hai.
-previousYearTestSchema.pre("save", function (next) {
-  this.totalQuestions = this.subjects.reduce(
-    (sum, subj) => sum + (subj.questions?.length || 0),
-    0
-  );
-
-  if (this.blueprint && this.blueprint.length > 0) {
-    let allFilled = true;
-
-    for (const bp of this.blueprint) {
-      const subj = this.subjects.find((s) => s.subjectName === bp.subjectName);
-      const filledCount = subj ? subj.questions.length : 0;
-      const isFilled = filledCount >= bp.questionCount;
-
-      if (subj) subj.filled = isFilled;
-      if (!isFilled) allFilled = false;
-    }
-
-    this.status = allFilled ? "complete" : "draft";
-  }
-
-  next();
-});
-
-const PreviousYearTest = rowQuestionConnection.model(
-  "PreviousYearTest",
-  previousYearTestSchema
-);
-
-export default PreviousYearTest;
-</file>
-
 <file path="backend/models/RankPredictorData.js">
 // models/RankPredictorData.js
 import mongoose from "mongoose";
@@ -3896,108 +3714,93 @@ const RankPredictorData = rowQuestionConnection.model(
 export default RankPredictorData;
 </file>
 
-<file path="backend/models/rowQuestionSchema.js">
+<file path="backend/models/Teacher.js">
+// models/Teacher.js
 import mongoose from "mongoose";
-// ⚡ Sahi export naam (rowQuestionConnection) ko import kiya
-import { rowQuestionConnection } from "../config/rowQuestion.js"; 
+import { rowQuestionConnection } from "../config/rowQuestion.js";
 
-const questionSchema = new mongoose.Schema(
+const teacherSchema = new mongoose.Schema(
   {
-    question: { type: String, required: true },
-    questionPhoto: { type: String, required: false },
-    option1: { type: String, required: true },
-    option2: { type: String, required: true },
-    option3: { type: String, required: true },
-    option4: { type: String, required: true }, 
-    correctOption: { type: Number, required: true }, 
-    questionNumber: { type: Number },
-    topicName: { type: String, required: true },
-    
-    // Spelling thik kar di: 'answerExplain'
-    answerExplain: { type: String, required: true },
-    answerExplainWithPhoto: { type: String, required: false },
-    subjectName: { type: String, required: true },
-    examName: { type: [String], required: true }, 
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    phone: { type: String, required: true, unique: true, trim: true },
+    password: { type: String },
+
+    role: { type: String, enum: ["main", "sub"], required: true },
+    examName: [{ type: String }], // teacher jis exam(o) ke liye kaam karta hai
+
+    // ---- Sub-teacher-only ----
+    parentTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", default: null },
+    assignedSubjects: [{ type: String }],
+
+    // ---- Main-teacher-only ----
+    subTeachers: [{ type: mongoose.Schema.Types.ObjectId, ref: "Teacher" }],
+
+    // ---- Invite / activation flow ----
+    status: { type: String, enum: ["pending", "active", "removed"], default: "pending" },
+    inviteToken: { type: String, default: null },
+    inviteTokenExpiry: { type: Date, default: null },
+
+    // ---- Group (coupon) context ----
+    activeCoupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
+    coupons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Coupon" }],
   },
   { timestamps: true }
 );
 
-// ⚡ Is specific connection ka use karke model ko compile aur export kiya
-export const Question = rowQuestionConnection.model("Question", questionSchema);
+const Teacher = rowQuestionConnection.model("Teacher", teacherSchema);
+export default Teacher;
 </file>
 
-<file path="backend/models/User.js">
-// models/User.js
-import mongoose from "mongoose";
-import { rowQuestionConnection } from "../config/rowQuestion.js";
+<file path="backend/utils/checkCouponAccess.js">
+// utils/checkCouponAccess.js
+// Reusable authorization helper — aage ke sabhi controllers (PYQ fill,
+// custom test, analysis) isi function ko import karke check karenge
+// ki teacher current coupon/subject ka access rakhta hai ya nahi.
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
 
-const userSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: [true, "Name zaroori hai"],
-      trim: true,
-    },
-    email: {
-      type: String,
-      required: [true, "Email zaroori hai"],
-      unique: true,
-      trim: true,
-      lowercase: true,
-    },
-    phone: {
-      type: String,
-      required: [true, "Phone number zaroori hai"],
-      unique: true,
-      trim: true,
-    },
-    password: {
-      type: String,
-      required: [true, "Password zaroori hai"],
-      minlength: [6, "Password kam se kam 6 characters ka hona chahiye"],
-    },
-    address: {
-      type: String,
-      required: [true, "Address zaroori hai"],
-      trim: true,
-    },
-    exam: {
-      type: String,
-      required: [true, "Exam ka naam zaroori hai"],
-      trim: true,
-    },
-
-    // ─────────────────────────────────────────────
-    // 👇 NAYA: Teacher-section ke liye — coupon/group linkage.
-    // exam-change wale pattern jaisa hi hai: ek waqt me sirf
-    // ek active coupon, purana switch karne par delete nahi hota.
-    // ─────────────────────────────────────────────
-    activeCoupon: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Coupon",
-      default: null,
-    },
-
-    // Poori history — coupon switch karte waqt purana entry ka
-    // leftAt set ho jata hai, naya entry push hota hai. Purana
-    // data kabhi delete nahi hota, sirf context badalta hai.
-    couponHistory: [
-      {
-        coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
-        examNameAtJoin: { type: String }, // us waqt kaunsa exam tha, reference ke liye
-        joinedAt: { type: Date, default: Date.now },
-        leftAt: { type: Date, default: null }, // null = abhi bhi active
-      },
-    ],
-  },
-  {
-    timestamps: true,
+/**
+ * @param {object} teacher - req.teacher (Main ya Sub)
+ * @param {string} couponId
+ * @param {string|null} subject - null pass karo agar sirf coupon-level check karna hai
+ * @returns {Promise<{ allowed: boolean, coupon: object|null, reason?: string }>}
+ */
+export const checkCouponAccess = async (teacher, couponId, subject = null) => {
+  if (!couponId) {
+    return { allowed: false, coupon: null, reason: "couponId zaroori hai." };
   }
-);
 
-const User = rowQuestionConnection.model("User", userSchema);
+  const coupon = await Coupon.findById(couponId);
+  if (!coupon) {
+    return { allowed: false, coupon: null, reason: "Coupon nahi mila." };
+  }
 
-export default User;
+  // Main Teacher — agar wahi coupon ka owner hai, hamesha allow
+  if (teacher.role === "main") {
+    if (coupon.mainTeacher.toString() === teacher._id.toString()) {
+      return { allowed: true, coupon };
+    }
+    return { allowed: false, coupon, reason: "Ye aapka coupon nahi hai." };
+  }
+
+  // Sub Teacher — CouponAccess record dhundo
+  const query = { coupon: coupon._id, subTeacher: teacher._id };
+  if (subject) query.subject = subject;
+
+  const access = await CouponAccess.findOne(query);
+  if (!access) {
+    return {
+      allowed: false,
+      coupon,
+      reason: subject
+        ? `Aap is coupon ke '${subject}' subject ke liye authorized nahi hain.`
+        : "Aap is coupon ke liye authorized nahi hain.",
+    };
+  }
+
+  return { allowed: true, coupon };
+};
 </file>
 
 <file path="backend/utils/dateHelpers.js">
@@ -4010,10 +3813,6 @@ export const getTodayIST = () => {
   const istTime = new Date(now.getTime() + istOffsetMs);
   return istTime.toISOString().split("T")[0];
 };
-</file>
-
-<file path="backend/.gitignore">
-repomix-output
 </file>
 
 <file path="backend/.gitignoretouch">
@@ -6166,455 +5965,98 @@ export const addBluePrint = async (req, res) => {
 };
 </file>
 
-<file path="backend/controllers/addMockTest.js">
-// controllers/addMocktest.js
-import mongoose from "mongoose";
-import Blueprint from "../models/bluePrint.js";
-import Performance from "../models/Performance.js";
-import { Question } from "../models/rowQuestionSchema.js";
+<file path="backend/controllers/addTeacher.js">
+// controllers/addTeacher.js
+import Teacher from "../models/Teacher.js";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
 
-// ─────────────────────────────────────────────
-// HELPER 1: Fisher-Yates Shuffle (unbiased)
-// ─────────────────────────────────────────────
-const fisherYatesShuffle = (arr) => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-// ─────────────────────────────────────────────
-// HELPER 2: String IDs → ObjectId array
-// BUG FIX 2: Invalid IDs filter karo — null/undefined/broken string crash karte hain
-// ─────────────────────────────────────────────
-const toObjectIds = (idIterable) =>
-  Array.from(idIterable)
-    .filter((id) => id && mongoose.Types.ObjectId.isValid(id)) // invalid IDs skip
-    .map((id) => new mongoose.Types.ObjectId(id));
-
-// ─────────────────────────────────────────────
-// HELPER 3: Topic name normalize karo
-// BUG FIX 7: "Sandhi", "sandhi", "SANDHI" → sab "sandhi" ho jayenge
-// ─────────────────────────────────────────────
-const normalizeTopic = (t) => (t ? t.trim().toLowerCase() : "");
-
-export const addMocktest = async (req, res) => {
+export const addTeacher = async (req, res) => {
   try {
-    // ─────────────────────────────────────────────
-    // STEP 0: Validation
-    // ─────────────────────────────────────────────
-    const { userId, examName, blueprintName } = req.body;
+    // 1. Frontend se data nikalna
+    const { name, email, phone, password, examName } = req.body;
 
-    if (!userId || !examName || !blueprintName) {
+    // 2. Validation check 
+    if (!name || !email || !phone || !password || !examName) {
       return res.status(400).json({
         success: false,
-        message: "userId, examName aur blueprintName teeno zaroori hain!",
+        message: "Sabhi fields bharna zaroori hai!",
       });
     }
 
-    // ─────────────────────────────────────────────
-    // STEP 1: Blueprint dhundo — dono fields se exact match
-    // ─────────────────────────────────────────────
-    const blueprint = await Blueprint.findOne({
-      examName: examName,
-      blueprintName: blueprintName,
-    });
+    // 3. Normalization
+    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedPhone = phone.trim();
 
-    if (!blueprint) {
-      return res.status(404).json({
+    // 4. Duplicate Check
+    const existingTeacher = await Teacher.findOne({ 
+      $or: [{ email: normalizedEmail }, { phone: normalizedPhone }] 
+    });
+    
+    if (existingTeacher) {
+      return res.status(400).json({
         success: false,
-        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+        message: "Is email ya phone number se account pehle hi bana hua hai!",
       });
     }
 
-    // ─────────────────────────────────────────────
-    // STEP 2: Past attempts nikalo + populate
-    // ─────────────────────────────────────────────
-    const pastAttempts = await Performance.find({
-      userId: userId,
-      examName: examName,
-    }).populate({
-      path: "attemptedQuestions.questionId",
-      select: "topicName subjectName",
-      model: Question,
+    // 5. Password ko hash karna
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // 6. Naya Teacher document save karna
+    const newTeacher = new Teacher({
+      name: name.trim(),
+      email: normalizedEmail,
+      phone: normalizedPhone,
+      password: hashedPassword,
+      examName: [examName], 
+      role: "main",
+      status: "active",
     });
+    
+    await newTeacher.save();
 
-    const isNewUser = pastAttempts.length === 0;
-
-    // ─────────────────────────────────────────────
-    // STEP 3 + 4: Weak Topics Map + Used IDs — ek hi loop mein
-    // BUG FIX 7: topic names normalize karke store karo
-    // BUG FIX 8: usedQuestionIds sirf Performance se — generate karte waqt add NAHI
-    // ─────────────────────────────────────────────
-    const weakTopicMap = {};   // { subject_normalized: { topic_normalized: wrongCount } }
-    const usedQuestionIds = new Set(); // sirf already ATTEMPTED questions
-
-    if (!isNewUser) {
-      for (const attempt of pastAttempts) {
-        for (const aq of attempt.attemptedQuestions) {
-          if (!aq.questionId) continue;
-
-          // BUG FIX 8: usedQuestionIds sirf yahan — Performance se
-          const idStr = aq.questionId._id
-            ? aq.questionId._id.toString()
-            : aq.questionId.toString();
-          if (idStr) usedQuestionIds.add(idStr);
-
-          // Weak topic map — sirf galat jawab
-          if (aq.isCorrect === false) {
-            const subject = normalizeTopic(aq.questionId.subjectName);
-            const topic = normalizeTopic(aq.questionId.topicName);
-            if (subject && topic) {
-              if (!weakTopicMap[subject]) weakTopicMap[subject] = {};
-              if (!weakTopicMap[subject][topic]) weakTopicMap[subject][topic] = 0;
-              weakTopicMap[subject][topic]++;
-            }
-          }
-        }
-      }
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 5: Har subject ke liye questions select karo
-    // ─────────────────────────────────────────────
-    const finalMockSubjects = [];
-    const MAX_EXTRA_PER_TOPIC = 2; // base 1 + max 2 extra = total max 3 per topic
-    const MAX_PER_TOPIC = 1 + MAX_EXTRA_PER_TOPIC; // = 3
-
-    // BUG FIX 6: usedIdsArray ek baar banao subjects loop se BAHAR
-    // Sab subjects ke liye yahi array use hoga — dobara toObjectIds call nahi
-    const usedIdsArray = toObjectIds(usedQuestionIds);
-
-    for (const subjectConfig of blueprint.subjects) {
-      const { subjectName, questionCount, importantTopics = [] } = subjectConfig;
-
-      // BUG FIX 7: importantTopics bhi normalize karo comparison ke liye
-      const importantTopicsNorm = importantTopics.map(normalizeTopic);
-
-      // ── 5a. Ek hi aggregate mein sab topics ke questions fetch karo ──
-      // BUG FIX 3: distinct + aggregate(unused) = 2 calls, pehle 3 thein
-      // BUG FIX 4: $project PEHLE lagao — $push: "$$ROOT" se pehle sirf zaruri fields lo
-      //            Isse Mongo RAM waste nahi karega poore documents push karke
-      // BUG FIX 5+6: $sample aggregate ke andar nahi, JS-side fisherYates se random
-
-      // Phase 1: Unused questions (jo pehle attempt nahi kiye)
-      const unusedQuestions = await Question.aggregate([
-        {
-          $match: {
-            examName: { $in: [examName] },
-            subjectName: subjectName,
-            _id: { $nin: usedIdsArray },
-          },
-        },
-        {
-          // BUG FIX 4: $project PEHLE — sirf ye fields chahiye, baaki sab skip
-          $project: {
-            _id: 1,
-            question: 1,
-            option1: 1,
-            option2: 1,
-            option3: 1,
-            option4: 1,
-            correctOption: 1,
-            topicName: 1,
-            subjectName: 1,
-            questionNumber: 1,
-          },
-        },
-        {
-          $group: {
-            _id: "$topicName",
-            questions: { $push: "$$ROOT" }, // ab sirf projected fields push hongi
-          },
-        },
-        {
-          $project: {
-            topicName: "$_id",
-            questions: { $slice: ["$questions", MAX_PER_TOPIC] },
-          },
-        },
-      ]);
-
-      // Phase 2: Fallback — jin topics ke unused questions nahi mile
-      // BUG FIX 3: distinct ki jagah unusedQuestions se hi topic list nikalo
-      const unusedTopicNames = unusedQuestions.map((g) => g._id);
-
-      // Sabhi topics dhundho — ek distinct call (unavoidable, distinct alag info deta hai)
-      const allTopicsDistinct = await Question.distinct("topicName", {
-        examName: { $in: [examName] },
-        subjectName: subjectName,
-      });
-
-      if (allTopicsDistinct.length === 0) continue; // is subject mein koi question hi nahi
-
-      const topicsWithNoUnused = allTopicsDistinct.filter(
-        (t) => !unusedTopicNames.includes(t)
-      );
-
-      // BUG FIX 5: Fallback mein bhi random chahiye — JS-side shuffle karunga
-      let fallbackQuestions = [];
-      if (topicsWithNoUnused.length > 0) {
-        fallbackQuestions = await Question.aggregate([
-          {
-            $match: {
-              examName: { $in: [examName] },
-              subjectName: subjectName,
-              topicName: { $in: topicsWithNoUnused },
-            },
-          },
-          {
-            // BUG FIX 4: $project pehle yahan bhi
-            $project: {
-              _id: 1,
-              question: 1,
-              option1: 1,
-              option2: 1,
-              option3: 1,
-              option4: 1,
-              correctOption: 1,
-              topicName: 1,
-              subjectName: 1,
-              questionNumber: 1,
-            },
-          },
-          {
-            $group: {
-              _id: "$topicName",
-              questions: { $push: "$$ROOT" },
-            },
-          },
-          {
-            $project: {
-              topicName: "$_id",
-              // MAX_PER_TOPIC se zyada fetch karo taaki shuffle ke baad variety ho
-              // BUG FIX 5: zyada lo, phir JS mein shuffle karke slice karo
-              questions: { $slice: ["$questions", MAX_PER_TOPIC * 3] },
-            },
-          },
-        ]);
-      }
-
-      // Topic question pool banao: { topicName: [shuffled questions] }
-      // BUG FIX 5: dono phases mein fisherYates shuffle — deterministic nahi rahega
-      const topicQuestionPool = {};
-      for (const group of [...unusedQuestions, ...fallbackQuestions]) {
-        const topicName = group._id || group.topicName;
-        if (!topicName) continue;
-        // Shuffle karo — unused aur fallback dono
-        const shuffled = fisherYatesShuffle(group.questions);
-        // Max 3 rakhna hai
-        topicQuestionPool[topicName] = shuffled.slice(0, MAX_PER_TOPIC);
-      }
-
-      // Pointer: har topic ke liye next pick index
-      const topicPointer = {};
-      Object.keys(topicQuestionPool).forEach((t) => (topicPointer[t] = 0));
-
-      // Tracker: kitne select hue per topic
-      const topicSelectedCount = {};
-      allTopicsDistinct.forEach((t) => (topicSelectedCount[t] = 0));
-
-      // Is subject ke selected IDs — same-subject duplicate rokne ke liye
-      const selectedIdsThisSubject = new Set();
-
-      // Helper: pool se next question lo
-      const pickFromTopic = (topic) => {
-        const pool = topicQuestionPool[topic];
-        if (!pool) return null;
-        const ptr = topicPointer[topic] || 0;
-        if (ptr >= pool.length) return null;
-        const q = pool[ptr];
-        topicPointer[topic] = ptr + 1;
-        return q;
-      };
-
-      // ── 5b. BASE ALLOCATION ──
-      let baseAllocated = 0;
-
-      // BUG FIX 7: Topics sorted by weak severity (normalize karke compare)
-      let orderedTopicsForBase = [...allTopicsDistinct];
-      if (!isNewUser) {
-        const subjectNorm = normalizeTopic(subjectName);
-        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
-        orderedTopicsForBase.sort((a, b) => {
-          const wa = weakTopicsThisSubject[normalizeTopic(a)] || 0;
-          const wb = weakTopicsThisSubject[normalizeTopic(b)] || 0;
-          return wb - wa;
-        });
-      }
-
-      for (const topic of orderedTopicsForBase) {
-        if (baseAllocated >= questionCount) break;
-
-        const q = pickFromTopic(topic);
-        if (q) {
-          const qId = q._id.toString();
-          selectedIdsThisSubject.add(qId);
-          // BUG FIX 8: usedQuestionIds mein ADD NAHI — sirf selectedIds track karo
-          topicSelectedCount[topic] = 1;
-          baseAllocated++;
-        }
-      }
-
-      // ── 5c. Extra count ──
-      let extraNeeded = questionCount - baseAllocated;
-
-      // ── 5d. Extra Pool (priority + severity) ──
-      let extraTopicPool = [];
-
-      // BUG FIX 1: Agar extraNeeded === 0 ya extraTopicPool empty hoga
-      // to while loop chalega hi nahi (maxLoopIterations = 0)
-      // lekin explicit guard bhi lagao safety ke liye
-      if (extraNeeded <= 0) {
-        extraTopicPool = []; // koi extra nahi chahiye
-      } else if (isNewUser) {
-        const importantInDB = allTopicsDistinct.filter((t) =>
-          importantTopicsNorm.includes(normalizeTopic(t))
-        );
-        const nonImportantTopics = allTopicsDistinct.filter(
-          (t) => !importantTopicsNorm.includes(normalizeTopic(t))
-        );
-        extraTopicPool = [...importantInDB, ...nonImportantTopics];
-      } else {
-        const subjectNorm = normalizeTopic(subjectName);
-        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
-
-        const importantInDB = allTopicsDistinct.filter((t) =>
-          importantTopicsNorm.includes(normalizeTopic(t))
-        );
-
-        const p1 = importantInDB
-          .filter((t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0)
-          .sort((a, b) =>
-            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
-            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
-          );
-
-        const p2 = importantInDB.filter(
-          (t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
-        );
-
-        const p3 = allTopicsDistinct
-          .filter(
-            (t) =>
-              !importantTopicsNorm.includes(normalizeTopic(t)) &&
-              (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0
-          )
-          .sort((a, b) =>
-            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
-            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
-          );
-
-        const p4 = allTopicsDistinct.filter(
-          (t) =>
-            !importantTopicsNorm.includes(normalizeTopic(t)) &&
-            (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
-        );
-
-        extraTopicPool = [...p1, ...p2, ...p3, ...p4];
-      }
-
-      // ── 5e. Extra questions lo round-robin se ──
-      // BUG FIX 1: extraTopicPool empty check EXPLICIT — 0 % 0 = NaN avoid
-      if (extraTopicPool.length > 0 && extraNeeded > 0) {
-        let extraPoolIndex = 0;
-        let loopGuard = 0;
-        const maxLoopIterations = extraTopicPool.length * MAX_EXTRA_PER_TOPIC * 2;
-
-        while (extraNeeded > 0 && loopGuard < maxLoopIterations) {
-          loopGuard++;
-
-          // BUG FIX 1: extraTopicPool.length guaranteed > 0 yahan
-          const topic = extraTopicPool[extraPoolIndex % extraTopicPool.length];
-          extraPoolIndex++;
-
-          const actualBaseCount = topicSelectedCount[topic] > 0 ? 1 : 0;
-          const currentCount = topicSelectedCount[topic] || 0;
-          const extraAlreadyTaken = currentCount - actualBaseCount;
-
-          if (extraAlreadyTaken >= MAX_EXTRA_PER_TOPIC) continue;
-
-          const q = pickFromTopic(topic);
-          if (q) {
-            const qId = q._id.toString();
-            if (!selectedIdsThisSubject.has(qId)) {
-              selectedIdsThisSubject.add(qId);
-              // BUG FIX 8: yahan bhi usedQuestionIds mein ADD NAHI
-              topicSelectedCount[topic] = (topicSelectedCount[topic] || 0) + 1;
-              extraNeeded--;
-            }
-          }
-        }
-      }
-
-      // ── 5f. Final questions — already fetched pool se nikalo (no extra DB call) ──
-      const allFetchedQuestions = [
-        ...unusedQuestions.flatMap((g) => g.questions),
-        ...fallbackQuestions.flatMap((g) => g.questions),
-      ];
-
-      // 👇 BUG FIX (security): correctOption yahan se HATA diya gaya —
-      // pehle ye seedha frontend ko chala jaata tha, aur DevTools ke
-      // Network tab mein test dete waqt hi sahi jawab dikh jaata tha.
-      // Ab isCorrect backend (addPerformence.js) khud DB se check karega.
-      const finalQuestions = allFetchedQuestions
-        .filter((q) => selectedIdsThisSubject.has(q._id.toString()))
-        .map((q) => ({
-          _id: q._id,
-          question: q.question,
-          option1: q.option1,
-          option2: q.option2,
-          option3: q.option3,
-          option4: q.option4,
-          topicName: q.topicName,
-          subjectName: q.subjectName,
-          questionNumber: q.questionNumber,
-        }));
-
-      // ── 5g. Final shuffle ──
-      const shuffledFinal = fisherYatesShuffle(finalQuestions);
-
-      finalMockSubjects.push({
-        subjectName,
-        questionCount: shuffledFinal.length,
-        questions: shuffledFinal,
-      });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 6 + 7: Response
-    // ─────────────────────────────────────────────
-    const totalActualQuestions = finalMockSubjects.reduce(
-      (sum, s) => sum + s.questions.length,
-      0
+    // 7. JWT Token Generate karna
+    const token = jwt.sign(
+      { teacherId: newTeacher._id },
+      process.env.JWT_SECRET || "mera_super_secret_key",
+      { expiresIn: "7d" }
     );
 
-    return res.status(200).json({
-      success: true,
-      message: isNewUser
-        ? "Naye user ke liye standard mock test ready hai!"
-        : "Aapke performance ke hisaab se personalized mock test ready hai!",
-      mockTest: {
-        examName: blueprint.examName,
-        blueprintName: blueprint.blueprintName,
-        mockType: blueprint.mockType,
-        marksPerQuestion: blueprint.marksPerQuestion,
-        negativeMarking: blueprint.negativeMarking,
-        totalQuestionsExpected: blueprint.totalQuestions,
-        totalQuestionsActual: totalActualQuestions,
-        isPersonalized: !isNewUser,
-        subjects: finalMockSubjects,
-      },
-    });
+    // 8. Cookie Options
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    // 9. Response bhejna
+    res.status(201)
+      .cookie("teacherToken", token, cookieOptions)
+      .json({
+        success: true,
+        message: "Teacher successfully registered & logged in!",
+        data: {
+          _id: newTeacher._id,
+          name: newTeacher.name,
+          email: newTeacher.email,
+          phone: newTeacher.phone,
+          role: newTeacher.role,
+          examName: newTeacher.examName,
+        }
+      });
+
   } catch (error) {
-    console.error("addMocktest error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server mein error aa gaya mock test banate waqt.",
-      error: error.message,
-    });
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Is email ya phone se account pehle hi maujood hai.",
+      });
+    }
+    console.error("Teacher Signup Error:", error);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
 </file>
@@ -6821,6 +6263,98 @@ export const submitChallenge = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server mein error aa gaya challenge submit karte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
+<file path="backend/controllers/teacherAuthentication.js">
+// controllers/teacherAuthentication.js
+import Teacher from "../models/Teacher.js";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+
+export const loginTeacher = async (req, res) => {
+  try {
+    // 1. Frontend se email ya phone, aur password nikalna
+    const { email, phone, password } = req.body;
+
+    if ((!email && !phone) || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Login karne ke liye Email ya Phone, aur Password dena zaroori hai!",
+      });
+    }
+
+    // 2. Query banana aur Normalization karna (taaki capital/small letter ka issue na ho)
+    let query = [];
+    if (email) query.push({ email: email.toLowerCase().trim() });
+    if (phone) query.push({ phone: phone.trim() });
+
+    // 3. Database mein Teacher ko dhundna
+    const teacher = await Teacher.findOne({ $or: query });
+
+    if (!teacher) {
+      return res.status(404).json({
+        success: false,
+        message: "Is email ya phone se koi account nahi mila.",
+      });
+    }
+
+    // 4. Status Check — Sirf "active" teachers hi login kar sakte hain
+    if (teacher.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: `Aapka account abhi '${teacher.status}' status mein hai. Sirf active accounts login kar sakte hain.`,
+      });
+    }
+
+    // 5. Password Verify karna
+    const isPasswordCorrect = await bcrypt.compare(password, teacher.password);
+    if (!isPasswordCorrect) {
+      return res.status(400).json({
+        success: false,
+        message: "Galat password!",
+      });
+    }
+
+    // 6. JWT Token Generate karna
+    const token = jwt.sign(
+      { teacherId: teacher._id },
+      process.env.JWT_SECRET || "mera_super_secret_key",
+      { expiresIn: "7d" }
+    );
+
+    // 7. Cookie Options set karna
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true, // Humesha true rakhein agar frontend aur backend alag URL par hain ya production mein hain
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    // 8. Response bhejna
+    return res.status(200)
+      .cookie("teacherToken", token, cookieOptions)
+      .json({
+        success: true,
+        message: "Login successful!",
+        data: {
+          _id: teacher._id,
+          name: teacher.name,
+          email: teacher.email,
+          phone: teacher.phone,
+          role: teacher.role,
+          examName: teacher.examName,
+        },
+      });
+
+  } catch (error) {
+    console.error("Teacher Login Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya login karte waqt.",
       error: error.message,
     });
   }
@@ -7083,6 +6617,292 @@ const performanceSchema = new mongoose.Schema(
 const Performance = rowQuestionConnection.model("Performance", performanceSchema);
 
 export default Performance;
+</file>
+
+<file path="backend/models/PreviousYearTest.js">
+// models/PreviousYearTest.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+// ─────────────────────────────────────────────
+// Ek question ka poora data — admin/teacher khud sab kuchh
+// manually daalega. Koi Question pool se link nahi hai, kyunki
+// ye REAL purane paper ke EXACT sawaal hain, permanently fixed.
+// ─────────────────────────────────────────────
+const pyqQuestionSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: [true, "Question likhna zaroori hai"] },
+    questionPhoto: { type: String, default: null },
+    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
+    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
+    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
+    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
+    correctOption: {
+      type: Number,
+      required: [true, "Correct option (1-4) zaroori hai"],
+      min: 1,
+      max: 4,
+    },
+    answerExplain: { type: String, default: "" },
+    answerExplainWithPhoto: { type: String, default: null },
+    topicName: { type: String, default: "General" },
+    subjectName: { type: String, required: [true, "Subject ka naam zaroori hai"] },
+    questionNumber: { type: Number },
+  },
+  { _id: true } // har question ki apni _id — attempt track karne ke liye
+);
+
+const pyqSubjectSchema = new mongoose.Schema(
+  {
+    subjectName: { type: String, required: true },
+    questions: [pyqQuestionSchema],
+    // 👇 NAYA: sirf blueprint-shell (teacher-created) papers ke liye
+    // meaningful — batata hai ki is subject ka quota poora bhar gaya
+    filled: { type: Boolean, default: false },
+  },
+  { _id: false }
+);
+
+const previousYearTestSchema = new mongoose.Schema(
+  {
+    examName: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+      index: true,
+    },
+    testName: {
+      type: String,
+      required: [true, "Test ka naam zaroori hai"],
+      trim: true,
+    },
+    year: {
+      type: Number,
+      required: [true, "Saal (year) batana zaroori hai"],
+    },
+    description: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    subjects: {
+      type: [pyqSubjectSchema],
+      validate: {
+        validator: (arr) => Array.isArray(arr) && arr.length > 0,
+        message: "Kam se kam ek subject ke questions hone chahiye",
+      },
+    },
+
+    marksPerQuestion: { type: Number, required: true, default: 1 },
+    negativeMarking: { type: Number, required: true, default: 0 },
+    durationMinutes: {
+      type: Number,
+      required: [true, "Duration (minutes) batana zaroori hai"],
+    },
+
+    totalQuestions: { type: Number, default: 0 },
+    isActive: { type: Boolean, default: true },
+
+    // ─────────────────────────────────────────────
+    // 👇 NAYA: Teacher-section — Blueprint-Shell model
+    // ─────────────────────────────────────────────
+
+    // null = global default paper (sabhi students ko dikhega, jab
+    // unke coupon-specific papers khatam ho jaayein — jaisa spec point
+    // 3.5 mein hai). Non-null = specific coupon/group ke liye bana
+    // teacher-created paper.
+    couponId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+      index: true,
+    },
+
+    // Shell kis Main Teacher ne banaya (global admin papers ke liye null)
+    createdByTeacher: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Teacher",
+      default: null,
+    },
+
+    // Sirf teacher-created shell papers mein use hota hai — kis subject
+    // ke kitne questions target hain. Global admin papers ke liye khaali []
+    blueprint: {
+      type: [
+        {
+          subjectName: { type: String, required: true },
+          questionCount: { type: Number, required: true },
+        },
+      ],
+      default: [],
+      _id: false,
+    },
+
+    // Global papers hamesha "complete" (admin ek-sath sab daalta hai,
+    // koi incremental-fill concept nahi). Teacher-created shell papers
+    // "draft" se shuru hote hain, jab tak blueprint ke saare subjects
+    // ka quota poora na bhar jaaye.
+    status: {
+      type: String,
+      enum: ["draft", "complete"],
+      default: "complete",
+    },
+  },
+  { timestamps: true }
+);
+
+// Save hone se pehle totalQuestions auto-calculate karo. Agar blueprint-shell
+// wala paper hai (blueprint.length > 0), to per-subject "filled" aur poore
+// paper ka "status" bhi yahin calculate ho jata hai.
+previousYearTestSchema.pre("save", function (next) {
+  this.totalQuestions = this.subjects.reduce(
+    (sum, subj) => sum + (subj.questions?.length || 0),
+    0
+  );
+
+  if (this.blueprint && this.blueprint.length > 0) {
+    let allFilled = true;
+
+    for (const bp of this.blueprint) {
+      const subj = this.subjects.find((s) => s.subjectName === bp.subjectName);
+      const filledCount = subj ? subj.questions.length : 0;
+      const isFilled = filledCount >= bp.questionCount;
+
+      if (subj) subj.filled = isFilled;
+      if (!isFilled) allFilled = false;
+    }
+
+    this.status = allFilled ? "complete" : "draft";
+  }
+
+  next();
+});
+
+const PreviousYearTest = rowQuestionConnection.model(
+  "PreviousYearTest",
+  previousYearTestSchema
+);
+
+export default PreviousYearTest;
+</file>
+
+<file path="backend/models/rowQuestionSchema.js">
+import mongoose from "mongoose";
+// ⚡ Sahi export naam (rowQuestionConnection) ko import kiya
+import { rowQuestionConnection } from "../config/rowQuestion.js"; 
+
+const questionSchema = new mongoose.Schema(
+  {
+    question: { type: String, required: true },
+    questionPhoto: { type: String, required: false },
+    option1: { type: String, required: true },
+    option2: { type: String, required: true },
+    option3: { type: String, required: true },
+    option4: { type: String, required: true }, 
+    correctOption: { type: Number, required: true }, 
+    questionNumber: { type: Number },
+    topicName: { type: String, required: true },
+    
+    // Spelling thik kar di: 'answerExplain'
+    answerExplain: { type: String, required: true },
+    answerExplainWithPhoto: { type: String, required: false },
+    subjectName: { type: String, required: true },
+    examName: { type: [String], required: true }, 
+    coupon: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Coupon",
+  default: null, // null = purana/global/free question
+},
+addedByTeacher: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: "Teacher",
+  default: null,
+}
+  },
+  { timestamps: true }
+);
+
+// ⚡ Is specific connection ka use karke model ko compile aur export kiya
+export const Question = rowQuestionConnection.model("Question", questionSchema);
+</file>
+
+<file path="backend/models/User.js">
+// models/User.js
+import mongoose from "mongoose";
+import { rowQuestionConnection } from "../config/rowQuestion.js";
+
+const userSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Name zaroori hai"],
+      trim: true,
+    },
+    email: {
+      type: String,
+      required: [true, "Email zaroori hai"],
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    phone: {
+      type: String,
+      required: [true, "Phone number zaroori hai"],
+      unique: true,
+      trim: true,
+    },
+    password: {
+      type: String,
+      required: [true, "Password zaroori hai"],
+      minlength: [6, "Password kam se kam 6 characters ka hona chahiye"],
+    },
+    address: {
+      type: String,
+      required: [true, "Address zaroori hai"],
+      trim: true,
+    },
+    exam: {
+      type: String,
+      required: [true, "Exam ka naam zaroori hai"],
+      trim: true,
+    },
+
+    // ─────────────────────────────────────────────
+    // 👇 NAYA: Teacher-section ke liye — coupon/group linkage.
+    // exam-change wale pattern jaisa hi hai: ek waqt me sirf
+    // ek active coupon, purana switch karne par delete nahi hota.
+    // ─────────────────────────────────────────────
+    activeCoupon: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Coupon",
+      default: null,
+    },
+
+    // Poori history — coupon switch karte waqt purana entry ka
+    // leftAt set ho jata hai, naya entry push hota hai. Purana
+    // data kabhi delete nahi hota, sirf context badalta hai.
+    couponHistory: [
+      {
+        coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", required: true },
+        examNameAtJoin: { type: String }, // us waqt kaunsa exam tha, reference ke liye
+        joinedAt: { type: Date, default: Date.now },
+        leftAt: { type: Date, default: null }, // null = abhi bhi active
+      },
+    ],
+  },
+  {
+    timestamps: true,
+  }
+);
+
+const User = rowQuestionConnection.model("User", userSchema);
+
+export default User;
+</file>
+
+<file path="backend/.gitignore">
+repomix-output
 </file>
 
 <file path="frontend/src/api/api.js">
@@ -7447,6 +7267,506 @@ export default {
       });
     },
   ],
+};
+</file>
+
+<file path="backend/controllers/addMockTest.js">
+// controllers/addMocktest.js
+import mongoose from "mongoose";
+import Blueprint from "../models/bluePrint.js";
+import Performance from "../models/Performance.js";
+import User from "../models/User.js"; // 👈 NAYA — activeCoupon nikalne ke liye
+import Coupon from "../models/Coupon.js"; // 👈 NAYA — coupon ka exam verify karne ke liye
+import { Question } from "../models/rowQuestionSchema.js";
+
+// ─────────────────────────────────────────────
+// HELPER 1: Fisher-Yates Shuffle (unbiased)
+// ─────────────────────────────────────────────
+const fisherYatesShuffle = (arr) => {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+};
+
+// ─────────────────────────────────────────────
+// HELPER 2: String IDs → ObjectId array
+// BUG FIX 2: Invalid IDs filter karo — null/undefined/broken string crash karte hain
+// ─────────────────────────────────────────────
+const toObjectIds = (idIterable) =>
+  Array.from(idIterable)
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id)) // invalid IDs skip
+    .map((id) => new mongoose.Types.ObjectId(id));
+
+// ─────────────────────────────────────────────
+// HELPER 3: Topic name normalize karo
+// BUG FIX 7: "Sandhi", "sandhi", "SANDHI" → sab "sandhi" ho jayenge
+// ─────────────────────────────────────────────
+const normalizeTopic = (t) => (t ? t.trim().toLowerCase() : "");
+
+export const addMocktest = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Validation
+    // ─────────────────────────────────────────────
+    const { userId, examName, blueprintName } = req.body;
+
+    if (!userId || !examName || !blueprintName) {
+      return res.status(400).json({
+        success: false,
+        message: "userId, examName aur blueprintName teeno zaroori hain!",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId.",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Blueprint dhundo — dono fields se exact match
+    // ─────────────────────────────────────────────
+    const blueprint = await Blueprint.findOne({
+      examName: examName,
+      blueprintName: blueprintName,
+    });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1.5: 👇 NAYA — User ka activeCoupon nikalo, coupon-aware
+    // question-pool filter banao.
+    //
+    // Logic:
+    // - Agar student kisi batch (coupon) mein enrolled hai AUR us coupon
+    //   ka exam wahi hai jo abhi request kiya gaya hai → sirf usi batch
+    //   ke exclusive questions milenge (coupon: activeCouponId).
+    // - Agar student kisi batch mein nahi hai, YA uska activeCoupon kisi
+    //   dusre exam ka hai (jaise beech mein exam badal liya lekin batch
+    //   nahi chhoda) → global/free pool use hoga (coupon: null), taaki
+    //   mock test kabhi khaali na aaye.
+    // ─────────────────────────────────────────────
+    const user = await User.findById(userId).select("activeCoupon");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User nahi mila!",
+      });
+    }
+
+    let activeCouponId = null;
+    if (user.activeCoupon) {
+      const coupon = await Coupon.findById(user.activeCoupon).select("exam");
+      if (coupon && coupon.exam === examName) {
+        activeCouponId = coupon._id;
+      }
+    }
+
+    // Ye object har Question query ke $match mein spread hoga
+    const couponFilter = activeCouponId
+      ? { coupon: activeCouponId }
+      : { coupon: null };
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Past attempts nikalo + populate
+    // ─────────────────────────────────────────────
+    const pastAttempts = await Performance.find({
+      userId: userId,
+      examName: examName,
+    }).populate({
+      path: "attemptedQuestions.questionId",
+      select: "topicName subjectName",
+      model: Question,
+    });
+
+    const isNewUser = pastAttempts.length === 0;
+
+    // ─────────────────────────────────────────────
+    // STEP 3 + 4: Weak Topics Map + Used IDs — ek hi loop mein
+    // BUG FIX 7: topic names normalize karke store karo
+    // BUG FIX 8: usedQuestionIds sirf Performance se — generate karte waqt add NAHI
+    // ─────────────────────────────────────────────
+    const weakTopicMap = {};   // { subject_normalized: { topic_normalized: wrongCount } }
+    const usedQuestionIds = new Set(); // sirf already ATTEMPTED questions
+
+    if (!isNewUser) {
+      for (const attempt of pastAttempts) {
+        for (const aq of attempt.attemptedQuestions) {
+          if (!aq.questionId) continue;
+
+          // BUG FIX 8: usedQuestionIds sirf yahan — Performance se
+          const idStr = aq.questionId._id
+            ? aq.questionId._id.toString()
+            : aq.questionId.toString();
+          if (idStr) usedQuestionIds.add(idStr);
+
+          // Weak topic map — sirf galat jawab
+          if (aq.isCorrect === false) {
+            const subject = normalizeTopic(aq.questionId.subjectName);
+            const topic = normalizeTopic(aq.questionId.topicName);
+            if (subject && topic) {
+              if (!weakTopicMap[subject]) weakTopicMap[subject] = {};
+              if (!weakTopicMap[subject][topic]) weakTopicMap[subject][topic] = 0;
+              weakTopicMap[subject][topic]++;
+            }
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Har subject ke liye questions select karo
+    // ─────────────────────────────────────────────
+    const finalMockSubjects = [];
+    const MAX_EXTRA_PER_TOPIC = 2; // base 1 + max 2 extra = total max 3 per topic
+    const MAX_PER_TOPIC = 1 + MAX_EXTRA_PER_TOPIC; // = 3
+
+    // BUG FIX 6: usedIdsArray ek baar banao subjects loop se BAHAR
+    // Sab subjects ke liye yahi array use hoga — dobara toObjectIds call nahi
+    const usedIdsArray = toObjectIds(usedQuestionIds);
+
+    for (const subjectConfig of blueprint.subjects) {
+      const { subjectName, questionCount, importantTopics = [] } = subjectConfig;
+
+      // BUG FIX 7: importantTopics bhi normalize karo comparison ke liye
+      const importantTopicsNorm = importantTopics.map(normalizeTopic);
+
+      // ── 5a. Ek hi aggregate mein sab topics ke questions fetch karo ──
+      // BUG FIX 3: distinct + aggregate(unused) = 2 calls, pehle 3 thein
+      // BUG FIX 4: $project PEHLE lagao — $push: "$$ROOT" se pehle sirf zaruri fields lo
+      //            Isse Mongo RAM waste nahi karega poore documents push karke
+      // BUG FIX 5+6: $sample aggregate ke andar nahi, JS-side fisherYates se random
+
+      // Phase 1: Unused questions (jo pehle attempt nahi kiye)
+      const unusedQuestions = await Question.aggregate([
+        {
+          $match: {
+            examName: { $in: [examName] },
+            subjectName: subjectName,
+            _id: { $nin: usedIdsArray },
+            ...couponFilter, // 👈 NAYA — batch-scoped ya free-pool
+          },
+        },
+        {
+          // BUG FIX 4: $project PEHLE — sirf ye fields chahiye, baaki sab skip
+          $project: {
+            _id: 1,
+            question: 1,
+            option1: 1,
+            option2: 1,
+            option3: 1,
+            option4: 1,
+            correctOption: 1,
+            topicName: 1,
+            subjectName: 1,
+            questionNumber: 1,
+          },
+        },
+        {
+          $group: {
+            _id: "$topicName",
+            questions: { $push: "$$ROOT" }, // ab sirf projected fields push hongi
+          },
+        },
+        {
+          $project: {
+            topicName: "$_id",
+            questions: { $slice: ["$questions", MAX_PER_TOPIC] },
+          },
+        },
+      ]);
+
+      // Phase 2: Fallback — jin topics ke unused questions nahi mile
+      // BUG FIX 3: distinct ki jagah unusedQuestions se hi topic list nikalo
+      const unusedTopicNames = unusedQuestions.map((g) => g._id);
+
+      // Sabhi topics dhundho — ek distinct call (unavoidable, distinct alag info deta hai)
+      const allTopicsDistinct = await Question.distinct("topicName", {
+        examName: { $in: [examName] },
+        subjectName: subjectName,
+        ...couponFilter, // 👈 NAYA
+      });
+
+      if (allTopicsDistinct.length === 0) continue; // is subject mein koi question hi nahi
+
+      const topicsWithNoUnused = allTopicsDistinct.filter(
+        (t) => !unusedTopicNames.includes(t)
+      );
+
+      // BUG FIX 5: Fallback mein bhi random chahiye — JS-side shuffle karunga
+      let fallbackQuestions = [];
+      if (topicsWithNoUnused.length > 0) {
+        fallbackQuestions = await Question.aggregate([
+          {
+            $match: {
+              examName: { $in: [examName] },
+              subjectName: subjectName,
+              topicName: { $in: topicsWithNoUnused },
+              ...couponFilter, // 👈 NAYA
+            },
+          },
+          {
+            // BUG FIX 4: $project pehle yahan bhi
+            $project: {
+              _id: 1,
+              question: 1,
+              option1: 1,
+              option2: 1,
+              option3: 1,
+              option4: 1,
+              correctOption: 1,
+              topicName: 1,
+              subjectName: 1,
+              questionNumber: 1,
+            },
+          },
+          {
+            $group: {
+              _id: "$topicName",
+              questions: { $push: "$$ROOT" },
+            },
+          },
+          {
+            $project: {
+              topicName: "$_id",
+              // MAX_PER_TOPIC se zyada fetch karo taaki shuffle ke baad variety ho
+              // BUG FIX 5: zyada lo, phir JS mein shuffle karke slice karo
+              questions: { $slice: ["$questions", MAX_PER_TOPIC * 3] },
+            },
+          },
+        ]);
+      }
+
+      // Topic question pool banao: { topicName: [shuffled questions] }
+      // BUG FIX 5: dono phases mein fisherYates shuffle — deterministic nahi rahega
+      const topicQuestionPool = {};
+      for (const group of [...unusedQuestions, ...fallbackQuestions]) {
+        const topicName = group._id || group.topicName;
+        if (!topicName) continue;
+        // Shuffle karo — unused aur fallback dono
+        const shuffled = fisherYatesShuffle(group.questions);
+        // Max 3 rakhna hai
+        topicQuestionPool[topicName] = shuffled.slice(0, MAX_PER_TOPIC);
+      }
+
+      // Pointer: har topic ke liye next pick index
+      const topicPointer = {};
+      Object.keys(topicQuestionPool).forEach((t) => (topicPointer[t] = 0));
+
+      // Tracker: kitne select hue per topic
+      const topicSelectedCount = {};
+      allTopicsDistinct.forEach((t) => (topicSelectedCount[t] = 0));
+
+      // Is subject ke selected IDs — same-subject duplicate rokne ke liye
+      const selectedIdsThisSubject = new Set();
+
+      // Helper: pool se next question lo
+      const pickFromTopic = (topic) => {
+        const pool = topicQuestionPool[topic];
+        if (!pool) return null;
+        const ptr = topicPointer[topic] || 0;
+        if (ptr >= pool.length) return null;
+        const q = pool[ptr];
+        topicPointer[topic] = ptr + 1;
+        return q;
+      };
+
+      // ── 5b. BASE ALLOCATION ──
+      let baseAllocated = 0;
+
+      // BUG FIX 7: Topics sorted by weak severity (normalize karke compare)
+      let orderedTopicsForBase = [...allTopicsDistinct];
+      if (!isNewUser) {
+        const subjectNorm = normalizeTopic(subjectName);
+        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
+        orderedTopicsForBase.sort((a, b) => {
+          const wa = weakTopicsThisSubject[normalizeTopic(a)] || 0;
+          const wb = weakTopicsThisSubject[normalizeTopic(b)] || 0;
+          return wb - wa;
+        });
+      }
+
+      for (const topic of orderedTopicsForBase) {
+        if (baseAllocated >= questionCount) break;
+
+        const q = pickFromTopic(topic);
+        if (q) {
+          const qId = q._id.toString();
+          selectedIdsThisSubject.add(qId);
+          // BUG FIX 8: usedQuestionIds mein ADD NAHI — sirf selectedIds track karo
+          topicSelectedCount[topic] = 1;
+          baseAllocated++;
+        }
+      }
+
+      // ── 5c. Extra count ──
+      let extraNeeded = questionCount - baseAllocated;
+
+      // ── 5d. Extra Pool (priority + severity) ──
+      let extraTopicPool = [];
+
+      // BUG FIX 1: Agar extraNeeded === 0 ya extraTopicPool empty hoga
+      // to while loop chalega hi nahi (maxLoopIterations = 0)
+      // lekin explicit guard bhi lagao safety ke liye
+      if (extraNeeded <= 0) {
+        extraTopicPool = []; // koi extra nahi chahiye
+      } else if (isNewUser) {
+        const importantInDB = allTopicsDistinct.filter((t) =>
+          importantTopicsNorm.includes(normalizeTopic(t))
+        );
+        const nonImportantTopics = allTopicsDistinct.filter(
+          (t) => !importantTopicsNorm.includes(normalizeTopic(t))
+        );
+        extraTopicPool = [...importantInDB, ...nonImportantTopics];
+      } else {
+        const subjectNorm = normalizeTopic(subjectName);
+        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
+
+        const importantInDB = allTopicsDistinct.filter((t) =>
+          importantTopicsNorm.includes(normalizeTopic(t))
+        );
+
+        const p1 = importantInDB
+          .filter((t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0)
+          .sort((a, b) =>
+            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
+            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
+          );
+
+        const p2 = importantInDB.filter(
+          (t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
+        );
+
+        const p3 = allTopicsDistinct
+          .filter(
+            (t) =>
+              !importantTopicsNorm.includes(normalizeTopic(t)) &&
+              (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0
+          )
+          .sort((a, b) =>
+            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
+            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
+          );
+
+        const p4 = allTopicsDistinct.filter(
+          (t) =>
+            !importantTopicsNorm.includes(normalizeTopic(t)) &&
+            (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
+        );
+
+        extraTopicPool = [...p1, ...p2, ...p3, ...p4];
+      }
+
+      // ── 5e. Extra questions lo round-robin se ──
+      // BUG FIX 1: extraTopicPool empty check EXPLICIT — 0 % 0 = NaN avoid
+      if (extraTopicPool.length > 0 && extraNeeded > 0) {
+        let extraPoolIndex = 0;
+        let loopGuard = 0;
+        const maxLoopIterations = extraTopicPool.length * MAX_EXTRA_PER_TOPIC * 2;
+
+        while (extraNeeded > 0 && loopGuard < maxLoopIterations) {
+          loopGuard++;
+
+          // BUG FIX 1: extraTopicPool.length guaranteed > 0 yahan
+          const topic = extraTopicPool[extraPoolIndex % extraTopicPool.length];
+          extraPoolIndex++;
+
+          const actualBaseCount = topicSelectedCount[topic] > 0 ? 1 : 0;
+          const currentCount = topicSelectedCount[topic] || 0;
+          const extraAlreadyTaken = currentCount - actualBaseCount;
+
+          if (extraAlreadyTaken >= MAX_EXTRA_PER_TOPIC) continue;
+
+          const q = pickFromTopic(topic);
+          if (q) {
+            const qId = q._id.toString();
+            if (!selectedIdsThisSubject.has(qId)) {
+              selectedIdsThisSubject.add(qId);
+              // BUG FIX 8: yahan bhi usedQuestionIds mein ADD NAHI
+              topicSelectedCount[topic] = (topicSelectedCount[topic] || 0) + 1;
+              extraNeeded--;
+            }
+          }
+        }
+      }
+
+      // ── 5f. Final questions — already fetched pool se nikalo (no extra DB call) ──
+      const allFetchedQuestions = [
+        ...unusedQuestions.flatMap((g) => g.questions),
+        ...fallbackQuestions.flatMap((g) => g.questions),
+      ];
+
+      // 👇 BUG FIX (security): correctOption yahan se HATA diya gaya —
+      // pehle ye seedha frontend ko chala jaata tha, aur DevTools ke
+      // Network tab mein test dete waqt hi sahi jawab dikh jaata tha.
+      // Ab isCorrect backend (addPerformence.js) khud DB se check karega.
+      const finalQuestions = allFetchedQuestions
+        .filter((q) => selectedIdsThisSubject.has(q._id.toString()))
+        .map((q) => ({
+          _id: q._id,
+          question: q.question,
+          option1: q.option1,
+          option2: q.option2,
+          option3: q.option3,
+          option4: q.option4,
+          topicName: q.topicName,
+          subjectName: q.subjectName,
+          questionNumber: q.questionNumber,
+        }));
+
+      // ── 5g. Final shuffle ──
+      const shuffledFinal = fisherYatesShuffle(finalQuestions);
+
+      finalMockSubjects.push({
+        subjectName,
+        questionCount: shuffledFinal.length,
+        questions: shuffledFinal,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 6 + 7: Response
+    // ─────────────────────────────────────────────
+    const totalActualQuestions = finalMockSubjects.reduce(
+      (sum, s) => sum + s.questions.length,
+      0
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: isNewUser
+        ? "Naye user ke liye standard mock test ready hai!"
+        : "Aapke performance ke hisaab se personalized mock test ready hai!",
+      mockTest: {
+        examName: blueprint.examName,
+        blueprintName: blueprint.blueprintName,
+        mockType: blueprint.mockType,
+        marksPerQuestion: blueprint.marksPerQuestion,
+        negativeMarking: blueprint.negativeMarking,
+        totalQuestionsExpected: blueprint.totalQuestions,
+        totalQuestionsActual: totalActualQuestions,
+        isPersonalized: !isNewUser,
+        isBatchContent: !!activeCouponId, // 👈 NAYA — frontend chahe to "batch-exclusive" badge dikha sakta hai
+        subjects: finalMockSubjects,
+      },
+    });
+  } catch (error) {
+    console.error("addMocktest error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya mock test banate waqt.",
+      error: error.message,
+    });
+  }
 };
 </file>
 
@@ -8081,6 +8401,231 @@ export const createChallenge = async (req, res) => {
 };
 </file>
 
+<file path="backend/controllers/inviteSubTeacher.js">
+// controllers/inviteSubTeacher.js
+// Sirf MAIN TEACHER hi naya sub-teacher invite kar sakta hai.
+// Teacher phone number ke saath-saath ek ya zyada coupons/subjects bhi
+// yahin decide kar sakta hai — sub-teacher ka access invite ke waqt hi
+// tay ho jaata hai. Exam alag se nahi chunna padta, kyunki har coupon
+// khud apne exam se bound hota hai — coupon assign karte hi exam bhi
+// automatically saath aa jata hai.
+import crypto from "crypto";
+import mongoose from "mongoose"; // 👈 NAYA: ObjectId format validate karne ke liye
+import Teacher from "../models/Teacher.js";
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
+
+const INVITE_VALID_DAYS = 3;
+
+export const inviteSubTeacher = async (req, res) => {
+  try {
+    // ─────────────────────────────────────────────
+    // STEP 0: Sirf Main Teacher hi invite bhej sakta hai
+    // ─────────────────────────────────────────────
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({
+        success: false,
+        message: "Sirf Main Teacher hi naya sub-teacher invite kar sakta hai!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 1: Validation — sirf phone zaroori hai
+    // ─────────────────────────────────────────────
+    const { phone, assignments } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number zaroori hai!",
+      });
+    }
+    if (!/^\d{10}$/.test(phone)) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number bilkul 10 anko ka hona chahiye!",
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: assignments validate + normalize karo
+    // Format: [{ couponId, subjects: ["Hindi", "Maths"] }, ...]
+    // Optional hai — bina assignments ke bhi invite bhej sakte hain
+    // ─────────────────────────────────────────────
+    const normalizedAssignments = [];
+
+    if (assignments !== undefined) {
+      if (!Array.isArray(assignments)) {
+        return res.status(400).json({
+          success: false,
+          message: "assignments ek array hona chahiye!",
+        });
+      }
+
+      for (const a of assignments) {
+        if (!a || !a.couponId || !Array.isArray(a.subjects) || a.subjects.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Har assignment mein couponId aur kam se kam ek subject hona zaroori hai!",
+          });
+        }
+
+        // 👇 BUG FIX 2: couponId ka format valid ObjectId hai ya nahi, pehle
+        // hi check karo — warna DB query crash karke generic 500 error
+        // de deta tha, ab clean 400 milega
+        if (!mongoose.Types.ObjectId.isValid(a.couponId)) {
+          return res.status(400).json({
+            success: false,
+            message: "couponId ka format galat hai.",
+          });
+        }
+
+        const cleanSubjects = a.subjects
+          .map((s) => (typeof s === "string" ? s.trim() : ""))
+          .filter(Boolean);
+
+        if (cleanSubjects.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Subject naam khali nahi ho sakta!",
+          });
+        }
+
+        normalizedAssignments.push({ couponId: a.couponId, subjects: cleanSubjects });
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 3: Diye gaye sabhi coupons is Main Teacher ke hi hain, verify karo
+    // ─────────────────────────────────────────────
+    let validCoupons = [];
+    if (normalizedAssignments.length > 0) {
+      const couponIds = [...new Set(normalizedAssignments.map((a) => a.couponId))];
+
+      validCoupons = await Coupon.find({
+        _id: { $in: couponIds },
+        mainTeacher: req.teacher._id,
+      });
+
+      if (validCoupons.length !== couponIds.length) {
+        return res.status(404).json({
+          success: false,
+          message: "Ek ya zyada coupons nahi mile ya aapke nahi hain!",
+        });
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 4: Is phone number ka teacher pehle se hai kya, check karo
+    // ─────────────────────────────────────────────
+    let teacher = await Teacher.findOne({ phone });
+
+    if (teacher) {
+      if (teacher.status === "active") {
+        return res.status(400).json({
+          success: false,
+          message: "Is phone number se ek active teacher account pehle se maujood hai!",
+        });
+      }
+
+      // 👇 BUG FIX 1: agar ye phone number "pending" status mein kisi AUR
+      // Main Teacher ke invite se already juda hai, to hijack na hone do —
+      // sirf wahi Main Teacher jisne pehle invite kiya tha, dobara
+      // invite/refresh kar sakta hai. "removed" status pe ye restriction
+      // nahi lagti — koi bhi Main Teacher ek removed teacher ko dobara
+      // hire kar sakta hai, wo intended hai.
+      if (
+        teacher.status === "pending" &&
+        teacher.parentTeacher &&
+        teacher.parentTeacher.toString() !== req.teacher._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Ye phone number pehle se kisi aur Main Teacher ke pending invite mein hai.",
+        });
+      }
+    }
+
+    const inviteToken = crypto.randomBytes(32).toString("hex");
+    const inviteTokenExpiry = new Date(Date.now() + INVITE_VALID_DAYS * 24 * 60 * 60 * 1000);
+
+    if (teacher) {
+      // ── Pehle se "pending" (isi Main Teacher ka) ya "removed" teacher
+      // hai — invite refresh karo ──
+      teacher.status = "pending";
+      teacher.inviteToken = inviteToken;
+      teacher.inviteTokenExpiry = inviteTokenExpiry;
+      teacher.parentTeacher = req.teacher._id;
+      await teacher.save();
+    } else {
+      // ── Bilkul naya sub-teacher — placeholder name/email ke sath banao ──
+      teacher = new Teacher({
+        name: "Pending Teacher",
+        email: `pending_${phone}@invite.mocktest.in`,
+        phone,
+        role: "sub",
+        status: "pending",
+        parentTeacher: req.teacher._id,
+        inviteToken,
+        inviteTokenExpiry,
+      });
+      await teacher.save();
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 5: Har assignment ke har subject ke liye CouponAccess bana do
+    // ─────────────────────────────────────────────
+    const assignedSummary = [];
+
+    for (const { couponId, subjects } of normalizedAssignments) {
+      for (const subject of subjects) {
+        await CouponAccess.findOneAndUpdate(
+          { coupon: couponId, subTeacher: teacher._id, subject },
+          { $setOnInsert: { coupon: couponId, subTeacher: teacher._id, subject } },
+          { upsert: true, new: true }
+        );
+      }
+
+      const couponDoc = validCoupons.find((c) => c._id.toString() === couponId);
+      assignedSummary.push({
+        couponId,
+        couponName: couponDoc?.name,
+        exam: couponDoc?.exam,
+        subjects,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 6: Response
+    // ─────────────────────────────────────────────
+    return res.status(201).json({
+      success: true,
+      message: "Invite ready hai! Link copy karke sub-teacher ko bhej dijiye.",
+      data: {
+        teacherId: teacher._id,
+        phone: teacher.phone,
+        inviteToken,
+        inviteTokenExpiry,
+        assignedCoupons: assignedSummary,
+      },
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "Is phone/email se pehle se koi account maujood hai.",
+      });
+    }
+    console.error("inviteSubTeacher error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server mein error aa gaya invite bhejte waqt.",
+      error: error.message,
+    });
+  }
+};
+</file>
+
 <file path="backend/models/Challenge.js">
 // models/Challenge.js
 import mongoose from "mongoose";
@@ -8547,85 +9092,6 @@ const ChallengeReview = () => {
 };
 
 export default ChallengeReview;
-</file>
-
-<file path="backend/server.js">
-import dotenv from "dotenv";
-dotenv.config(); // sabse upar — baaki sab iske baad
-
-import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser"; // 👈 1. Ye naya import add kiya hai
-import path from "path";
-import { fileURLToPath } from "url";
-import { rowQuestionConnection } from "./config/rowQuestion.js";
-import questionRouter from "./routes/Routes.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// ─────────────────────────────────────────────
-// CORS — frontend se API call allow karne ke liye
-// CORS missing hone pe browser silently block karta hai —
-// koi proper error nahi aata, bas request fail hoti hai
-// ─────────────────────────────────────────────
-const allowedOrigins = [
-  "http://localhost:5173",  // React dev server (Vite)
-  "https://demomock-1.onrender.com",  
-  process.env.FRONTEND_URL, // Production frontend URL (.env mein daalo)
-].filter(Boolean); // undefined values hata do
-
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Postman/mobile app ke liye origin nahi hoti — allow karo
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS blocked: ${origin} allowed nahi hai`));
-    },
-    credentials: true, // cookies/auth headers ke liye
-  })
-);
-
-// ─────────────────────────────────────────────
-// Middleware
-// ─────────────────────────────────────────────
-app.use(express.json());
-app.use(cookieParser()); // 👈 2. Ye middleware add kiya taaki req.cookies read ho sake (Hamesha routes se upar hona chahiye)
-
-// ─────────────────────────────────────────────
-// Routes
-// ─────────────────────────────────────────────
-app.use("/api", questionRouter);
-
-// ─────────────────────────────────────────────
-// Frontend (React build) serve karna — single-origin setup
-// Ye API routes ke BAAD hai, taaki /api/* pehle match ho jaye
-// ─────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "../frontend/dist")));
-
-app.get(/^(?!\/api).*/, (req, res) => {
-  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
-});
-
-// ─────────────────────────────────────────────
-// Database connection check karke server start karo
-// Pehle DB connect ho, phir server sune —
-// warna server chal jaata hai but DB queries fail hoti hain
-// ─────────────────────────────────────────────
-rowQuestionConnection.once("connected", () => {
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Database connected`);
-  });
-});
-
-rowQuestionConnection.on("error", (err) => {
-  console.error("Database connection failed:", err.message);
-  process.exit(1); // DB nahi chala to server band karo
-});
 </file>
 
 <file path="frontend/src/pages/UserTopicAnalysis.jsx">
@@ -9680,6 +10146,85 @@ export const getUserMockTests = async (req, res) => {
     });
   }
 };
+</file>
+
+<file path="backend/server.js">
+import dotenv from "dotenv";
+dotenv.config(); // sabse upar — baaki sab iske baad
+
+import express from "express";
+import cors from "cors";
+import cookieParser from "cookie-parser"; // 👈 1. Ye naya import add kiya hai
+import path from "path";
+import { fileURLToPath } from "url";
+import { rowQuestionConnection } from "./config/rowQuestion.js";
+import questionRouter from "./routes/Routes.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const app = express();
+const PORT = process.env.PORT || 5000;
+
+// ─────────────────────────────────────────────
+// CORS — frontend se API call allow karne ke liye
+// CORS missing hone pe browser silently block karta hai —
+// koi proper error nahi aata, bas request fail hoti hai
+// ─────────────────────────────────────────────
+const allowedOrigins = [
+  "http://localhost:5173",  // React dev server (Vite)
+  "https://mocktest1.onrender.com",  
+  process.env.FRONTEND_URL, // Production frontend URL (.env mein daalo)
+].filter(Boolean); // undefined values hata do
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Postman/mobile app ke liye origin nahi hoti — allow karo
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS blocked: ${origin} allowed nahi hai`));
+    },
+    credentials: true, // cookies/auth headers ke liye
+  })
+);
+
+// ─────────────────────────────────────────────
+// Middleware
+// ─────────────────────────────────────────────
+app.use(express.json());
+app.use(cookieParser()); // 👈 2. Ye middleware add kiya taaki req.cookies read ho sake (Hamesha routes se upar hona chahiye)
+
+// ─────────────────────────────────────────────
+// Routes
+// ─────────────────────────────────────────────
+app.use("/api", questionRouter);
+
+// ─────────────────────────────────────────────
+// Frontend (React build) serve karna — single-origin setup
+// Ye API routes ke BAAD hai, taaki /api/* pehle match ho jaye
+// ─────────────────────────────────────────────
+app.use(express.static(path.join(__dirname, "../frontend/dist")));
+
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+});
+
+// ─────────────────────────────────────────────
+// Database connection check karke server start karo
+// Pehle DB connect ho, phir server sune —
+// warna server chal jaata hai but DB queries fail hoti hain
+// ─────────────────────────────────────────────
+rowQuestionConnection.once("connected", () => {
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+    console.log(`Database connected`);
+  });
+});
+
+rowQuestionConnection.on("error", (err) => {
+  console.error("Database connection failed:", err.message);
+  process.exit(1); // DB nahi chala to server band karo
+});
 </file>
 
 <file path="frontend/src/pages/Singup.jsx">
@@ -13779,154 +14324,6 @@ const App = () => {
 export default App;
 </file>
 
-<file path="backend/routes/Routes.js">
-// routes/Routes.js
-import express from "express";
-
-
-import Blueprint from "../models/bluePrint.js";
-
-import { addQuestion }    from "../controllers/addQuestion.js";
-import { addUser }        from "../controllers/addUser.js";
-import { addPerformence } from "../controllers/addPerformence.js";
-import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
-import { addMocktest }    from "../controllers/addMockTest.js";
-import { loginUser } from "../controllers/authentication.js";
-import { updateUserInfo } from "../controllers/updateSutf.js";
-import { allExamName } from "../controllers/allExamName.js";
-import { getChallenge } from "../controllers/getChallenge.js";
-import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
-
-import { createChallenge } from "../controllers/createChallenge.js";
-import { submitChallenge } from "../controllers/submitChallenge.js";
-import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
-import { getMyChallenges } from "../controllers/getMyChallenges.js";
-
-// Rank Predictor ke controllers
-import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
-import { predictRank } from "../controllers/predictRank.js";
-import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
-
-// 👇 NAYA: Previous Year Test ke controllers
-import { addPreviousYearTest } from "../controllers/addPreviousYearTest.js";
-import { getAllPreviousYearTests } from "../controllers/getAllPreviousYearTests.js";
-import { getPreviousYearTest } from "../controllers/getPreviousYearTest.js";
-import { submitPreviousYearTest } from "../controllers/submitPreviousYearTest.js";
-import { getPreviousYearAttemptDetail } from "../controllers/getPreviousYearAttemptDetail.js";
-
-// imports ke sath (upar)
-import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
-import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
-import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
-import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
-import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
-import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
-
-// ── Middleware ────────────────────────────────
-import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
-import { userInfo } from "../middlewares/userInfo.js";
-
-// ── Analysis functions ────────────────────────
-import {
-  getAllAnalysis1stPage,   
-  getPerformanceAnalysis,  
-  getSubjectAnalysis,      
-  getTopicAnalysis,        
-  getUserMockTests,        
-} from "../pages/user/analysicUser.js";
-import { logoutUser } from "../controllers/logoutUser.js";
-import { hideQuestion } from "../controllers/hideQuestion.js";
-
-const router = express.Router();
-
-// ─────────────────────────────────────────────
-// POST ROUTES
-// ─────────────────────────────────────────────
-router.post("/add-question", processQuestionMiddleware, addQuestion);
-router.post("/add-user",        addUser);
-router.post("/add-performence", addPerformence);
-router.post("/add-bluePrint",   addBluePrint);
-router.post("/generate-mock",  userInfo, addMocktest);
-router.post("/user-Login",   loginUser);
-router.post("/user-update",  userInfo, updateUserInfo);
-
-router.post("/create-challenge", userInfo, createChallenge);
-router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
-
-// Admin is route se rank-predictor ka reference data feed karega
-router.post("/add-rank-predictor-data", addRankPredictorData);
-
-// 👇 NAYA: Admin is route se poora Previous Year Test (paper + sab questions) add karega
-router.post("/add-previous-year-test", addPreviousYearTest);
-router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTest);
-
-
-router.post("/add-current-affair", addCurrentAffair);
-router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
-router.post("/logout", logoutUser);
-router.post("/analysis/hide-question", userInfo, hideQuestion);
-
-
-// ─────────────────────────────────────────────
-// GET ROUTES 
-// ─────────────────────────────────────────────
-
-router.get("/me", userInfo, (req, res) => {
-    res.status(200).json({ success: true, data: req.user });
-});
-
-router.get("/is-admin", userInfo, (req, res) => {
-    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
-    res.status(200).json({ success: true, isAdmin: isAdminUser });
-});
-
-router.get("/blueprints/:examName", userInfo, async (req, res) => {
-    try {
-        const { examName } = req.params;
-        const blueprints = await Blueprint.find({ examName });
-        
-        res.status(200).json({ success: true, data: blueprints });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
-    }
-});
-
-router.get("/analysis/mock-list/:userId/:examName", userInfo, getUserMockTests);
-router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
-router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
-router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
-router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-
-router.get("/allExamName", allExamName);
-
-router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
-router.get("/challenge/:challengeCode", userInfo, getChallenge);
-router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-router.get("/my-challenges", userInfo, getMyChallenges);
-
-// Rank Predictor ke GET routes
-router.get("/rank-predictor/:examName", userInfo, predictRank);
-router.get("/rank-predictor-data/:examName", getRankPredictorData);
-
-// 👇 NAYA: Previous Year Test ke GET routes
-router.get("/previous-year-tests/:examName", userInfo, getAllPreviousYearTests);
-router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
-router.get("/previous-year-attempt/:attemptId", userInfo, getPreviousYearAttemptDetail);
-
-
-// GET routes ke sath — IMPORTANT: /dates wala route pehle aana chahiye
-// warna ":date" param usko match kar lega aur wrong controller chalega
-router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
-router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
-router.get("/current-affair/:examName", userInfo, getCurrentAffair);
-
-router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
-router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
-router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
-
-export default router;
-</file>
-
 <file path="frontend/src/pages/UserAllAnalysis.jsx">
 import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -14761,6 +15158,200 @@ const QuestionDetailCard = ({ q }) => {
 };
 
 export default UserAllAnalysis;
+</file>
+
+<file path="backend/routes/Routes.js">
+// routes/Routes.js
+import express from "express";
+
+
+import Blueprint from "../models/bluePrint.js";
+
+import { addQuestion }    from "../controllers/addQuestion.js";
+import { addUser }        from "../controllers/addUser.js";
+import { addPerformence } from "../controllers/addPerformence.js";
+import { addBluePrint }   from "../controllers/addBlluePrient.js"; 
+import { addMocktest }    from "../controllers/addMockTest.js";
+import { loginUser } from "../controllers/authentication.js";
+import { updateUserInfo } from "../controllers/updateSutf.js";
+import { allExamName } from "../controllers/allExamName.js";
+import { getChallenge } from "../controllers/getChallenge.js";
+import { getChallengeAttemptDetail } from "../controllers/getChallengeAttemptDetail.js";
+
+import { createChallenge } from "../controllers/createChallenge.js";
+import { submitChallenge } from "../controllers/submitChallenge.js";
+import { getChallengeLeaderboard } from "../controllers/getChallengeLeaderboard.js";
+import { getMyChallenges } from "../controllers/getMyChallenges.js";
+
+// Rank Predictor ke controllers
+import { addRankPredictorData } from "../controllers/addRankPredictorData.js";
+import { predictRank } from "../controllers/predictRank.js";
+import { getRankPredictorData } from "../controllers/getRankPredictorData.js";
+
+// 👇 NAYA: Previous Year Test ke controllers
+import { addPreviousYearTest } from "../controllers/addPreviousYearTest.js";
+import { getAllPreviousYearTests } from "../controllers/getAllPreviousYearTests.js";
+import { getPreviousYearTest } from "../controllers/getPreviousYearTest.js";
+import { submitPreviousYearTest } from "../controllers/submitPreviousYearTest.js";
+import { getPreviousYearAttemptDetail } from "../controllers/getPreviousYearAttemptDetail.js";
+
+// imports ke sath (upar)
+import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
+import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
+import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
+import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
+import { submitCurrentAffairQuiz } from "../controllers/submitCurrentAffairQuiz.js";
+import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAttemptDetail.js";
+
+// ── Middleware ────────────────────────────────
+import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
+import { userInfo } from "../middlewares/userInfo.js";
+
+import { addTeacher } from "../controllers/addTeacher.js";
+import { loginTeacher } from "../controllers/teacherAuthentication.js";
+import { teacherInfo } from "../middlewares/teacherInfo.js";
+
+import { createCoupon } from "../controllers/createCoupon.js";
+import { getMyCoupons } from "../controllers/getMyCoupons.js";
+
+import { inviteSubTeacher } from "../controllers/inviteSubTeacher.js";
+import { acceptInvite } from "../controllers/acceptInvite.js";
+
+import { getMySubTeachers } from "../controllers/getMySubTeachers.js";
+import { removeSubTeacher } from "../controllers/removeSubTeacher.js";
+import { assignCouponAccess, revokeCouponAccess } from "../controllers/manageCouponAccess.js";
+import { switchActiveCoupon } from "../controllers/switchActiveCoupon.js";
+
+import { redeemCoupon } from "../controllers/redeemCoupon.js";
+import { getMyBatch } from "../controllers/getMyBatch.js";
+// ── Analysis functions ────────────────────────
+import {
+  getAllAnalysis1stPage,   
+  getPerformanceAnalysis,  
+  getSubjectAnalysis,      
+  getTopicAnalysis,        
+  getUserMockTests,        
+} from "../pages/user/analysicUser.js";
+import { logoutUser } from "../controllers/logoutUser.js";
+import { hideQuestion } from "../controllers/hideQuestion.js";
+
+import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQuestion.js";
+import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js";
+
+const router = express.Router();
+
+// ─────────────────────────────────────────────
+// POST ROUTES
+// ─────────────────────────────────────────────
+router.post("/add-question", processQuestionMiddleware, addQuestion);
+router.post("/add-user",        addUser);
+router.post("/add-performence", addPerformence);
+router.post("/add-bluePrint",   addBluePrint);
+router.post("/generate-mock",  userInfo, addMocktest);
+router.post("/user-Login",   loginUser);
+router.post("/user-update",  userInfo, updateUserInfo);
+
+router.post("/create-challenge", userInfo, createChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
+
+// Admin is route se rank-predictor ka reference data feed karega
+router.post("/add-rank-predictor-data", addRankPredictorData);
+
+// 👇 NAYA: Admin is route se poora Previous Year Test (paper + sab questions) add karega
+router.post("/add-previous-year-test", addPreviousYearTest);
+router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTest);
+
+
+router.post("/add-current-affair", addCurrentAffair);
+router.post("/add-current-affair-quiz", addCurrentAffairQuiz);
+router.post("/logout", logoutUser);
+router.post("/analysis/hide-question", userInfo, hideQuestion);
+
+
+router.post("/teacher-signup", addTeacher);
+router.post("/teacher-login", loginTeacher);
+
+router.post("/create-coupon", teacherInfo, createCoupon);
+
+router.post("/invite-sub-teacher", teacherInfo, inviteSubTeacher); // sirf Main Teacher call kar sakta hai
+router.post("/accept-invite", acceptInvite); // PUBLIC — koi login nahi chahiye
+
+router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, removeSubTeacher);
+router.post("/manage-coupon-access/assign", teacherInfo, assignCouponAccess);
+router.post("/manage-coupon-access/revoke", teacherInfo, revokeCouponAccess);
+router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
+
+router.post("/redeem-coupon", userInfo, redeemCoupon);
+router.post("/teacher/add-question",teacherInfo, processTeacherQuestionMiddleware, addTeacherQuestion );
+
+// ─────────────────────────────────────────────
+// GET ROUTES 
+// ─────────────────────────────────────────────
+
+router.get("/me", userInfo, (req, res) => {
+    res.status(200).json({ success: true, data: req.user });
+});
+
+router.get("/is-admin", userInfo, (req, res) => {
+    const isAdminUser = !!process.env.ADMIN_EMAIL && req.user.email === process.env.ADMIN_EMAIL;
+    res.status(200).json({ success: true, isAdmin: isAdminUser });
+});
+
+router.get("/blueprints/:examName", userInfo, async (req, res) => {
+    try {
+        const { examName } = req.params;
+        const blueprints = await Blueprint.find({ examName });
+        
+        res.status(200).json({ success: true, data: blueprints });
+    } catch (error) {
+        res.status(500).json({ success: false, message: "Blueprints fetch karne mein error aaya", error: error.message });
+    }
+});
+
+router.get("/teacher-me", teacherInfo, (req, res) => {
+  res.status(200).json({ success: true, data: req.teacher });
+});
+
+router.get("/analysis/mock-list/:userId/:examName", userInfo, getUserMockTests);
+router.get("/analysis/overview/:userId/:examName", userInfo,   getAllAnalysis1stPage);
+router.get("/analysis/mock-detail/:performanceId", userInfo,   getPerformanceAnalysis);
+router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo,  getSubjectAnalysis);
+router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
+
+router.get("/allExamName", allExamName);
+
+router.get("/challenge/:challengeCode/leaderboard", getChallengeLeaderboard);
+router.get("/challenge/:challengeCode", userInfo, getChallenge);
+router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
+router.get("/my-challenges", userInfo, getMyChallenges);
+
+// Rank Predictor ke GET routes
+router.get("/rank-predictor/:examName", userInfo, predictRank);
+router.get("/rank-predictor-data/:examName", getRankPredictorData);
+
+// 👇 NAYA: Previous Year Test ke GET routes
+router.get("/previous-year-tests/:examName", userInfo, getAllPreviousYearTests);
+router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
+router.get("/previous-year-attempt/:attemptId", userInfo, getPreviousYearAttemptDetail);
+
+
+// GET routes ke sath — IMPORTANT: /dates wala route pehle aana chahiye
+// warna ":date" param usko match kar lega aur wrong controller chalega
+router.get("/current-affair/:examName/dates", userInfo, getCurrentAffairDates);
+router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
+router.get("/current-affair/:examName", userInfo, getCurrentAffair);
+
+router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
+router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
+router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
+
+router.get("/my-coupons", teacherInfo, getMyCoupons);
+
+router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
+
+router.get("/my-batch", userInfo, getMyBatch);
+
+export default router;
 </file>
 
 <file path="frontend/src/pages/HomePage.jsx">
