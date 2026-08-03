@@ -240,6 +240,14 @@ const ProfilePage = () => {
               ))}
             </div>
 
+            {/* 👇 NAYA: Meri Batch button — coupon/batch dekhne ke liye */}
+            <button
+              onClick={() => navigate("/MyBatch")}
+              className="w-full py-3 rounded-xl border border-[#7C3AED]/40 text-[#A78BFA] hover:bg-[#7C3AED]/10 font-medium mb-3 transition-colors"
+            >
+              Meri Batch
+            </button>
+
             {/* Action buttons */}
             <button
               onClick={startEdit}
@@ -247,6 +255,7 @@ const ProfilePage = () => {
             >
               Profile Edit Karein
             </button>
+            
             <button
               onClick={handleLogout}
               className="w-full py-3 rounded-xl border border-red-500/30 text-red-400 hover:bg-red-500/10 font-medium transition-colors"

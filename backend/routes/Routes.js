@@ -75,6 +75,32 @@ import { hideQuestion } from "../controllers/hideQuestion.js";
 import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQuestion.js";
 import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js";
 import { createPreviousYearPaperShell } from "../controllers/createPreviousYearPaperShell.js";
+import { fillPreviousYearPaperSubject } from "../controllers/fillPreviousYearPaperSubject.js";
+import { createCustomTest } from "../controllers/createCustomTest.js";
+
+import { getAllCustomTests } from "../controllers/getAllCustomTests.js";
+import { getCustomTest } from "../controllers/getCustomTest.js";
+import { submitCustomTest } from "../controllers/submitCustomTest.js";
+import { getCustomTestAttemptDetail } from "../controllers/getCustomTestAttemptDetail.js";
+import { searchStudentByPhone } from "../controllers/searchStudentByPhone.js";
+import {
+  getStudentOverview,
+  getStudentMockDetail,
+  getStudentSubjectAnalysis,
+  getStudentTopicAnalysis,
+} from "../pages/teacher/analysisTeacher.js";
+import { getClassTopicAnalysis } from "../controllers/getClassTopicAnalysis.js";
+import { getClassQuestionAnalysis } from "../controllers/getClassQuestionAnalysis.js";
+
+import { getTeacherDashboard } from "../controllers/getTeacherDashboard.js";
+import { logoutTeacher } from "../controllers/logoutTeacher.js";
+import { getTeacherPYQPapers } from "../controllers/getTeacherPYQPapers.js";
+import { getTeacherPYQPaperById } from "../controllers/getTeacherPYQPaperById.js";
+import { getTeacherCustomTests } from "../controllers/getTeacherCustomTests.js";
+
+
+
+
 
 const router = express.Router();
 
@@ -123,6 +149,13 @@ router.post("/redeem-coupon", userInfo, redeemCoupon);
 router.post("/teacher/add-question",teacherInfo, processTeacherQuestionMiddleware, addTeacherQuestion );
 
 router.post("/teacher/previous-year-paper/create-shell", teacherInfo, createPreviousYearPaperShell);
+router.post("/teacher/previous-year-paper/:paperId/fill-subject", teacherInfo, fillPreviousYearPaperSubject);
+router.post("/teacher/custom-test/create", teacherInfo, createCustomTest);
+router.post("/custom-test/:testId/submit", userInfo, submitCustomTest);
+
+
+router.post("/teacher-logout", logoutTeacher);
+
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
@@ -190,5 +223,24 @@ router.get("/my-coupons", teacherInfo, getMyCoupons);
 router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
 
 router.get("/my-batch", userInfo, getMyBatch);
+
+router.get("/custom-test-attempt/:attemptId", userInfo, getCustomTestAttemptDetail);
+router.get("/custom-tests/:examName", userInfo, getAllCustomTests);
+router.get("/custom-test/:testId", userInfo, getCustomTest);
+router.get("/teacher/search-student", teacherInfo, searchStudentByPhone);
+router.get("/teacher/analysis/overview/:studentId/:examName", teacherInfo, getStudentOverview);
+router.get("/teacher/analysis/mock-detail/:studentId/:performanceId", teacherInfo, getStudentMockDetail);
+router.get("/teacher/analysis/subject/:studentId/:examName/:subjectName", teacherInfo, getStudentSubjectAnalysis);
+router.get("/teacher/analysis/topic/:studentId/:examName/:subjectName/:topicName", teacherInfo, getStudentTopicAnalysis);
+router.get("/teacher/class-analysis/topics", teacherInfo, getClassTopicAnalysis);
+router.get("/teacher/class-analysis/questions/:subjectName/:topicName", teacherInfo, getClassQuestionAnalysis);
+
+
+router.get("/teacher/dashboard", teacherInfo, getTeacherDashboard);
+router.get("/teacher/previous-year-paper/list", teacherInfo, getTeacherPYQPapers);
+router.get("/teacher/previous-year-paper/:paperId", teacherInfo, getTeacherPYQPaperById);
+router.get("/teacher/custom-test/list", teacherInfo, getTeacherCustomTests);
+
+
 
 export default router;

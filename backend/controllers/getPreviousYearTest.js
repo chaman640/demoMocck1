@@ -1,6 +1,9 @@
 // controllers/getPreviousYearTest.js
 // Test lene se pehle yahan se data aayega — correctOption/answerExplain
 // yahan se strip kar diya jata hai, warna DevTools se answers dikh jaate!
+// 👇 UPDATED: Ab "complete" status bhi check hota hai (draft/incomplete
+// teacher-shells kabhi student ko accidentally serve na hon), aur agar
+// paper kisi coupon se linked hai to sirf usi batch ka student le sakta hai.
 import mongoose from "mongoose";
 import PreviousYearTest from "../models/PreviousYearTest.js";
 
@@ -12,13 +15,30 @@ export const getPreviousYearTest = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid Test ID" });
     }
 
-    const test = await PreviousYearTest.findOne({ _id: testId, isActive: true });
+    const test = await PreviousYearTest.findOne({
+      _id: testId,
+      isActive: true,
+      status: "complete", // 👈 NAYA — draft/incomplete shell kabhi serve nahi hoga
+    });
 
     if (!test) {
       return res.status(404).json({
         success: false,
         message: "Ye Previous Year Test nahi mila.",
       });
+    }
+
+    // 👇 NAYA: Agar ye ek batch-exclusive (teacher-created) paper hai,
+    // to sirf usi batch ka student isko le sakta hai — koi bhi random
+    // testId guess karke doosre batch ka exclusive paper na khol paaye
+    if (test.couponId) {
+      const studentCouponId = req.user.activeCoupon ? req.user.activeCoupon.toString() : null;
+      if (studentCouponId !== test.couponId.toString()) {
+        return res.status(403).json({
+          success: false,
+          message: "Ye paper aapki batch ke liye available nahi hai.",
+        });
+      }
     }
 
     const safeSubjects = test.subjects.map((s) => ({
