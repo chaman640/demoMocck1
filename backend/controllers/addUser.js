@@ -2,14 +2,15 @@
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt"; // 👈 Password hash karne ke liye import kiya
+import { verifyOtpCode } from "../utils/otpService.js"; // 👈 NAYA
 
 export const addUser = async (req, res) => {
     try {
         // 1. Frontend se saara data nikalna
-        const { name, email, phone, password, address, exam } = req.body;
+        const { name, email, phone, password, address, exam, otp } = req.body; // 👈 otp add kiya
 
         // 2. Validation check: Koi field khali toh nahi hai
-        if (!name || !email || !phone || !password || !address || !exam) {
+        if (!name || !email || !phone || !password || !address || !exam || !otp) { // 👈 otp bhi zaroori
             return res.status(400).json({ success: false, message: "Sabhi fields bharna zaroori hai!" });
         }
 
@@ -21,6 +22,9 @@ export const addUser = async (req, res) => {
                 message: "Is email ya phone number se account pehle hi bana hua hai!" 
             });
         }
+
+        // 👇 NAYA: OTP verify karo — galat/expired/missing OTP par account NAHI banega
+        await verifyOtpCode(phone, "signup", otp);
 
         // 3. Password ko bcrypt se encrypt (hash) karna
         const salt = await bcrypt.genSalt(10);
@@ -69,6 +73,10 @@ export const addUser = async (req, res) => {
            
     } catch (error) {
         console.error("Signup Error:", error);
-        res.status(500).json({ success: false, message: "Internal Server Error" });
+        // 👇 NAYA: verifyOtpCode se aane wale statusCode/message ko sahi se handle karo
+        return res.status(error.statusCode || 500).json({
+            success: false,
+            message: error.statusCode ? error.message : "Internal Server Error",
+        });
     }
 };

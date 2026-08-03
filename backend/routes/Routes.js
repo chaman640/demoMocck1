@@ -98,6 +98,7 @@ import { getTeacherPYQPapers } from "../controllers/getTeacherPYQPapers.js";
 import { getTeacherPYQPaperById } from "../controllers/getTeacherPYQPaperById.js";
 import { getTeacherCustomTests } from "../controllers/getTeacherCustomTests.js";
 
+import { sendSignupOtp } from "../controllers/sendSignupOtp.js";
 
 
 
@@ -155,7 +156,7 @@ router.post("/custom-test/:testId/submit", userInfo, submitCustomTest);
 
 
 router.post("/teacher-logout", logoutTeacher);
-
+router.post("/send-signup-otp", sendSignupOtp);
 
 // ─────────────────────────────────────────────
 // GET ROUTES 
