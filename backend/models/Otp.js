@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { rowQuestionConnection } from "../db/connection.js"; // 👈 apna actual connection-file ka path yahan check/adjust kar lena
+import { rowQuestionConnection } from "../config/rowQuestion.js";
 
 const otpSchema = new mongoose.Schema(
   {
