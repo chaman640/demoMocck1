@@ -240,13 +240,13 @@ const Login = () => {
             <Link to="/Singup" className="text-[#2563EB] font-bold hover:underline ml-1">
               Sign Up
             </Link>
-            <div className="text-right -mt-2 mb-2">
+            
+          </div>
+          <div className="text-right -mt-2 mb-2">
   <Link to="/ForgotPassword" className="text-xs text-[#2563EB] hover:underline">
     Password bhool gaye?
   </Link>
 </div>
-          </div>
-          
         </div>
       </div>
     </div>
