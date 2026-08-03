@@ -13,18 +13,14 @@ const MAX_VERIFY_ATTEMPTS = 5;
 const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
 
 const sendOtpViaFast2Sms = async (phone, otpCode) => {
-  const url = new URL("https://www.fast2sms.com/dev/bulkV2");
-  url.searchParams.set("authorization", process.env.FAST2SMS_API_KEY);
-  url.searchParams.set("route", "otp");
-  url.searchParams.set("variables_values", otpCode);
-  url.searchParams.set("numbers", phone);
+  const apiKey = process.env.FAST2SMS_API_KEY; // naam wahi rehne do, sirf value 2Factor ki key hai
+  const url = `https://2factor.in/API/V1/${apiKey}/SMS/${phone}/${otpCode}`;
 
-  const response = await fetch(url.toString());
+  const response = await fetch(url);
   const data = await response.json();
 
-  if (!data.return) {
-    // Fast2SMS response shape: { return: true/false, message: [...] }
-    console.error("Fast2SMS error:", data);
+  if (data.Status !== "Success") {
+    console.error("2Factor error:", data);
     const err = new Error("SMS bhejne mein error aaya. Thodi der baad try karein.");
     err.statusCode = 502;
     throw err;
