@@ -6,8 +6,9 @@ const TeacherSignup = () => {
   const navigate = useNavigate();
   const [examList, setExamList] = useState([]);
   const [formData, setFormData] = useState({
-    name: "", email: "", phone: "", password: "", confirmPassword: "", examName: "",
+    name: "", email: "", phone: "", password: "", confirmPassword: "",
   });
+  const [selectedExams, setSelectedExams] = useState([]); // 👈 NAYA — multiple exams
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -29,6 +30,14 @@ const TeacherSignup = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // 👇 NAYA — exam checkbox toggle karta hai (add/remove from selectedExams)
+  const toggleExam = (exam) => {
+    if (fieldErrors.examName) setFieldErrors((prev) => ({ ...prev, examName: false }));
+    setSelectedExams((prev) =>
+      prev.includes(exam) ? prev.filter((e) => e !== exam) : [...prev, exam]
+    );
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -39,7 +48,7 @@ const TeacherSignup = () => {
     if (formData.phone.length !== 10) errors.phone = true;
     if (formData.password.length < 6) errors.password = true;
     if (formData.password !== formData.confirmPassword) errors.confirmPassword = true;
-    if (!formData.examName) errors.examName = true;
+    if (selectedExams.length === 0) errors.examName = true; // 👈 UPDATED — array check
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
@@ -54,7 +63,7 @@ const TeacherSignup = () => {
         email: formData.email.trim(),
         phone: formData.phone,
         password: formData.password,
-        examName: formData.examName,
+        examName: selectedExams, // 👈 UPDATED — poora array bhejte hain
       });
       navigate("/TeacherDashboard");
     } catch (err) {
@@ -126,21 +135,40 @@ const TeacherSignup = () => {
               </div>
             </div>
 
+            {/* 👇 UPDATED: single-select dropdown ki jagah ab multi-select checkbox list */}
             <div>
-              <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                Primary Exam
+              <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.examName ? "text-red-500" : "text-gray-400"}`}>
+                Exams (ek ya zyada chunein)
               </label>
-              <select
-                name="examName"
-                value={formData.examName}
-                onChange={handleChange}
-                className={`${getInputClass("examName")} appearance-none cursor-pointer`}
+              <div
+                className={`space-y-2.5 p-3.5 rounded-xl border max-h-48 overflow-y-auto ${
+                  fieldErrors.examName ? "border-red-500" : "border-gray-700"
+                }`}
               >
-                <option value="" disabled>Select exam</option>
-                {examList.map((e, i) => (
-                  <option key={i} value={e}>{e}</option>
-                ))}
-              </select>
+                {examList.length === 0 ? (
+                  <p className="text-xs text-gray-500">Exams load ho rahe hain...</p>
+                ) : (
+                  examList.map((exam, i) => (
+                    <label
+                      key={i}
+                      className="flex items-center gap-2.5 text-sm text-gray-300 cursor-pointer"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedExams.includes(exam)}
+                        onChange={() => toggleExam(exam)}
+                        className="w-4 h-4 accent-[#7C3AED] flex-shrink-0"
+                      />
+                      {exam}
+                    </label>
+                  ))
+                )}
+              </div>
+              {selectedExams.length > 0 && (
+                <p className="text-[11px] text-[#A78BFA] mt-1.5">
+                  {selectedExams.length} exam{selectedExams.length > 1 ? "s" : ""} select kiye: {selectedExams.join(", ")}
+                </p>
+              )}
             </div>
 
             <button
