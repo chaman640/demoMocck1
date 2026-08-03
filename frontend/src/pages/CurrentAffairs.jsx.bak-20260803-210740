@@ -141,12 +141,6 @@ const CurrentAffairs = () => {
         { attemptedQuestions }
       );
       setResultData(res.data.data);
-      // 🐛 BUG FIX: submit ke baad local state update karna zaroori tha.
-      // Pehle review se "wapas" aane par dobara "Quiz Shuru Karein" dikhta tha,
-      // aur click karte hi 409 "pehle hi de chuke hain" error aa jata tha.
-      setAffair((prev) =>
-        prev ? { ...prev, alreadyAttempted: true, attemptSummary: res.data.data } : prev
-      );
       setPhase("result");
     } catch (err) {
       submittingRef.current = false;

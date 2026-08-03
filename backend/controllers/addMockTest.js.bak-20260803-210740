@@ -38,20 +38,19 @@ export const addMocktest = async (req, res) => {
     // ─────────────────────────────────────────────
     // STEP 0: Validation
     // ─────────────────────────────────────────────
-    const { examName, blueprintName } = req.body;
+    const { userId, examName, blueprintName } = req.body;
 
-    // 🔒 SECURITY FIX: userId ab request body se NAHI aata.
-    // Pehle koi bhi kisi aur ka userId bhej kar uske past attempts ke hisaab
-    // se "personalized" mock generate karva sakta tha (data leak + galat data).
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
-    }
-    const userId = req.user._id;
-
-    if (!examName || !blueprintName) {
+    if (!userId || !examName || !blueprintName) {
       return res.status(400).json({
         success: false,
-        message: "examName aur blueprintName dono zaroori hain!",
+        message: "userId, examName aur blueprintName teeno zaroori hain!",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid userId.",
       });
     }
 
@@ -468,19 +467,6 @@ export const addMocktest = async (req, res) => {
       (sum, s) => sum + s.questions.length,
       0
     );
-
-    // 🐛 BUG FIX: agar ek bhi question na mile (naya batch, ya coupon ke
-    // liye abhi questions add nahi hue) to pehle backend 200 + khaali
-    // subjects bhejta tha, aur MockTest.jsx `nonEmptySubjects[0].questions[0]`
-    // par TypeError de kar white screen ho jata tha. Ab saaf error milta hai.
-    if (totalActualQuestions === 0) {
-      return res.status(404).json({
-        success: false,
-        message: activeCouponId
-          ? "Aapki batch ke liye abhi is exam ke questions add nahi hue hain. Apne teacher se kahein."
-          : "Is exam/blueprint ke liye abhi questions available nahi hain.",
-      });
-    }
 
     return res.status(200).json({
       success: true,

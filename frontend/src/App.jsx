@@ -1,5 +1,5 @@
 // App.jsx
-import { HashRouter, Routes, Route } from 'react-router-dom'; 
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MockTest from './pages/MockTest';
 import UserAllAnalysis from './pages/UserAllAnalysis';
@@ -14,8 +14,13 @@ import ChallengeReview from './pages/ChallengeReview';
 import MyChallenges from './pages/MyChallenges';
 import PreviousYearTests from './pages/PreviousYearTests';
 import PreviousYearTest from './pages/PreviousYearTest';
-import CurrentAffairs from './pages/CurrentAffairs'
+import CurrentAffairs from './pages/CurrentAffairs';
 import MyBatch from './pages/MyBatch';
+// 👇 NAYE: student ke liye Custom Test pages (backend pehle se ready tha,
+// sirf UI missing tha — teacher test banata tha lekin student le hi nahi pata tha)
+import CustomTests from './pages/CustomTests';
+import CustomTest from './pages/CustomTest';
+import ForgotPassword from './pages/ForgotPassword';
 
 // Teacher pages
 import TeacherLogin from './pages/teacher/TeacherLogin';
@@ -34,9 +39,6 @@ import TeacherStudentSubjectAnalysis from './pages/teacher/TeacherStudentSubject
 import TeacherStudentTopicAnalysis from './pages/teacher/TeacherStudentTopicAnalysis';
 import TeacherClassAnalysis from './pages/teacher/TeacherClassAnalysis';
 import TeacherCoupons from './pages/teacher/TeacherCoupons';
-import ForgotPassword from './pages/ForgotPassword';
-
-
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -47,57 +49,81 @@ const queryClient = new QueryClient({
   },
 });
 
-const App = () => { 
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <HashRouter>
         <div>
           <Routes>
-            <Route path="/" element={<HomePage/>} />
-            <Route path="/MockTest" element={<MockTest/>} />
-            <Route path="/UserAllAnalysis" element={<UserAllAnalysis/>} />
-            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis/>} />
-            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis/>} />
-            <Route path="/Login" element={<Login/>} />
-            <Route path="/Singup" element={<Singup/>} />
-            <Route path="/AnalysisPage" element={<UserAllAnalysis/>} />
-            <Route path="/HomePage" element={<HomePage/>} />
-            <Route path="/ProfilePage" element={<ProfilePage/>} />
-            <Route path="/Challenge" element={<Challenge/>} />
-            <Route path="/Challenge/:code" element={<Challenge/>} />
-            <Route path="/Challenge/:code/review" element={<ChallengeReview/>} />
-            <Route path="/MyChallenges" element={<MyChallenges/>} />
-            <Route path="/PreviousYearTests" element={<PreviousYearTests/>} />
-            <Route path="/PreviousYearTest/:testId" element={<PreviousYearTest/>} />
-            <Route path="/CurrentAffairs" element={<CurrentAffairs/>} />
-            <Route path="/MyBatch" element={<MyBatch/>} />
+            {/* ── Student ── */}
+            <Route path="/" element={<HomePage />} />
+            <Route path="/HomePage" element={<HomePage />} />
+            <Route path="/MockTest" element={<MockTest />} />
+            <Route path="/UserAllAnalysis" element={<UserAllAnalysis />} />
+            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis />} />
+            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis />} />
+            <Route path="/AnalysisPage" element={<UserAllAnalysis />} />
+            <Route path="/ProfilePage" element={<ProfilePage />} />
 
-            {/* Teacher routes */}
-            <Route path="/TeacherLogin" element={<TeacherLogin/>} />
-            <Route path="/TeacherSignup" element={<TeacherSignup/>} />
-            <Route path="/AcceptInvite/:token" element={<AcceptInvite/>} />
-            <Route path="/TeacherDashboard" element={<TeacherDashboard/>} />
-            <Route path="/TeacherSubTeachers" element={<TeacherSubTeachers/>} />
-            <Route path="/TeacherAddQuestion" element={<TeacherAddQuestion/>} />
-            <Route path="/TeacherPYQPapers" element={<TeacherPYQPapers/>} />
-            <Route path="/TeacherPYQPaperFill/:paperId/:subjectName" element={<TeacherPYQPaperFill/>} />
-            <Route path="/TeacherCustomTests" element={<TeacherCustomTests/>} />
-            <Route path="/TeacherStudentSearch" element={<TeacherStudentSearch/>} />
-            <Route path="/TeacherStudentAnalysis/:studentId" element={<TeacherStudentAnalysis/>} />
-            <Route path="/TeacherStudentSubjectAnalysis/:studentId" element={<TeacherStudentSubjectAnalysis/>} />
-            <Route path="/TeacherStudentTopicAnalysis/:studentId" element={<TeacherStudentTopicAnalysis/>} />
-            <Route path="/TeacherClassAnalysis" element={<TeacherClassAnalysis/>} />
-            <Route path="/TeacherCoupons" element={<TeacherCoupons/>} />
-            <Route path="/ForgotPassword" element={<ForgotPassword/>} />
+            <Route path="/Login" element={<Login />} />
+            <Route path="/Singup" element={<Singup />} />
+            {/* 🐛 FIX: "Signup" (sahi spelling) type karne par blank page aata tha.
+                Ab dono spellings kaam karti hain. */}
+            <Route path="/Signup" element={<Singup />} />
+            <Route path="/ForgotPassword" element={<ForgotPassword />} />
 
-            
+            <Route path="/Challenge" element={<Challenge />} />
+            <Route path="/Challenge/:code" element={<Challenge />} />
+            <Route path="/Challenge/:code/review" element={<ChallengeReview />} />
+            <Route path="/MyChallenges" element={<MyChallenges />} />
 
-            <Route path="/TeacherContent" element={<TeacherContent/>} />
+            <Route path="/PreviousYearTests" element={<PreviousYearTests />} />
+            <Route path="/PreviousYearTest/:testId" element={<PreviousYearTest />} />
+
+            {/* 👇 NAYE routes — batch ke custom tests */}
+            <Route path="/CustomTests" element={<CustomTests />} />
+            <Route path="/CustomTest/:testId" element={<CustomTest />} />
+
+            <Route path="/CurrentAffairs" element={<CurrentAffairs />} />
+            <Route path="/CurrentAffairs/:date" element={<CurrentAffairs />} />
+            <Route path="/MyBatch" element={<MyBatch />} />
+
+            {/* ── Teacher ── */}
+            <Route path="/TeacherLogin" element={<TeacherLogin />} />
+            <Route path="/TeacherSignup" element={<TeacherSignup />} />
+            <Route path="/AcceptInvite/:token" element={<AcceptInvite />} />
+            <Route path="/TeacherDashboard" element={<TeacherDashboard />} />
+            <Route path="/TeacherContent" element={<TeacherContent />} />
+            <Route path="/TeacherSubTeachers" element={<TeacherSubTeachers />} />
+            <Route path="/TeacherAddQuestion" element={<TeacherAddQuestion />} />
+            <Route path="/TeacherPYQPapers" element={<TeacherPYQPapers />} />
+            <Route
+              path="/TeacherPYQPaperFill/:paperId/:subjectName"
+              element={<TeacherPYQPaperFill />}
+            />
+            <Route path="/TeacherCustomTests" element={<TeacherCustomTests />} />
+            <Route path="/TeacherStudentSearch" element={<TeacherStudentSearch />} />
+            <Route path="/TeacherStudentAnalysis/:studentId" element={<TeacherStudentAnalysis />} />
+            <Route
+              path="/TeacherStudentSubjectAnalysis/:studentId"
+              element={<TeacherStudentSubjectAnalysis />}
+            />
+            <Route
+              path="/TeacherStudentTopicAnalysis/:studentId"
+              element={<TeacherStudentTopicAnalysis />}
+            />
+            <Route path="/TeacherClassAnalysis" element={<TeacherClassAnalysis />} />
+            <Route path="/TeacherCoupons" element={<TeacherCoupons />} />
+
+            {/* 🐛 FIX: pehle koi bhi galat URL (jaise refresh ke baad #/xyz)
+                bilkul BLANK white page dikhata tha — koi catch-all route hi
+                nahi tha. Ab seedha home pe bhej dete hain. */}
+            <Route path="*" element={<Navigate to="/HomePage" replace />} />
           </Routes>
         </div>
       </HashRouter>
     </QueryClientProvider>
-  )
-}
+  );
+};
 
 export default App;

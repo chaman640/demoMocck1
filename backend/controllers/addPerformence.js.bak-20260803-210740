@@ -1,43 +1,40 @@
 // controllers/addPerformence.js
+
 import Performance from "../models/Performance.js";
 import Blueprint from "../models/bluePrint.js";
 import { Question } from "../models/rowQuestionSchema.js";
 
 export const addPerformence = async (req, res) => {
   try {
-    const { examName, blueprintName, attemptedQuestions } = req.body;
+    const { userId, examName, blueprintName, attemptedQuestions } = req.body;
 
     // ─────────────────────────────────────────────
-    // 🔒 SECURITY FIX: userId ab request body se NAHI aata.
-    //
-    // Pehle ye route bina login ke tha aur body ka `userId` blindly trust
-    // karta tha — koi bhi banda kisi bhi user ki ID daal kar uske account
-    // mein fake performance/score daal sakta tha (analysis khराब kar deta).
-    // Ab route pe userInfo middleware hai aur ID session se aati hai.
-    // ─────────────────────────────────────────────
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
-    }
-    const userId = req.user._id;
-
     // 1. Validation
-    if (!examName || !blueprintName || !attemptedQuestions) {
+    // ─────────────────────────────────────────────
+    if (!userId || !examName || !blueprintName || !attemptedQuestions) {
       return res.status(400).json({
         success: false,
-        message: "examName, blueprintName aur attemptedQuestions bharna zaroori hai!",
+        message:
+          "userId, examName, blueprintName aur attemptedQuestions bharna zaroori hai!",
       });
     }
 
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions me kam se kam ek question hona chahiye!",
+        message:
+          "attemptedQuestions me kam se kam ek question hona chahiye!",
       });
     }
 
+    // ─────────────────────────────────────────────
     // 2. Per-question shape validation
-    // NOTE: `isCorrect` jaanbujh kar trust nahi karte — wo neeche server-side
-    // DB ke correctOption se calculate hota hai.
+    // BUG FIX (security): isCorrect ab yahan validate/trust NAHI kiya jaata.
+    // Pehle jo bhi isCorrect frontend bhejta tha wahi seedha DB mein save
+    // ho jaata tha — matlab Network request edit karke score badhaya ja
+    // sakta tha. Ab sirf questionId aur timeTakenInSeconds ka shape check
+    // karenge; isCorrect hum khud STEP 4-5 mein DB se nikalenge.
+    // ─────────────────────────────────────────────
     for (const q of attemptedQuestions) {
       if (!q.questionId) {
         return res.status(400).json({
@@ -58,8 +55,13 @@ export const addPerformence = async (req, res) => {
       }
     }
 
-    // 3. Blueprint
-    const blueprint = await Blueprint.findOne({ blueprintName, examName });
+    // ─────────────────────────────────────────────
+    // 3. Blueprint dhundo (marksPerQuestion, negativeMarking, totalQuestions ke liye)
+    // ─────────────────────────────────────────────
+    const blueprint = await Blueprint.findOne({
+      blueprintName,
+      examName,
+    });
 
     if (!blueprint) {
       return res.status(404).json({
@@ -68,19 +70,28 @@ export const addPerformence = async (req, res) => {
       });
     }
 
-    // 4. Sare questions ka REAL correctOption + subjectName DB se
-    const questionIds = attemptedQuestions.map((q) => q.questionId).filter(Boolean);
+    // ─────────────────────────────────────────────
+    // 4. Sare attempted questions ka REAL correctOption + subjectName
+    // ek hi query mein DB se nikalo — yahi ab source of truth hai
+    // (submitChallenge.js mein bhi bilkul isi pattern se hota hai)
+    // ─────────────────────────────────────────────
+    const questionIds = attemptedQuestions
+      .map((q) => q.questionId)
+      .filter(Boolean);
 
-    const questionDocs = await Question.find({ _id: { $in: questionIds } }).select(
-      "_id subjectName correctOption"
-    );
+    const questionDocs = await Question.find({
+      _id: { $in: questionIds },
+    }).select("_id subjectName correctOption");
 
     const questionMap = {};
     for (const doc of questionDocs) {
       questionMap[doc._id.toString()] = doc;
     }
 
-    // 5. isCorrect SERVER-SIDE calculate + subject grouping
+    // ─────────────────────────────────────────────
+    // 5. Har question ke liye isCorrect SERVER-SIDE calculate karo,
+    // aur subject-wise grouping bhi isi ek loop mein kar lo
+    // ─────────────────────────────────────────────
     let correctCount = 0;
     let wrongCount = 0;
     let unattemptedCount = 0;
@@ -92,7 +103,8 @@ export const addPerformence = async (req, res) => {
       const qIdStr = q.questionId ? q.questionId.toString() : null;
       const questionDoc = qIdStr ? questionMap[qIdStr] : null;
 
-      // Fake/deleted questionId → skip
+      // Agar ye question DB mein mila hi nahi (deleted ya tampered
+      // questionId), skip karo — fake ID daal ke score badhaya nahi ja sakta
       if (!questionDoc) continue;
 
       const userAnswer =
@@ -100,8 +112,12 @@ export const addPerformence = async (req, res) => {
           ? String(q.userAnswer)
           : null;
 
+      // BUG FIX: isCorrect ab frontend se NAHI aata — hum khud
+      // userAnswer ko DB ke correctOption se compare karke nikalte hain
       const isCorrect =
-        userAnswer === null ? null : userAnswer === String(questionDoc.correctOption);
+        userAnswer === null
+          ? null
+          : userAnswer === String(questionDoc.correctOption);
 
       const timeTaken =
         typeof q.timeTakenInSeconds === "number" && q.timeTakenInSeconds >= 0
@@ -119,6 +135,7 @@ export const addPerformence = async (req, res) => {
         timeTakenInSeconds: timeTaken,
       });
 
+      // Subject-wise grouping — DB ke subjectName se (client se nahi)
       const subjectName = questionDoc.subjectName;
       if (subjectName) {
         if (!subjectGroups[subjectName]) {
@@ -145,6 +162,9 @@ export const addPerformence = async (req, res) => {
       }
     }
 
+    // Agar koi bhi valid question match nahi hua (sab tampered/deleted the)
+    // Note: purana dead check (counts === attemptedQuestions.length, jo
+    // hamesha true hota tha) yahan se hata diya — ab ye meaningful check hai
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
@@ -152,16 +172,23 @@ export const addPerformence = async (req, res) => {
       });
     }
 
-    // 6. Score
+    // ─────────────────────────────────────────────
+    // 6. Score Calculate
+    // ─────────────────────────────────────────────
     const calculatedScore =
-      correctCount * blueprint.marksPerQuestion - wrongCount * blueprint.negativeMarking;
+      correctCount * blueprint.marksPerQuestion -
+      wrongCount * blueprint.negativeMarking;
 
-    // 7. subjectAnalysis
+    // ─────────────────────────────────────────────
+    // 7. subjectAnalysis array banao
+    // ─────────────────────────────────────────────
     const subjectAnalysis = Object.keys(subjectGroups).map((subjectName) => {
       const { correct, wrong, unattempted, total, totalTime, timedCount } =
         subjectGroups[subjectName];
 
-      const accuracy = total === 0 ? 0 : Number(((correct / total) * 100).toFixed(2));
+      const accuracy =
+        total === 0 ? 0 : Number(((correct / total) * 100).toFixed(2));
+
       const averageTimePerQuestion =
         timedCount === 0 ? 0 : Number((totalTime / timedCount).toFixed(2));
 
@@ -177,7 +204,9 @@ export const addPerformence = async (req, res) => {
       };
     });
 
-    // 8. Save
+    // ─────────────────────────────────────────────
+    // 8. Save Performance
+    // ─────────────────────────────────────────────
     const newPerformance = new Performance({
       userId,
       examName,
@@ -192,7 +221,9 @@ export const addPerformence = async (req, res) => {
 
     await newPerformance.save();
 
+    // ─────────────────────────────────────────────
     // 9. Response
+    // ─────────────────────────────────────────────
     return res.status(201).json({
       success: true,
       message: "User Performance Successfully Save Ho Gayi.",
@@ -209,7 +240,6 @@ export const addPerformence = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("addPerformence error:", error);
     return res.status(500).json({
       success: false,
       message: "Performance save karte waqt server error aaya.",

@@ -4,7 +4,6 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import Teacher from "../models/Teacher.js";
-import { authCookieOptions } from "../utils/cookieOptions.js"; // 👈 NAYA
 
 export const acceptInvite = async (req, res) => {
   try {
@@ -25,16 +24,11 @@ export const acceptInvite = async (req, res) => {
         message: "Naam, email aur password bharna zaroori hai!",
       });
     }
-    if (String(password).length < 6) {
+    if (password.length < 6) {
       return res.status(400).json({
         success: false,
         message: "Password kam se kam 6 characters ka hona chahiye!",
       });
-    }
-
-    const normalizedEmail = String(email).toLowerCase().trim();
-    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
     }
 
     // ─────────────────────────────────────────────
@@ -64,10 +58,11 @@ export const acceptInvite = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 3: Email kisi aur teacher ke paas to nahi hai
+    // STEP 3: Email kisi aur teacher ke paas to nahi hai, check karo
+    // (khud ka placeholder email chhodkar)
     // ─────────────────────────────────────────────
     const emailTaken = await Teacher.findOne({
-      email: normalizedEmail,
+      email: email.toLowerCase().trim(),
       _id: { $ne: teacher._id },
     });
     if (emailTaken) {
@@ -83,22 +78,17 @@ export const acceptInvite = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    teacher.name = String(name).trim();
-    teacher.email = normalizedEmail;
+    teacher.name = name.trim();
+    teacher.email = email.toLowerCase().trim();
     teacher.password = hashedPassword;
     teacher.status = "active";
     teacher.inviteToken = null;
-    teacher.inviteTokenExpiry = null;
-
-    // 🐛 FIX: role explicitly "sub" set kar rahe hain. Agar kabhi purana doc
-    // bina role ke ban gaya ho to teacherInfo/checkCouponAccess mein
-    // "Aapki teacher role valid nahi hai" wala 403 aa jata tha.
-    if (teacher.role !== "sub") teacher.role = "sub";
+    teacher.inviteTokenExpiry = null; // 👈 link ab dobara kabhi use nahi ho sakta
 
     await teacher.save();
 
     // ─────────────────────────────────────────────
-    // STEP 5: Auto-login — JWT + cookie
+    // STEP 5: Auto-login — JWT + cookie (addTeacher.js jaisa hi pattern)
     // ─────────────────────────────────────────────
     const jwtToken = jwt.sign(
       { teacherId: teacher._id },
@@ -106,9 +96,15 @@ export const acceptInvite = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    return res
-      .status(200)
-      .cookie("teacherToken", jwtToken, authCookieOptions())
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    return res.status(200)
+      .cookie("teacherToken", jwtToken, cookieOptions)
       .json({
         success: true,
         message: "Account activate ho gaya! Aap login ho chuke hain.",

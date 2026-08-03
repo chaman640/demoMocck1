@@ -4,17 +4,11 @@
 // se match karta hai — kisi doosre teacher ke students kabhi nahi dikhenge.
 import User from "../models/User.js";
 
-// 🐛 FIX: regex special characters escape karna zaroori hai.
-// Pehle user ka input seedha `new RegExp` mein jata tha. Agar koi "(" ya "["
-// jaisa character daal deta to MongoDB "Regular expression is invalid" ke saath
-// 500 error de deta tha. "." bhejne par TOH poori batch ke students dikh jate the.
-const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
 export const searchStudentByPhone = async (req, res) => {
   try {
     const { phone } = req.query;
 
-    if (!phone || String(phone).trim().length < 3) {
+    if (!phone || phone.trim().length < 3) {
       return res.status(400).json({
         success: false,
         message: "Search ke liye kam se kam 3 digit ka phone number dein.",
@@ -28,21 +22,14 @@ export const searchStudentByPhone = async (req, res) => {
       });
     }
 
-    // 🐛 FIX: sirf digits allow — search box phone ke liye hai
-    const cleanedPhone = String(phone).trim().replace(/\D/g, "");
-    if (cleanedPhone.length < 3) {
-      return res.status(400).json({
-        success: false,
-        message: "Kam se kam 3 digit (sirf number) daalein.",
-      });
-    }
-
     // ─────────────────────────────────────────────
-    // STRICT PRIVACY RULE: sirf isi coupon ke students
+    // STRICT PRIVACY RULE: sirf isi coupon ke students —
+    // partial match allow karte hain (regex) taaki teacher poora
+    // number yaad na rakhna pade, lekin scope hamesha apne coupon tak
     // ─────────────────────────────────────────────
     const students = await User.find({
       activeCoupon: req.teacher.activeCoupon,
-      phone: { $regex: escapeRegex(cleanedPhone) },
+      phone: { $regex: phone.trim(), $options: "i" },
     })
       .select("name phone exam")
       .limit(20);

@@ -13,13 +13,12 @@ export const getAllAnalysis1stPage = async (req, res) => {
   try {
     let { userId, examName } = req.params;
 
-    // 🔒 SECURITY FIX: userId ab URL se NAHI, login session se aata hai.
-    // Pehle koi bhi logged-in student URL mein kisi aur ka userId daal kar
-    // uski poori analysis (score, sawaal, weak topics) dekh sakta tha.
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id;
     }
-    userId = req.user._id;
 
     // 1. Sare mocks fetch karo
     const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
@@ -161,13 +160,7 @@ export const getPerformanceAnalysis = async (req, res) => {
       });
     }
 
-    // 🔒 SECURITY FIX: sirf apna hi performance doc padha ja sakta hai.
-    // Pehle koi bhi performanceId daal kar doosre student ka poora
-    // question-by-question breakdown (jawab + explanation) dekh sakta tha.
-    const performance = await Performance.findOne({
-      _id: performanceId,
-      userId: req.user?._id,
-    }).populate({
+    const performance = await Performance.findById(performanceId).populate({
       path: "attemptedQuestions.questionId",
       model: RowQuestion,
     });
@@ -267,13 +260,12 @@ export const getSubjectAnalysis = async (req, res) => {
   try {
     let { userId, examName, subjectName } = req.params;
 
-    // 🔒 SECURITY FIX: userId ab URL se NAHI, login session se aata hai.
-    // Pehle koi bhi logged-in student URL mein kisi aur ka userId daal kar
-    // uski poori analysis (score, sawaal, weak topics) dekh sakta tha.
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id;
     }
-    userId = req.user._id;
 
     const last3Tests = await Performance.find({ userId, examName })
       .sort({ createdAt: -1 })
@@ -450,13 +442,12 @@ export const getTopicAnalysis = async (req, res) => {
   try {
     let { userId, examName, subjectName, topicName } = req.params;
 
-    // 🔒 SECURITY FIX: userId ab URL se NAHI, login session se aata hai.
-    // Pehle koi bhi logged-in student URL mein kisi aur ka userId daal kar
-    // uski poori analysis (score, sawaal, weak topics) dekh sakta tha.
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+    if (userId === "active_user") {
+      if (!req.user || !req.user._id) {
+        return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      }
+      userId = req.user._id;
     }
-    userId = req.user._id;
 
     const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
 
@@ -584,13 +575,14 @@ export const getTopicAnalysis = async (req, res) => {
 // ─────────────────────────────────────────────
 export const getUserMockTests = async (req, res) => {
   try {
-    const { examName } = req.params;
+    const { userId, examName } = req.params;
 
-    // 🔒 SECURITY FIX: URL ka :userId ignore — hamesha logged-in user ka data
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid User ID",
+      });
     }
-    const userId = req.user._id;
 
     const tests = await Performance.find({ userId, examName })
       .select(

@@ -2,10 +2,10 @@
 import Teacher from "../models/Teacher.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import { authCookieOptions } from "../utils/cookieOptions.js"; // 👈 NAYA
 
 export const loginTeacher = async (req, res) => {
   try {
+    // 1. Frontend se email ya phone, aur password nikalna
     const { email, phone, password } = req.body;
 
     if ((!email && !phone) || !password) {
@@ -15,11 +15,12 @@ export const loginTeacher = async (req, res) => {
       });
     }
 
-    // Query banana + normalization
-    const query = [];
-    if (email) query.push({ email: String(email).toLowerCase().trim() });
-    if (phone) query.push({ phone: String(phone).trim() });
+    // 2. Query banana aur Normalization karna (taaki capital/small letter ka issue na ho)
+    let query = [];
+    if (email) query.push({ email: email.toLowerCase().trim() });
+    if (phone) query.push({ phone: phone.trim() });
 
+    // 3. Database mein Teacher ko dhundna
     const teacher = await Teacher.findOne({ $or: query });
 
     if (!teacher) {
@@ -29,43 +30,41 @@ export const loginTeacher = async (req, res) => {
       });
     }
 
-    // Status check — sirf "active" teacher login kar sakta hai
+    // 4. Status Check — Sirf "active" teachers hi login kar sakte hain
     if (teacher.status !== "active") {
-      // 🐛 FIX: pehle raw status ("pending") dikhta tha jo user ko samajh nahi
-      // aata tha. Ab har status ka apna clear message hai.
-      const message =
-        teacher.status === "pending"
-          ? "Aapka account abhi activate nahi hua. Main Teacher se mila invite link kholkar naam/email/password set karein."
-          : teacher.status === "removed"
-          ? "Aapka account Main Teacher ne remove kar diya hai. Unse dobara invite mangwayein."
-          : "Aapka account abhi active nahi hai.";
-      return res.status(403).json({ success: false, message });
-    }
-
-    // 🐛 FIX: agar password set hi nahi hai (adhoora invite flow) to
-    // bcrypt.compare crash karke 500 deta tha. Ab clean message.
-    if (!teacher.password) {
       return res.status(403).json({
         success: false,
-        message: "Is account ka password set nahi hai. Invite link se account activate karein.",
+        message: `Aapka account abhi '${teacher.status}' status mein hai. Sirf active accounts login kar sakte hain.`,
       });
     }
 
+    // 5. Password Verify karna
     const isPasswordCorrect = await bcrypt.compare(password, teacher.password);
     if (!isPasswordCorrect) {
-      // 🐛 FIX: galat password pe 400 ke bajaye standard 401
-      return res.status(401).json({ success: false, message: "Galat password!" });
+      return res.status(400).json({
+        success: false,
+        message: "Galat password!",
+      });
     }
 
+    // 6. JWT Token Generate karna
     const token = jwt.sign(
       { teacherId: teacher._id },
       process.env.JWT_SECRET || "mera_super_secret_key",
       { expiresIn: "7d" }
     );
 
-    return res
-      .status(200)
-      .cookie("teacherToken", token, authCookieOptions())
+    // 7. Cookie Options set karna
+    const cookieOptions = {
+      httpOnly: true,
+      secure: true, // Humesha true rakhein agar frontend aur backend alag URL par hain ya production mein hain
+      sameSite: "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+
+    // 8. Response bhejna
+    return res.status(200)
+      .cookie("teacherToken", token, cookieOptions)
       .json({
         success: true,
         message: "Login successful!",
@@ -78,6 +77,7 @@ export const loginTeacher = async (req, res) => {
           examName: teacher.examName,
         },
       });
+
   } catch (error) {
     console.error("Teacher Login Error:", error);
     return res.status(500).json({

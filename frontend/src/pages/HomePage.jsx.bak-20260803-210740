@@ -150,21 +150,6 @@ const HomePage = () => {
       sub: "Roz ki khabrein",
       onClick: () => navigate("/CurrentAffairs"),
     },
-    // 👇 NAYA: teacher ke banaye Custom Tests ka link. Pehle backend mein
-    // ye feature poora bana tha lekin student ke liye koi entry point hi
-    // nahi tha — teacher test banata tha aur wo kabhi kisi tak pahunchta hi nahi tha.
-    {
-      icon: "📋",
-      label: "Batch Tests",
-      sub: "Teacher ke test",
-      onClick: () => navigate("/CustomTests"),
-    },
-    {
-      icon: "👥",
-      label: "Meri Batch",
-      sub: "Coupon / teacher",
-      onClick: () => navigate("/MyBatch"),
-    },
     {
       icon: "🏆",
       label: "My Challenges",
@@ -205,7 +190,12 @@ const HomePage = () => {
     },
   ];
 
-  // (unused `navItems` hata diya gaya — bottom nav ab <BottomNav /> se aata hai)
+  const navItems = [
+    { label: "Home", active: true, icon: "home" },
+    { label: "Test", icon: "test", onClick: () => navigate('/MockTest') },
+    { label: "Analysis", icon: "analysis", onClick: () => navigate('/UserAllAnalysis') },
+    { label: "Profile", icon: "profile", onClick: () => navigate('/ProfilePage') },
+  ];
 
   // 👇 UPDATED: spinner ki jagah ab skeleton layout dikhega
   if (isLoading) {

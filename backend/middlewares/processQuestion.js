@@ -1,111 +1,166 @@
-// middlewares/processQuestion.js
+// middlewares/processQuestion.js  (ADMIN question upload)
+import "dotenv/config"; // 🐛 FIX #1 — niche wajah likhi hai
 import multer from "multer";
 import cloudinaryPackage from "cloudinary";
 import sharp from "sharp";
-import fs from "fs";
-import path from "path";
-// import dotenv from "dotenv";
 
-// dotenv.config();
+const cloudinary = cloudinaryPackage.v2;
 
-const cloudinary = cloudinaryPackage.v2; // 👈 V2 Instance setup done
+// ─────────────────────────────────────────────
+// 🐛 FIX #1 — CLOUDINARY CONFIG KA TIMING BUG
+//
+// Pehle file ke top pe seedha `cloudinary.config({ cloud_name: process.env... })`
+// likha tha. ESM mein saare imports server.js ke `dotenv.config()` se PEHLE
+// chalte hain, isliye us waqt process.env khaali hota tha → cloud_name/api_key
+// dono `undefined` → HAR image upload "Cloudinary upload failed" deta tha.
+//
+// Ab: (a) top pe "dotenv/config" import kiya, aur (b) config ko lazy function
+// mein daala jo pehli upload par chalta hai. Dono milke ye bug permanently
+// khatam kar dete hain.
+// ─────────────────────────────────────────────
+let cloudinaryReady = false;
+const ensureCloudinary = () => {
+  if (cloudinaryReady) return;
 
-// 1️⃣ Cloudinary Configuration (Theek kar diya)
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
+  const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
+  if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
+    // 🐛 FIX: pehle env missing hone par bhi upload try hota tha aur
+    // ek confusing error aata tha. Ab saaf message milta hai.
+    throw new Error(
+      "Cloudinary env variables set nahi hain (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
+    );
+  }
 
-// 2️⃣ Multer Memory Storage Setup
-const storage = multer.memoryStorage();
+  cloudinary.config({
+    cloud_name: CLOUDINARY_CLOUD_NAME,
+    api_key: CLOUDINARY_API_KEY,
+    api_secret: CLOUDINARY_API_SECRET,
+  });
+  cloudinaryReady = true;
+};
+
+// ─────────────────────────────────────────────
+// Multer — memory storage
+// ─────────────────────────────────────────────
 const uploadFields = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
 }).fields([
   { name: "questionPhoto", maxCount: 1 },
-  { name: "answerExplainWithPhoto", maxCount: 1 }
+  { name: "answerExplainWithPhoto", maxCount: 1 },
 ]);
 
-// Helper function: Local temporary file ko Cloudinary par upload karne ke liye
-const uploadToCloudinary = async (localFilePath) => {
-  try {
-    // 👈 Yahan bhi 'cloudinary' kar diya
-    const response = await cloudinary.uploader.upload(localFilePath, {
-      folder: "questions_photos",
-      resource_type: "image"
-    });
-    return response.secure_url;
-  } catch (error) {
-    throw new Error("Cloudinary upload failed: " + error.message);
-  }
-};
+// ─────────────────────────────────────────────
+// 🐛 FIX #2 — temp file ka jhamela hataya
+// Pehle image ko ./public/temp mein likha jata tha, phir Cloudinary pe upload,
+// phir delete. Render jaise hosts pe filesystem read-only/ephemeral hota hai —
+// wahan ye chain toot jati thi. Ab seedha buffer se stream upload hota hai.
+// ─────────────────────────────────────────────
+const uploadBufferToCloudinary = (buffer, folder) =>
+  new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      { folder, resource_type: "image" },
+      (error, result) => {
+        if (error) return reject(new Error("Cloudinary upload failed: " + error.message));
+        resolve(result.secure_url);
+      }
+    );
+    stream.end(buffer);
+  });
 
-// 3️⃣ Main Middleware Function
+// ─────────────────────────────────────────────
+// Main middleware
+// ─────────────────────────────────────────────
 export const processQuestionMiddleware = (req, res, next) => {
+  // 🐛 FIX #3 — BULK JSON UPLOAD TOOTA HUA THA
+  //
+  // Purana code har request pe single-question validation chalata tha.
+  // addQuestion.js array (bulk) support karta hai, lekin JSON array bhejne par
+  // `const { question, option1... } = req.body` sab undefined hota tha
+  // → hamesha 400 "Sabhi fields aur options zaroori hain!".
+  // Matlab bulk question upload kabhi kaam hi nahi karta tha.
+  //
+  // Ab: agar request multipart nahi hai (yaani image nahi hai) to seedha
+  // controller ko bhej dete hain — wahan proper validation hoti hai.
+  if (!req.is("multipart/form-data")) {
+    return next();
+  }
+
   uploadFields(req, res, async function (err) {
     if (err) {
       return res.status(400).json({ success: false, message: "Multer Error: " + err.message });
     }
 
     try {
-      const { question, option1, option2, option3, option4, correctOption, subjectName, topicName,examName } = req.body;
+      const {
+        question,
+        option1,
+        option2,
+        option3,
+        option4,
+        correctOption,
+        subjectName,
+        topicName,
+        answerExplain,
+        examName,
+      } = req.body;
 
       // 🛑 A. TEXT DATA VALIDATION
       if (!question || !option1 || !option2 || !option3 || !option4 || !subjectName || !topicName) {
-        return res.status(400).json({ success: false, message: "❌ Sabhi fields aur options zaroori hain!" });
+        return res
+          .status(400)
+          .json({ success: false, message: "❌ Sabhi fields aur options zaroori hain!" });
       }
-      if (!correctOption || correctOption < 1 || correctOption > 4) {
-        return res.status(400).json({ success: false, message: "❌ correctOption 1 se 4 ke beech hona chahiye!" });
+      // 🐛 FIX #4: answerExplain schema mein `required: true` hai, lekin yahan
+      // check nahi hota tha → save() pe mongoose ValidationError aur 500 error.
+      if (!answerExplain) {
+        return res.status(400).json({ success: false, message: "❌ answerExplain zaroori hai!" });
       }
+      const correctOpt = Number(correctOption);
+      if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
+        return res
+          .status(400)
+          .json({ success: false, message: "❌ correctOption 1 se 4 ke beech hona chahiye!" });
+      }
+      req.body.correctOption = correctOpt;
 
+      // examName ko array mein normalize karo
       let parsedExamName = examName;
       if (typeof examName === "string") {
-        try { parsedExamName = JSON.parse(examName); } catch (e) { parsedExamName = [examName]; }
+        try {
+          parsedExamName = JSON.parse(examName);
+        } catch (e) {
+          parsedExamName = [examName];
+        }
       }
       if (!parsedExamName || !Array.isArray(parsedExamName) || parsedExamName.length === 0) {
-        return res.status(400).json({ success: false, message: "❌ examName array hona zaroori hai!" });
+        return res
+          .status(400)
+          .json({ success: false, message: "❌ examName array hona zaroori hai!" });
       }
       req.body.examName = parsedExamName;
 
-      const tempDir = "./public/temp";
-      if (!fs.existsSync(tempDir)) {
-        fs.mkdirSync(tempDir, { recursive: true });
-      }
-
-      // 📂 B. PHOTO PROCESSING & COMPRESSION VIA SHARP
+      // 📂 B. PHOTO COMPRESS + UPLOAD
       const fileFields = ["questionPhoto", "answerExplainWithPhoto"];
-      
+      const hasAnyFile = fileFields.some((f) => req.files?.[f]?.[0]);
+      if (hasAnyFile) ensureCloudinary();
+
       for (const field of fileFields) {
-        if (req.files && req.files[field] && req.files[field][0]) {
-          const fileBuffer = req.files[field][0].buffer;
-          const uniqueName = `${field}-${Date.now()}-${Math.round(Math.random() * 1e9)}.jpeg`;
-          const localOutputPath = path.join(tempDir, uniqueName);
-
-          await sharp(fileBuffer)
-            .jpeg({ quality: 60 }) 
-            .toFile(localOutputPath);
-
-          // ☁️ C. UPLOAD TO CLOUDINARY
-          const cloudinaryUrl = await uploadToCloudinary(localOutputPath);
-          req.body[field] = cloudinaryUrl;
-
-          // 🗑️ D. DELETE LOCAL TEMP FILE
-          if (fs.existsSync(localOutputPath)) {
-            fs.unlinkSync(localOutputPath);
-          }
+        const file = req.files?.[field]?.[0];
+        if (file) {
+          const compressed = await sharp(file.buffer).jpeg({ quality: 60 }).toBuffer();
+          req.body[field] = await uploadBufferToCloudinary(compressed, "questions_photos");
         } else {
           req.body[field] = null;
         }
       }
 
       next();
-
     } catch (error) {
       return res.status(500).json({
         success: false,
         message: "❌ Middleware mein processing error aaya",
-        error: error.message
+        error: error.message,
       });
     }
   });
