@@ -34,6 +34,7 @@ import TeacherStudentSubjectAnalysis from './pages/teacher/TeacherStudentSubject
 import TeacherStudentTopicAnalysis from './pages/teacher/TeacherStudentTopicAnalysis';
 import TeacherClassAnalysis from './pages/teacher/TeacherClassAnalysis';
 import TeacherCoupons from './pages/teacher/TeacherCoupons';
+import ForgotPassword from './pages/ForgotPassword';
 
 
 
@@ -87,7 +88,9 @@ const App = () => {
             <Route path="/TeacherStudentTopicAnalysis/:studentId" element={<TeacherStudentTopicAnalysis/>} />
             <Route path="/TeacherClassAnalysis" element={<TeacherClassAnalysis/>} />
             <Route path="/TeacherCoupons" element={<TeacherCoupons/>} />
+            <Route path="/ForgotPassword" element={<ForgotPassword/>} />
 
+            
 
             <Route path="/TeacherContent" element={<TeacherContent/>} />
           </Routes>
