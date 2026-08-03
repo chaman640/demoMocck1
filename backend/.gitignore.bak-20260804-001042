@@ -1,0 +1,21 @@
+# ⚠️ SABSE ZAROORI — .env kabhi git mein nahi jana chahiye.
+# Aapke purane .gitignore mein sirf "repomix-output" tha, isliye .env aur
+# node_modules dono repo mein commit ho rahe the (secrets public ho gaye).
+.env
+.env.*
+!.env.example
+
+node_modules/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Upload middleware ab temp files nahi banata, phir bhi purani files ignore
+public/temp/
+uploads/
+
+repomix-output*
+*.log
+.DS_Store
+.vscode/
+.idea/

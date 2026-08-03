@@ -1,11 +1,10 @@
 // controllers/fillPreviousYearPaperSubject.js
 // Sub-Teacher (ya Main Teacher) apne assigned subject ka quota is
-// paper-shell mein fill karta hai. "Sab ya koi nahi" — koi bhi question
-// invalid ho ya quota se zyada ho to poora batch reject.
+// paper-shell mein fill karta hai. Ek hi call mein "sab ya koi nahi" —
+// agar koi bhi question invalid hai ya quota se zyada hai, poora batch reject.
 import mongoose from "mongoose";
 import PreviousYearTest from "../models/PreviousYearTest.js";
 import { checkCouponAccess } from "../utils/checkCouponAccess.js";
-import { normalizeSubject, sameSubject } from "../utils/subjectName.js";
 
 export const fillPreviousYearPaperSubject = async (req, res) => {
   try {
@@ -18,15 +17,20 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(paperId)) {
       return res.status(400).json({ success: false, message: "Invalid paperId." });
     }
-    if (!normalizeSubject(subjectName)) {
+    if (!subjectName) {
       return res.status(400).json({ success: false, message: "subjectName zaroori hai!" });
     }
     if (!Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ success: false, message: "Kam se kam ek question dena zaroori hai." });
+      return res.status(400).json({
+        success: false,
+        message: "Kam se kam ek question dena zaroori hai.",
+      });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1: Paper dhundo
+    // STEP 1: Paper dhundo — sirf teacher-created shell papers fill
+    // ho sakte hain (couponId null matlab global/admin paper, wo yahan
+    // se nahi chhera ja sakta)
     // ─────────────────────────────────────────────
     const paper = await PreviousYearTest.findById(paperId);
     if (!paper) {
@@ -40,30 +44,30 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 2: Access control (ab case/space-safe)
+    // STEP 2: Access control — is teacher ka is coupon + subject ke
+    // liye authorization (Main Teacher automatically pass ho jayega)
     // ─────────────────────────────────────────────
     const { allowed, reason } = await checkCouponAccess(req.teacher, paper.couponId, subjectName);
     if (!allowed) {
-      return res.status(403).json({ success: false, message: reason || "Aapko is subject ka access nahi hai." });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 3: Blueprint + subject block dhundo
-    //
-    // 🐛 FIX: pehle `b.subjectName === subjectName` se exact match hota tha.
-    // URL me subject ka naam encode hokar aata hai; agar kahin bhi capital/small
-    // ya extra space ka farak ho jata to "Ye subject is paper ke blueprint mein
-    // hai hi nahi" wala error aata tha, jabki subject saamne dikh raha hota tha.
-    // ─────────────────────────────────────────────
-    const blueprintEntry = paper.blueprint.find((b) => sameSubject(b.subjectName, subjectName));
-    if (!blueprintEntry) {
-      return res.status(400).json({
+      return res.status(403).json({
         success: false,
-        message: `'${normalizeSubject(subjectName)}' is paper ke blueprint mein hai hi nahi.`,
+        message: reason || "Aapko is subject ka access nahi hai.",
       });
     }
 
-    const subjectBlock = paper.subjects.find((s) => sameSubject(s.subjectName, subjectName));
+    // ─────────────────────────────────────────────
+    // STEP 3: Blueprint mein ye subject hona chahiye, aur uska
+    // subjects[] block bhi (shell banate waqt pre-populate hota hai)
+    // ─────────────────────────────────────────────
+    const blueprintEntry = paper.blueprint.find((b) => b.subjectName === subjectName);
+    if (!blueprintEntry) {
+      return res.status(400).json({
+        success: false,
+        message: `'${subjectName}' is paper ke blueprint mein hai hi nahi.`,
+      });
+    }
+
+    const subjectBlock = paper.subjects.find((s) => s.subjectName === subjectName);
     if (!subjectBlock) {
       return res.status(404).json({
         success: false,
@@ -74,7 +78,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (subjectBlock.filled) {
       return res.status(400).json({
         success: false,
-        message: `'${subjectBlock.subjectName}' ka quota pehle hi poora ho chuka hai.`,
+        message: `'${subjectName}' ka quota pehle hi poora ho chuka hai.`,
       });
     }
 
@@ -108,12 +112,13 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (questions.length > remainingSlots) {
       return res.status(400).json({
         success: false,
-        message: `Sirf ${remainingSlots} aur question(s) add kar sakte hain '${subjectBlock.subjectName}' ke liye (quota: ${blueprintEntry.questionCount}, already filled: ${subjectBlock.questions.length}).`,
+        message: `Sirf ${remainingSlots} aur question(s) add kar sakte hain '${subjectName}' ke liye (quota: ${blueprintEntry.questionCount}, already filled: ${subjectBlock.questions.length}).`,
       });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 6: questionNumber auto-numbering (subject block ke andar)
+    // STEP 6: questionNumber auto-numbering — isi subject-block ke
+    // andar sequential
     // ─────────────────────────────────────────────
     let nextNumber = subjectBlock.questions.length + 1;
 
@@ -127,23 +132,22 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
       correctOption: Number(q.correctOption),
       answerExplain: q.answerExplain || "",
       answerExplainWithPhoto: q.answerExplainWithPhoto || null,
-      topicName: normalizeSubject(q.topicName) || "General",
-      // 🐛 FIX: subjectName model me required hai — pehle yahan set hi nahi hota tha,
-      // jo mongoose validation error de sakta tha
-      subjectName: subjectBlock.subjectName,
+      topicName: q.topicName || "General",
       questionNumber: nextNumber++,
     }));
 
     subjectBlock.questions.push(...newQuestions);
 
+    // Save hote hi pre-save hook khud subjectBlock.filled aur paper.status
+    // (draft/complete) calculate kar dega — humein manually kuch set nahi karna
     await paper.save();
 
     return res.status(200).json({
       success: true,
-      message: `'${subjectBlock.subjectName}' mein ${newQuestions.length} question(s) add ho gaye! (${subjectBlock.questions.length}/${blueprintEntry.questionCount})`,
+      message: `'${subjectName}' mein ${newQuestions.length} question(s) add ho gaye! (${subjectBlock.questions.length}/${blueprintEntry.questionCount})`,
       data: {
         paperId: paper._id,
-        subjectName: subjectBlock.subjectName,
+        subjectName,
         filled: subjectBlock.filled,
         paperStatus: paper.status,
         currentCount: subjectBlock.questions.length,

@@ -1,16 +1,17 @@
 // utils/classAnalytics.js
 // Reusable aggregation helpers — teacher ke active-coupon ke students ka
-// class-level topic/question analysis banane ke liye.
+// class-level topic/question analysis banane ke liye. Ek hi core logic,
+// alag-alag percentile-filters (all/top25/bottom25/custom) ke liye reuse hota hai.
 import User from "../models/User.js";
 import Coupon from "../models/Coupon.js";
 import CouponAccess from "../models/CouponAccess.js";
 import Performance from "../models/Performance.js";
 import { Question as RowQuestion } from "../models/rowQuestionSchema.js";
-import { ciExact } from "./subjectName.js";
 
 // ─────────────────────────────────────────────
 // Sub-teacher ke liye uske active-coupon mein authorized subjects.
-// Main Teacher ke liye null (koi restriction nahi).
+// Main Teacher ke liye null (matlab koi restriction nahi — sab dekh sakta hai,
+// jaisa spec point 5 mein hai: "Main Teacher hamesha sab kuch dekh sakta hai")
 // ─────────────────────────────────────────────
 export const getAllowedSubjectsForTeacher = async (teacher) => {
   if (teacher.role === "main") return null;
@@ -23,12 +24,11 @@ export const getAllowedSubjectsForTeacher = async (teacher) => {
 
 // ─────────────────────────────────────────────
 // Teacher ke active-coupon ke students ko percentile-filter ke hisaab se
-// resolve karta hai. examName bhi coupon se hi derive hota hai.
+// resolve karta hai. examName bhi coupon se hi derive hota hai (client se
+// nahi leते, taaki galat exam ka data kabhi cross na ho — jaisa
+// addTeacherQuestion.js mein bhi pattern hai).
 // ─────────────────────────────────────────────
-export const resolveFilteredStudentIds = async (
-  teacher,
-  { filter = "all", minPercentile, maxPercentile }
-) => {
+export const resolveFilteredStudentIds = async (teacher, { filter = "all", minPercentile, maxPercentile }) => {
   if (!teacher.activeCoupon) {
     const err = new Error("Pehle apna active group/coupon select karein.");
     err.statusCode = 400;
@@ -49,13 +49,13 @@ export const resolveFilteredStudentIds = async (
     return {
       studentIds: [],
       totalBatchStudents: 0,
-      totalWithData: 0,
       selectedCount: 0,
       examName: coupon.exam,
       couponName: coupon.name,
     };
   }
 
+  // "Sabhi Students" — koi ranking zaroori nahi, poori batch use karo
   if (filter === "all") {
     return {
       studentIds: batchStudents.map((s) => s._id),
@@ -67,8 +67,11 @@ export const resolveFilteredStudentIds = async (
     };
   }
 
-  // Percentile filters ke liye ranking chahiye — sirf unhi students ki
-  // jinka is exam mein kam se kam ek Performance doc hai.
+  // ─────────────────────────────────────────────
+  // Percentile filters (top25/bottom25/custom) ke liye ranking chahiye —
+  // sirf unhi students ko rank karenge jinka is exam mein kam se kam ek
+  // Performance doc hai. Bina data wale students ranking mein meaningless hain.
+  // ─────────────────────────────────────────────
   const perfAgg = await Performance.aggregate([
     { $match: { userId: { $in: batchStudents.map((s) => s._id) }, examName: coupon.exam } },
     {
@@ -84,9 +87,12 @@ export const resolveFilteredStudentIds = async (
   const rankedList = perfAgg
     .map((p) => {
       const total = p.totalCorrect + p.totalWrong + p.totalUnattempted;
-      return { studentId: p._id, accuracy: total > 0 ? (p.totalCorrect / total) * 100 : 0 };
+      return {
+        studentId: p._id,
+        accuracy: total > 0 ? (p.totalCorrect / total) * 100 : 0,
+      };
     })
-    .sort((a, b) => b.accuracy - a.accuracy);
+    .sort((a, b) => b.accuracy - a.accuracy); // best pehle (0 = top)
 
   const n = rankedList.length;
   let selected;
@@ -125,7 +131,7 @@ export const resolveFilteredStudentIds = async (
 };
 
 // ─────────────────────────────────────────────
-// CORE 1: Topic-wise wrong% breakdown
+// CORE FUNCTION 1: Topic-wise wrong% breakdown, diye gaye studentIds ke liye.
 // allowedSubjects === null matlab koi restriction nahi (Main Teacher).
 // ─────────────────────────────────────────────
 export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubjects) => {
@@ -134,7 +140,7 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
   const pipeline = [
     { $match: { userId: { $in: studentIds }, examName } },
     { $unwind: "$attemptedQuestions" },
-    { $match: { "attemptedQuestions.isCorrect": { $ne: null } } },
+    { $match: { "attemptedQuestions.isCorrect": { $ne: null } } }, // unattempted skip
     {
       $lookup: {
         from: RowQuestion.collection.name,
@@ -147,12 +153,7 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
   ];
 
   if (Array.isArray(allowedSubjects)) {
-    // 🐛 FIX: pehle `{ $in: allowedSubjects }` se EXACT string match hota tha.
-    // Sub-teacher ko "Maths" ka access ho aur questions "maths" me save hue ho
-    // to class analysis bilkul khaali dikhta tha. Ab case/space-safe regex.
-    pipeline.push({
-      $match: { "questionDoc.subjectName": { $in: allowedSubjects.map((s) => ciExact(s)) } },
-    });
+    pipeline.push({ $match: { "questionDoc.subjectName": { $in: allowedSubjects } } });
   }
 
   pipeline.push(
@@ -160,7 +161,9 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
       $group: {
         _id: { subjectName: "$questionDoc.subjectName", topicName: "$questionDoc.topicName" },
         totalAttempts: { $sum: 1 },
-        wrongCount: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.isCorrect", false] }, 1, 0] } },
+        wrongCount: {
+          $sum: { $cond: [{ $eq: ["$attemptedQuestions.isCorrect", false] }, 1, 0] },
+        },
       },
     },
     {
@@ -175,14 +178,16 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
         },
       },
     },
-    { $sort: { wrongPercentage: -1, totalAttempts: -1 } }
+    { $sort: { wrongPercentage: -1, totalAttempts: -1 } } // sabse zyada galti wala topic upar
   );
 
   return await Performance.aggregate(pipeline);
 };
 
 // ─────────────────────────────────────────────
-// CORE 2: Ek topic ke andar question-level breakdown + wrong-option distribution
+// CORE FUNCTION 2: Ek topic ke andar question-level breakdown, wrong-option
+// distribution ke saath — common misconception pakadne ke liye ("kitne %
+// students ne kaunsa galat option choose kiya").
 // ─────────────────────────────────────────────
 export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName, topicName) => {
   if (studentIds.length === 0) return [];
@@ -200,13 +205,7 @@ export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName
       },
     },
     { $unwind: "$questionDoc" },
-    // 🐛 FIX: yahan bhi case/space-safe match
-    {
-      $match: {
-        "questionDoc.subjectName": ciExact(subjectName),
-        "questionDoc.topicName": ciExact(topicName),
-      },
-    },
+    { $match: { "questionDoc.subjectName": subjectName, "questionDoc.topicName": topicName } },
     {
       $group: {
         _id: "$attemptedQuestions.questionId",
@@ -217,7 +216,9 @@ export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName
         option4: { $first: "$questionDoc.option4" },
         correctOption: { $first: "$questionDoc.correctOption" },
         totalAttempts: { $sum: 1 },
-        wrongCount: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.isCorrect", false] }, 1, 0] } },
+        wrongCount: {
+          $sum: { $cond: [{ $eq: ["$attemptedQuestions.isCorrect", false] }, 1, 0] },
+        },
         opt1Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "1"] }, 1, 0] } },
         opt2Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "2"] }, 1, 0] } },
         opt3Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "3"] }, 1, 0] } },

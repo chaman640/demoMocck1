@@ -1,5 +1,5 @@
 // App.jsx
-import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import MockTest from './pages/MockTest';
 import UserAllAnalysis from './pages/UserAllAnalysis';
@@ -49,46 +49,6 @@ const queryClient = new QueryClient({
   },
 });
 
-// ─────────────────────────────────────────────
-// 🐛 FIX: pehle koi bhi galat URL par BILKUL BLANK safed page aata tha
-// (koi catch-all route hi nahi tha) — samajh hi nahi aata tha ki galti kya hui.
-//
-// Pehle maine ise chup-chaap HomePage par redirect kar diya tha, lekin usse
-// aur confusion hui: lagta tha "teacher page khul hi nahi raha". Ab saaf
-// screen dikhti hai jisme URL bhi likha hota hai aur seedhe links bhi hain.
-// ─────────────────────────────────────────────
-const NotFound = () => {
-  const location = useLocation();
-  const linkCls =
-    'block w-full py-3 rounded-xl border border-gray-700 text-gray-300 hover:border-[#7C3AED] hover:text-white text-center text-sm transition-colors';
-
-  return (
-    <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
-      <div className="w-full max-w-md text-center">
-        <div className="text-5xl mb-4">🧭</div>
-        <h1 className="text-xl font-bold mb-2">Ye page nahi mila</h1>
-        <p className="text-gray-400 text-sm mb-1">Aapne ye address khola tha:</p>
-        <p className="text-xs font-mono text-[#A78BFA] bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 mb-6 break-all">
-          #{location.pathname}
-        </p>
-
-        <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
-          Dhyan dein: is site ke saare address me <b className="text-gray-300">#</b> aata hai —
-          jaise <span className="font-mono text-gray-300">site.com/#/TeacherLogin</span>.
-          Bina <b className="text-gray-300">#</b> ke likhne par hamesha HomePage hi khulta hai.
-        </p>
-
-        <div className="space-y-2.5">
-          <Link to="/HomePage" className={linkCls}>🏠 Student Home</Link>
-          <Link to="/Login" className={linkCls}>👤 Student Login</Link>
-          <Link to="/TeacherLogin" className={linkCls}>🧑‍🏫 Teacher Login</Link>
-          <Link to="/TeacherDashboard" className={linkCls}>📊 Teacher Dashboard</Link>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
@@ -107,7 +67,8 @@ const App = () => {
 
             <Route path="/Login" element={<Login />} />
             <Route path="/Singup" element={<Singup />} />
-            {/* 🐛 FIX: "Signup" (sahi spelling) type karne par blank page aata tha */}
+            {/* 🐛 FIX: "Signup" (sahi spelling) type karne par blank page aata tha.
+                Ab dono spellings kaam karti hain. */}
             <Route path="/Signup" element={<Singup />} />
             <Route path="/ForgotPassword" element={<ForgotPassword />} />
 
@@ -154,8 +115,10 @@ const App = () => {
             <Route path="/TeacherClassAnalysis" element={<TeacherClassAnalysis />} />
             <Route path="/TeacherCoupons" element={<TeacherCoupons />} />
 
-            {/* Galat URL par blank page ke bajaye ab helpful screen */}
-            <Route path="*" element={<NotFound />} />
+            {/* 🐛 FIX: pehle koi bhi galat URL (jaise refresh ke baad #/xyz)
+                bilkul BLANK white page dikhata tha — koi catch-all route hi
+                nahi tha. Ab seedha home pe bhej dete hain. */}
+            <Route path="*" element={<Navigate to="/HomePage" replace />} />
           </Routes>
         </div>
       </HashRouter>

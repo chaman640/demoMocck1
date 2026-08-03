@@ -94,7 +94,6 @@ import {
 import { getClassTopicAnalysis } from "../controllers/getClassTopicAnalysis.js";
 import { getClassQuestionAnalysis } from "../controllers/getClassQuestionAnalysis.js";
 
-import { getTeacherSubjects } from "../controllers/getTeacherSubjects.js"; // 👈 NAYA
 import { getTeacherDashboard } from "../controllers/getTeacherDashboard.js";
 import { logoutTeacher } from "../controllers/logoutTeacher.js";
 import { getTeacherPYQPapers } from "../controllers/getTeacherPYQPapers.js";
@@ -246,12 +245,6 @@ router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
 router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, removeSubTeacher);
 router.post("/manage-coupon-access/assign", teacherInfo, assignCouponAccess);
 router.post("/manage-coupon-access/revoke", teacherInfo, revokeCouponAccess);
-
-// ── Subject suggestions ──
-// 👇 NAYA: subject ka naam haath se type karne ki wajah se spelling galtiyan
-// hoti thi (aur poore flow chup-chaap toot jate the). Ab frontend yahan se
-// suggestion list mangwata hai.
-router.get("/teacher/subjects", teacherInfo, getTeacherSubjects);
 
 // ── Content ──
 router.post(

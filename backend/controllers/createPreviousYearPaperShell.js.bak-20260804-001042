@@ -1,19 +1,16 @@
 // controllers/createPreviousYearPaperShell.js
 // Sirf MAIN TEACHER ek naya paper "shell" banata hai — sirf structure
-// (naam, saal, blueprint: kaunse subject ke kitne questions chahiye).
+// (naam, saal, blueprint: kaunse subject ke kitne questions chahiye)
+// define hota hai, actual questions abhi nahi daale jaate. Har blueprint
+// subject ke liye "subjects" array mein ek khaali placeholder bhi bana
+// dete hain, taaki sub-teachers baad mein seedha usme push kar sakein.
 import PreviousYearTest from "../models/PreviousYearTest.js";
 import Coupon from "../models/Coupon.js";
-import {
-  normalizeSubject,
-  subjectKey,
-  getKnownSubjects,
-  canonicalizeSubject,
-} from "../utils/subjectName.js";
 
 export const createPreviousYearPaperShell = async (req, res) => {
   try {
     // ─────────────────────────────────────────────
-    // STEP 0: Sirf Main Teacher
+    // STEP 0: Sirf Main Teacher hi shell bana sakta hai
     // ─────────────────────────────────────────────
     if (req.teacher.role !== "main") {
       return res.status(403).json({
@@ -43,11 +40,14 @@ export const createPreviousYearPaperShell = async (req, res) => {
       });
     }
     if (!durationMinutes) {
-      return res.status(400).json({ success: false, message: "durationMinutes zaroori hai!" });
+      return res.status(400).json({
+        success: false,
+        message: "durationMinutes zaroori hai!",
+      });
     }
 
     for (const b of blueprint) {
-      if (!normalizeSubject(b.subjectName) || !b.questionCount || b.questionCount <= 0) {
+      if (!b.subjectName || !b.questionCount || b.questionCount <= 0) {
         return res.status(400).json({
           success: false,
           message: "Blueprint ke har entry mein subjectName aur positive questionCount hona zaroori hai.",
@@ -55,51 +55,33 @@ export const createPreviousYearPaperShell = async (req, res) => {
       }
     }
 
+    // Duplicate subject names blueprint mein na hon (warna fill-quota logic confuse ho jayegi)
+    const subjectNamesInBlueprint = blueprint.map((b) => b.subjectName);
+    if (new Set(subjectNamesInBlueprint).size !== subjectNamesInBlueprint.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Blueprint mein ek subject sirf ek hi baar aana chahiye.",
+      });
+    }
+
     // ─────────────────────────────────────────────
-    // STEP 2: Coupon verify — examName YAHIN se derive
+    // STEP 2: Coupon is Main Teacher ka hi ho, verify karo —
+    // examName YAHIN se derive hoga (manual mismatch avoid karne ke liye)
     // ─────────────────────────────────────────────
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon nahi mila ya aapka nahi hai!" });
+      return res.status(404).json({
+        success: false,
+        message: "Ye coupon nahi mila ya aapka nahi hai!",
+      });
     }
 
     // ─────────────────────────────────────────────
-    // STEP 3: 🐛 SUBJECT SPELLING FIX
-    //
-    // Purani do dikkatein:
-    //  (a) duplicate check `new Set(names)` case-SENSITIVE tha — "Hindi" aur
-    //      "hindi" dono blueprint me chale jate the, aur paper me 2 alag blocks
-    //      ban jate the. Sub-teacher ek hi bhar pata tha, doosra hamesha khaali
-    //      reh jata tha → paper hamesha "draft" → student ko kabhi dikhta hi nahi.
-    //  (b) subjectName trim nahi hota tha — "Maths " wale block ko sub-teacher
-    //      (jiske paas "Maths" ka access hai) kabhi fill nahi kar pata tha.
+    // STEP 3: subjects array pre-populate karo — blueprint ke hisaab se,
+    // har subject khaali questions ke saath. Isse sub-teacher jab fill
+    // karega, to seedha apne subject ka array match ho jayega.
     // ─────────────────────────────────────────────
-    const known = await getKnownSubjects(coupon._id, coupon.exam);
-
-    const seen = new Map(); // key -> canonical
-    const cleanBlueprint = [];
-
-    for (const b of blueprint) {
-      const { canonical } = canonicalizeSubject(b.subjectName, known);
-      const k = subjectKey(canonical);
-
-      if (seen.has(k)) {
-        return res.status(400).json({
-          success: false,
-          message:
-            `Blueprint mein '${seen.get(k)}' do baar aa gaya hai (aapne '${normalizeSubject(b.subjectName)}' likha hai). ` +
-            `Ek subject sirf ek hi baar aana chahiye — spelling/capital-small alag ho to bhi wo ek hi subject mana jayega.`,
-        });
-      }
-
-      seen.set(k, canonical);
-      cleanBlueprint.push({ subjectName: canonical, questionCount: Number(b.questionCount) });
-    }
-
-    // ─────────────────────────────────────────────
-    // STEP 4: subjects array pre-populate + save
-    // ─────────────────────────────────────────────
-    const initialSubjects = cleanBlueprint.map((b) => ({
+    const initialSubjects = blueprint.map((b) => ({
       subjectName: b.subjectName,
       questions: [],
       filled: false,
@@ -107,23 +89,24 @@ export const createPreviousYearPaperShell = async (req, res) => {
 
     const newPaper = new PreviousYearTest({
       examName: coupon.exam,
-      testName: String(testName).trim(),
+      testName: testName.trim(),
       year,
       description: description || "",
       couponId: coupon._id,
       createdByTeacher: req.teacher._id,
-      blueprint: cleanBlueprint,
+      blueprint,
       subjects: initialSubjects,
       marksPerQuestion: marksPerQuestion ?? 1,
       negativeMarking: negativeMarking ?? 0,
       durationMinutes,
+      // status "draft" pre-save hook khud set kar dega (kyunki subjects khaali hain)
     });
 
     await newPaper.save();
 
     return res.status(201).json({
       success: true,
-      message: `'${newPaper.testName}' ka shell ban gaya! Ab sub-teachers apna-apna subject fill kar sakte hain.`,
+      message: `'${testName}' ka shell ban gaya! Ab sub-teachers apna-apna subject fill kar sakte hain.`,
       data: newPaper,
     });
   } catch (error) {

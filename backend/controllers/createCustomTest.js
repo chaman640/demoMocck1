@@ -1,21 +1,18 @@
 // controllers/createCustomTest.js
-// Main ya Sub Teacher — dono custom test bana sakte hain (spec point 4).
-// MVP: koi shell/fill split nahi — poora test (sab subjects + questions)
-// ek hi call mein banta hai. Access control PYQ-fill jaisa hi hai:
-// har subject ke liye checkCouponAccess verify hota hai, "sab ya koi nahi".
+// Main ya Sub Teacher — dono custom test bana sakte hain.
 import CustomTest from "../models/CustomTest.js";
 import { checkCouponAccess } from "../utils/checkCouponAccess.js";
+import {
+  normalizeSubject,
+  subjectKey,
+  getKnownSubjects,
+  canonicalizeSubject,
+} from "../utils/subjectName.js";
 
 export const createCustomTest = async (req, res) => {
   try {
-    const {
-      couponId,
-      testName,
-      subjects,
-      marksPerQuestion,
-      negativeMarking,
-      durationMinutes,
-    } = req.body;
+    const { couponId, testName, subjects, marksPerQuestion, negativeMarking, durationMinutes } =
+      req.body;
 
     // ─────────────────────────────────────────────
     // STEP 0: Validation
@@ -27,14 +24,11 @@ export const createCustomTest = async (req, res) => {
       });
     }
     if (!durationMinutes) {
-      return res.status(400).json({
-        success: false,
-        message: "durationMinutes zaroori hai!",
-      });
+      return res.status(400).json({ success: false, message: "durationMinutes zaroori hai!" });
     }
 
     for (const subj of subjects) {
-      if (!subj.subjectName || !Array.isArray(subj.questions) || subj.questions.length === 0) {
+      if (!normalizeSubject(subj.subjectName) || !Array.isArray(subj.questions) || subj.questions.length === 0) {
         return res.status(400).json({
           success: false,
           message: `'${subj.subjectName || "Unknown"}' subject mein subjectName aur kam se kam ek question hona zaroori hai!`,
@@ -43,44 +37,73 @@ export const createCustomTest = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1: Access control — har subject ke liye alag-alag verify
-    // karo. Main Teacher automatically pass (agar coupon uska hai),
-    // Sub Teacher sirf apne authorized subjects ke liye.
+    // STEP 1: 🐛 SUBJECT SPELLING FIX — pehle subjectName jaisa likha tha
+    // waisa hi save ho jata tha. Ab normalize + batch ki "sahi" spelling.
+    //
+    // Saath hi: ek hi test me "Maths" aur "maths" do alag subject blocks ban
+    // sakte the (student ko do tabs dikhte the). Ab wo merge ho jate hain.
     // ─────────────────────────────────────────────
-    const uniqueSubjects = [...new Set(subjects.map((s) => s.subjectName))];
     let coupon = null;
+    const firstCheck = await checkCouponAccess(req.teacher, couponId, null);
+    if (!firstCheck.allowed) {
+      return res.status(403).json({ success: false, message: firstCheck.reason || "Access denied." });
+    }
+    coupon = firstCheck.coupon;
 
-    for (const subjectName of uniqueSubjects) {
-      const { allowed, coupon: c, reason } = await checkCouponAccess(req.teacher, couponId, subjectName);
+    const known = await getKnownSubjects(coupon._id, coupon.exam);
+
+    // Subject blocks ko canonical naam ke hisaab se merge karo
+    const mergedBySubject = new Map(); // canonicalName -> questions[]
+    const notInBlueprint = [];
+
+    for (const subj of subjects) {
+      const { canonical, inBlueprint } = canonicalizeSubject(subj.subjectName, known);
+      if (!inBlueprint && !notInBlueprint.includes(canonical)) notInBlueprint.push(canonical);
+
+      if (!mergedBySubject.has(canonical)) mergedBySubject.set(canonical, []);
+      mergedBySubject.get(canonical).push(...subj.questions);
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2: Access control — har (canonical) subject ke liye alag verify.
+    // Main Teacher automatically pass, Sub Teacher sirf authorized subjects.
+    // ─────────────────────────────────────────────
+    const canonicalSubjects = [...mergedBySubject.keys()];
+    const finalNameBySubject = {};
+
+    for (const subjectName of canonicalSubjects) {
+      const { allowed, reason, subject: authorizedSpelling } = await checkCouponAccess(
+        req.teacher,
+        couponId,
+        subjectName
+      );
       if (!allowed) {
         return res.status(403).json({
           success: false,
           message: reason || `Aapko '${subjectName}' subject ka access nahi hai.`,
         });
       }
-      coupon = c; // sabse aakhri call se coupon mil jayega, examName ke liye kaafi hai
+      // Sub-teacher ke access record wali spelling ko priority do
+      finalNameBySubject[subjectName] =
+        req.teacher.role === "sub" && authorizedSpelling ? authorizedSpelling : subjectName;
     }
 
     // ─────────────────────────────────────────────
-    // STEP 2: Har question validate karo save() se PEHLE — "sab ya koi nahi"
+    // STEP 3: Har question validate karo save() se PEHLE — "sab ya koi nahi"
     // ─────────────────────────────────────────────
     const validationErrors = [];
-    subjects.forEach((subj) => {
-      subj.questions.forEach((q, idx) => {
+    for (const [subjName, qs] of mergedBySubject.entries()) {
+      qs.forEach((q, idx) => {
         if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
-          validationErrors.push(
-            `'${subj.subjectName}' Question ${idx + 1}: sabhi options aur question text zaroori hain.`
-          );
+          validationErrors.push(`'${subjName}' Question ${idx + 1}: sabhi options aur question text zaroori hain.`);
           return;
         }
         const correctOpt = Number(q.correctOption);
         if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
-          validationErrors.push(
-            `'${subj.subjectName}' Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`
-          );
+          validationErrors.push(`'${subjName}' Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`);
         }
       });
-    });
+    }
 
     if (validationErrors.length > 0) {
       return res.status(400).json({
@@ -91,30 +114,32 @@ export const createCustomTest = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 3: subjects array ko model-shape mein normalize karo
+    // STEP 4: model-shape mein normalize
     // ─────────────────────────────────────────────
-    const finalSubjects = subjects.map((subj) => ({
-      subjectName: subj.subjectName,
-      questions: subj.questions.map((q) => ({
-        question: q.question,
-        questionPhoto: q.questionPhoto || null,
-        option1: q.option1,
-        option2: q.option2,
-        option3: q.option3,
-        option4: q.option4,
-        correctOption: Number(q.correctOption),
-        answerExplain: q.answerExplain || "",
-        topicName: q.topicName || "General",
-        subjectName: subj.subjectName,
-      })),
-    }));
+    const finalSubjects = [...mergedBySubject.entries()].map(([subjName, qs]) => {
+      const finalName = finalNameBySubject[subjName] || subjName;
+      return {
+        subjectName: finalName,
+        questions: qs.map((q) => ({
+          question: q.question,
+          questionPhoto: q.questionPhoto || null,
+          option1: q.option1,
+          option2: q.option2,
+          option3: q.option3,
+          option4: q.option4,
+          correctOption: Number(q.correctOption),
+          answerExplain: q.answerExplain || "",
+          topicName: normalizeSubject(q.topicName) || "General",
+          subjectName: finalName,
+        })),
+      };
+    });
 
     // ─────────────────────────────────────────────
-    // STEP 4: Save — examName coupon se derive (client se nahi lete,
-    // taaki galat exam ka test galat coupon mein kabhi na ja sake)
+    // STEP 5: Save — examName coupon se derive
     // ─────────────────────────────────────────────
     const newTest = new CustomTest({
-      testName: testName.trim(),
+      testName: String(testName).trim(),
       examName: coupon.exam,
       couponId: coupon._id,
       createdBy: req.teacher._id,
@@ -128,7 +153,7 @@ export const createCustomTest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${testName}' successfully ban gaya! (${newTest.totalQuestions} questions)`,
+      message: `'${newTest.testName}' successfully ban gaya! (${newTest.totalQuestions} questions)`,
       data: newTest,
     });
   } catch (error) {

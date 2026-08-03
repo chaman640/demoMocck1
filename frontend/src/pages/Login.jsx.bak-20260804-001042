@@ -247,21 +247,6 @@ const Login = () => {
     Password bhool gaye?
   </Link>
 </div>
-
-          {/* 👇 NAYA: Teacher section tak pahunchne ka rasta.
-              Pehle poori site par teacher section ka koi link hi nahi tha —
-              teacher ko manually "site.com/#/TeacherLogin" type karna padta tha,
-              aur "#" bhool jaane par hamesha student HomePage hi khulta tha. */}
-          <div className="mt-4 pt-4 border-t border-[#E2E8F0] text-center text-xs text-[#64748B]">
-            Teacher ho?{' '}
-            <Link to="/TeacherLogin" className="text-[#2563EB] font-bold hover:underline ml-1">
-              Teacher Login
-            </Link>
-            <span className="mx-1.5 text-[#CBD5E1]">|</span>
-            <Link to="/TeacherSignup" className="text-[#2563EB] font-bold hover:underline">
-              Teacher Signup
-            </Link>
-          </div>
         </div>
       </div>
     </div>

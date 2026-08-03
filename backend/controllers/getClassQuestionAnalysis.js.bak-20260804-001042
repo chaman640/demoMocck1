@@ -4,7 +4,6 @@ import {
   getAllowedSubjectsForTeacher,
   getQuestionWiseBreakdown,
 } from "../utils/classAnalytics.js";
-import { sameSubject, normalizeSubject } from "../utils/subjectName.js";
 
 export const getClassQuestionAnalysis = async (req, res) => {
   try {
@@ -12,19 +11,19 @@ export const getClassQuestionAnalysis = async (req, res) => {
     const { filter = "all", minPercentile, maxPercentile } = req.query;
 
     if (!subjectName || !topicName) {
-      return res.status(400).json({ success: false, message: "subjectName aur topicName zaroori hain." });
+      return res.status(400).json({
+        success: false,
+        message: "subjectName aur topicName zaroori hain.",
+      });
     }
 
     // Sub-teacher apne authorized subject ke alawa kisi aur subject ka
     // drill-down nahi dekh sakta — privacy/scope enforcement
     const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
-
-    // 🐛 FIX: pehle `!allowedSubjects.includes(subjectName)` se exact match hota tha.
-    // "Maths" ka access hone par bhi "maths" wale drill-down par 403 aa jata tha.
-    if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, subjectName))) {
+    if (Array.isArray(allowedSubjects) && !allowedSubjects.includes(subjectName)) {
       return res.status(403).json({
         success: false,
-        message: `Aap '${normalizeSubject(subjectName)}' subject ke liye authorized nahi hain.`,
+        message: `Aap '${subjectName}' subject ke liye authorized nahi hain.`,
       });
     }
 

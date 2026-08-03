@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
 import ActiveCouponSwitcher from "../../components/ActiveCouponSwitcher";
-import SubjectPicker from "../../components/SubjectPicker";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -315,13 +314,12 @@ const TeacherCustomTests = () => {
                           ))}
                       </select>
                     ) : (
-                      <SubjectPicker
+                      <input
+                        type="text"
                         value={newSubjectName}
-                        onChange={setNewSubjectName}
+                        onChange={(e) => setNewSubjectName(e.target.value)}
                         placeholder="Subject naam (e.g. Hindi)"
-                        className={`${inputClass} w-full`}
-                        wrapperClassName="flex-1 min-w-0"
-                        compact
+                        className={`${inputClass} flex-1`}
                       />
                     )}
                     <button

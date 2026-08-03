@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
 import ActiveCouponSwitcher from "../../components/ActiveCouponSwitcher";
-import SubjectPicker from "../../components/SubjectPicker";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -208,12 +207,11 @@ const TeacherAddQuestion = () => {
                       ))}
                     </select>
                   ) : (
-                    // 👇 subject ab type karne ke bajaye chips se chun sakte hain.
-                    // Spelling galti (Maths / maths / Math) se pehle sub-teacher
-                    // lock ho jata tha aur sawaal mock test me aate hi nahi the.
-                    <SubjectPicker
+                    <input
+                      type="text"
+                      name="subjectName"
                       value={form.subjectName}
-                      onChange={(v) => setForm((prev) => ({ ...prev, subjectName: v }))}
+                      onChange={handleChange}
                       placeholder="e.g. Hindi"
                       className={inputClass}
                     />
