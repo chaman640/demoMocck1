@@ -42,25 +42,7 @@ import { getCurrentAffairAttemptDetail } from "../controllers/getCurrentAffairAt
 // ── Middleware ────────────────────────────────
 import { processQuestionMiddleware } from "../middlewares/processQuestion.js";
 import { userInfo } from "../middlewares/userInfo.js";
-import { adminOnly } from "../middlewares/adminOnly.js";
-
-// 🔒 NAYA (Round 1): rate limiters — poora explanation
-// middlewares/rateLimiters.js mein hai.
-import {
-  otpLimiter,
-  otpIpLimiter,
-  loginLimiter,
-  loginEmailLimiter,
-  loginIpLimiter,
-  signupLimiter,
-  signupIpLimiter,
-  adminLimiter,
-  writeLimiter,
-} from "../middlewares/rateLimiters.js";
-
-// multipart (image wale) requests ke liye — multer ke BAAD dobara sanitize.
-// Wajah middlewares/sanitize.js ke comment me likhi hai.
-import { sanitizeBody } from "../middlewares/sanitize.js";
+import { adminOnly } from "../middlewares/adminOnly.js"; // 👈 NAYA
 
 // ── Teacher ───────────────────────────────────
 import { addTeacher } from "../controllers/addTeacher.js";
@@ -112,7 +94,7 @@ import {
 import { getClassTopicAnalysis } from "../controllers/getClassTopicAnalysis.js";
 import { getClassQuestionAnalysis } from "../controllers/getClassQuestionAnalysis.js";
 
-import { getTeacherSubjects } from "../controllers/getTeacherSubjects.js";
+import { getTeacherSubjects } from "../controllers/getTeacherSubjects.js"; // 👈 NAYA
 import { getTeacherDashboard } from "../controllers/getTeacherDashboard.js";
 import { logoutTeacher } from "../controllers/logoutTeacher.js";
 import { getTeacherPYQPapers } from "../controllers/getTeacherPYQPapers.js";
@@ -127,26 +109,20 @@ const router = express.Router();
 
 // ═════════════════════════════════════════════
 // PUBLIC AUTH ROUTES (student)
-//
-// 🔒 Round 1: har public route pe rate limit lag gaya hai. Ye woh routes hain
-// jinhe internet pe koi bhi bina login ke maar sakta hai — isliye yahi sabse
-// pehle abuse hote hain (fake signup, password brute force, OTP se paisa
-// jalana). Ab har IP/number ki ginti hoti hai.
 // ═════════════════════════════════════════════
-// 🐛 CRITICAL FIX (pehle wale round se): frontend `/signup` pe POST karta tha
-// lekin backend pe sirf `/add-user` tha → student signup HAMESHA 404 deta tha.
-router.post("/signup", signupIpLimiter, signupLimiter, addUser);
-router.post("/add-user", signupIpLimiter, signupLimiter, addUser);
+// 🐛 CRITICAL FIX: frontend (Singup.jsx) `/signup` pe POST karta tha lekin
+// backend pe sirf `/add-user` tha → student signup HAMESHA 404 deta tha.
+// Ab dono naam kaam karte hain, taaki purani/nayi dono frontend build chale.
+router.post("/signup", addUser);
+router.post("/add-user", addUser);
 
-router.post("/user-Login", loginIpLimiter, loginLimiter, loginEmailLimiter, loginUser);
-router.post("/user-login", loginIpLimiter, loginLimiter, loginEmailLimiter, loginUser); // case-safe alias
+router.post("/user-Login", loginUser);
+router.post("/user-login", loginUser); // case-safe alias
 router.post("/logout", logoutUser);
 
-// OTP = asli paisa. Do limit lagti hain: ek number pe, ek IP pe.
-router.post("/send-signup-otp", otpIpLimiter, otpLimiter, sendSignupOtp);
-router.post("/request-reset-otp", otpIpLimiter, otpLimiter, requestResetOtp);
-// 6-digit OTP guess karne ki koshish yahin ruk jaayegi
-router.post("/reset-password", signupIpLimiter, signupLimiter, resetPassword);
+router.post("/send-signup-otp", sendSignupOtp);
+router.post("/request-reset-otp", requestResetOtp);
+router.post("/reset-password", resetPassword);
 
 router.get("/allExamName", allExamName);
 
@@ -154,15 +130,13 @@ router.get("/allExamName", allExamName);
 // ADMIN-ONLY ROUTES
 // 🔒 SECURITY FIX: ye sab pehle bilkul khule the — koi bhi banda internet se
 // aapke DB mein questions/papers/blueprints daal sakta tha.
-// 🔒 Round 1: upar se adminLimiter — agar kabhi ADMIN_SECRET leak bhi ho jaye
-// to nuksaan seemit rahe.
 // ═════════════════════════════════════════════
-router.post("/add-question", adminLimiter, adminOnly, processQuestionMiddleware, sanitizeBody, addQuestion);
-router.post("/add-bluePrint", adminLimiter, adminOnly, addBluePrint);
-router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredictorData);
-router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
-router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
-router.post("/add-current-affair-quiz", adminLimiter, adminOnly, addCurrentAffairQuiz);
+router.post("/add-question", adminOnly, processQuestionMiddleware, addQuestion);
+router.post("/add-bluePrint", adminOnly, addBluePrint);
+router.post("/add-rank-predictor-data", adminOnly, addRankPredictorData);
+router.post("/add-previous-year-test", adminOnly, addPreviousYearTest);
+router.post("/add-current-affair", adminOnly, addCurrentAffair);
+router.post("/add-current-affair-quiz", adminOnly, addCurrentAffairQuiz);
 
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)
@@ -172,16 +146,13 @@ router.get("/me", userInfo, (req, res) => {
 });
 
 router.get("/is-admin", userInfo, (req, res) => {
-  // 🔧 Round 1: dono taraf lowercase. Pehle sirf env wali value lowercase hoti
-  // thi — purana account jiska email DB me "Anuj@Gmail.com" tarah save hai,
-  // wo kabhi admin match hi nahi karta tha (aur koi hint bhi nahi milta tha).
-  const configuredEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
   const isAdminUser =
-    !!configuredEmail && String(req.user.email || "").toLowerCase().trim() === configuredEmail;
+    !!process.env.ADMIN_EMAIL &&
+    req.user.email === process.env.ADMIN_EMAIL.toLowerCase().trim();
   res.status(200).json({ success: true, isAdmin: isAdminUser });
 });
 
-router.post("/user-update", userInfo, writeLimiter, updateUserInfo);
+router.post("/user-update", userInfo, updateUserInfo);
 
 router.get("/blueprints/:examName", userInfo, async (req, res) => {
   try {
@@ -189,23 +160,18 @@ router.get("/blueprints/:examName", userInfo, async (req, res) => {
     const blueprints = await Blueprint.find({ examName });
     res.status(200).json({ success: true, data: blueprints });
   } catch (error) {
-    console.error("blueprints error:", error);
     res.status(500).json({
       success: false,
       message: "Blueprints fetch karne mein error aaya",
-      // 🔒 Round 1: production me asli error message bahar nahi jata —
-      // usme model/field ke naam hote hain jo attacker ke kaam aate hain.
-      ...(process.env.NODE_ENV === "production" ? {} : { error: error.message }),
+      error: error.message,
     });
   }
 });
 
-// generate-mock DB pe sabse bhaari kaam hai (random questions nikalna),
-// isliye ispe writeLimiter zaroori hai
-router.post("/generate-mock", userInfo, writeLimiter, addMocktest);
+router.post("/generate-mock", userInfo, addMocktest);
 // 🔒 SECURITY FIX: pehle ye route BINA login ke tha aur body ka userId trust
 // karta tha — koi bhi kisi ke naam pe fake performance daal sakta tha.
-router.post("/add-performence", userInfo, writeLimiter, addPerformence);
+router.post("/add-performence", userInfo, addPerformence);
 
 // ── Analysis (student) ──
 router.get("/analysis/mock-list/:userId/:examName", userInfo, getUserMockTests);
@@ -213,15 +179,15 @@ router.get("/analysis/overview/:userId/:examName", userInfo, getAllAnalysis1stPa
 router.get("/analysis/mock-detail/:performanceId", userInfo, getPerformanceAnalysis);
 router.get("/analysis/subject/:userId/:examName/:subjectName", userInfo, getSubjectAnalysis);
 router.get("/analysis/topic/:userId/:examName/:subjectName/:topicName", userInfo, getTopicAnalysis);
-router.post("/analysis/hide-question", userInfo, writeLimiter, hideQuestion);
+router.post("/analysis/hide-question", userInfo, hideQuestion);
 
 // ── Challenge ──
-router.post("/create-challenge", userInfo, writeLimiter, createChallenge);
+router.post("/create-challenge", userInfo, createChallenge);
 // ⚠️ ORDER: "/leaderboard" aur "/my-attempt" wale routes generic
 // "/challenge/:challengeCode" se PEHLE aane chahiye.
 router.get("/challenge/:challengeCode/leaderboard", userInfo, getChallengeLeaderboard);
 router.get("/challenge/:challengeCode/my-attempt", userInfo, getChallengeAttemptDetail);
-router.post("/challenge/:challengeCode/submit", userInfo, writeLimiter, submitChallenge);
+router.post("/challenge/:challengeCode/submit", userInfo, submitChallenge);
 router.get("/challenge/:challengeCode", userInfo, getChallenge);
 router.get("/my-challenges", userInfo, getMyChallenges);
 
@@ -232,13 +198,13 @@ router.get("/rank-predictor/:examName", userInfo, predictRank);
 // ── Previous Year Tests ──
 router.get("/previous-year-tests/:examName", userInfo, getAllPreviousYearTests);
 router.get("/previous-year-attempt/:attemptId", userInfo, getPreviousYearAttemptDetail);
-router.post("/previous-year-test/:testId/submit", userInfo, writeLimiter, submitPreviousYearTest);
+router.post("/previous-year-test/:testId/submit", userInfo, submitPreviousYearTest);
 router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
 
 // ── Custom Tests (student) ──
 router.get("/custom-test-attempt/:attemptId", userInfo, getCustomTestAttemptDetail);
 router.get("/custom-tests/:examName", userInfo, getAllCustomTests);
-router.post("/custom-test/:testId/submit", userInfo, writeLimiter, submitCustomTest);
+router.post("/custom-test/:testId/submit", userInfo, submitCustomTest);
 router.get("/custom-test/:testId", userInfo, getCustomTest);
 
 // ── Current Affairs ──
@@ -248,22 +214,20 @@ router.get("/current-affair/:examName/:date", userInfo, getCurrentAffair);
 router.get("/current-affair/:examName", userInfo, getCurrentAffair);
 
 router.get("/current-affair-quiz/:examName/:date/my-attempt", userInfo, getCurrentAffairAttemptDetail);
-router.post("/current-affair-quiz/:examName/:date/submit", userInfo, writeLimiter, submitCurrentAffairQuiz);
+router.post("/current-affair-quiz/:examName/:date/submit", userInfo, submitCurrentAffairQuiz);
 router.get("/current-affair-quiz/:examName/:date", userInfo, getCurrentAffairQuiz);
 
 // ── Batch / Coupon (student) ──
-// coupon code guess karne ki koshish yahin ruk jaayegi
-router.post("/redeem-coupon", userInfo, writeLimiter, redeemCoupon);
+router.post("/redeem-coupon", userInfo, redeemCoupon);
 router.get("/my-batch", userInfo, getMyBatch);
 
 // ═════════════════════════════════════════════
 // TEACHER ROUTES
 // ═════════════════════════════════════════════
-router.post("/teacher-signup", signupIpLimiter, signupLimiter, addTeacher);
-router.post("/teacher-login", loginIpLimiter, loginLimiter, loginEmailLimiter, loginTeacher);
+router.post("/teacher-signup", addTeacher);
+router.post("/teacher-login", loginTeacher);
 router.post("/teacher-logout", logoutTeacher);
-// PUBLIC — invite link se aata hai, isliye limit zaroori hai
-router.post("/accept-invite", signupIpLimiter, signupLimiter, acceptInvite);
+router.post("/accept-invite", acceptInvite); // PUBLIC — invite link se aata hai
 
 router.get("/teacher-me", teacherInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.teacher });
@@ -272,39 +236,38 @@ router.get("/teacher-me", teacherInfo, (req, res) => {
 router.get("/teacher/dashboard", teacherInfo, getTeacherDashboard);
 
 // ── Coupons / group ──
-router.post("/create-coupon", teacherInfo, writeLimiter, createCoupon);
+router.post("/create-coupon", teacherInfo, createCoupon);
 router.get("/my-coupons", teacherInfo, getMyCoupons);
 router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
 
 // ── Sub-teachers ──
-router.post("/invite-sub-teacher", teacherInfo, writeLimiter, inviteSubTeacher);
+router.post("/invite-sub-teacher", teacherInfo, inviteSubTeacher);
 router.get("/my-sub-teachers", teacherInfo, getMySubTeachers);
-router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, writeLimiter, removeSubTeacher);
-router.post("/manage-coupon-access/assign", teacherInfo, writeLimiter, assignCouponAccess);
-router.post("/manage-coupon-access/revoke", teacherInfo, writeLimiter, revokeCouponAccess);
+router.post("/remove-sub-teacher/:subTeacherId", teacherInfo, removeSubTeacher);
+router.post("/manage-coupon-access/assign", teacherInfo, assignCouponAccess);
+router.post("/manage-coupon-access/revoke", teacherInfo, revokeCouponAccess);
 
 // ── Subject suggestions ──
-// subject ka naam haath se type karne ki wajah se spelling galtiyan hoti thi
-// (aur poore flow chup-chaap toot jate the). Ab frontend yahan se list mangwata hai.
+// 👇 NAYA: subject ka naam haath se type karne ki wajah se spelling galtiyan
+// hoti thi (aur poore flow chup-chaap toot jate the). Ab frontend yahan se
+// suggestion list mangwata hai.
 router.get("/teacher/subjects", teacherInfo, getTeacherSubjects);
 
 // ── Content ──
 router.post(
   "/teacher/add-question",
   teacherInfo,
-  writeLimiter,
   processTeacherQuestionMiddleware,
-  sanitizeBody, // 👈 multer ke baad — multipart field "subjectName[$ne]" jaisi chaal rokta hai
   addTeacherQuestion
 );
 
-router.post("/teacher/previous-year-paper/create-shell", teacherInfo, writeLimiter, createPreviousYearPaperShell);
-router.post("/teacher/previous-year-paper/:paperId/fill-subject", teacherInfo, writeLimiter, fillPreviousYearPaperSubject);
+router.post("/teacher/previous-year-paper/create-shell", teacherInfo, createPreviousYearPaperShell);
+router.post("/teacher/previous-year-paper/:paperId/fill-subject", teacherInfo, fillPreviousYearPaperSubject);
 // ⚠️ ORDER: "/list" generic ":paperId" se pehle
 router.get("/teacher/previous-year-paper/list", teacherInfo, getTeacherPYQPapers);
 router.get("/teacher/previous-year-paper/:paperId", teacherInfo, getTeacherPYQPaperById);
 
-router.post("/teacher/custom-test/create", teacherInfo, writeLimiter, createCustomTest);
+router.post("/teacher/custom-test/create", teacherInfo, createCustomTest);
 router.get("/teacher/custom-test/list", teacherInfo, getTeacherCustomTests);
 
 // ── Students / analysis (teacher) ──

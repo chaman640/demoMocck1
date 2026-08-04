@@ -16,23 +16,8 @@
 //
 // Dono mein se kam se kam EK set karna zaroori hai, warna admin routes band rahenge.
 // ─────────────────────────────────────────────
-import crypto from "crypto";
 import jwt from "jsonwebtoken";
-// 🔒 Round 1: leaked fallback secret ("mera_super_secret_key") hataya —
-// poori wajah utils/jwtSecret.js mein likhi hai.
-import { JWT_SECRET } from "../utils/jwtSecret.js";
 import User from "../models/User.js";
-
-/** Length bataye bina, constant time me do string compare karta hai. */
-const safeEqual = (a, b) => {
-  const bufA = Buffer.from(String(a));
-  const bufB = Buffer.from(String(b));
-  // timingSafeEqual alag lambai par throw karta hai, isliye pehle dono ko
-  // ek hi lambai ka hash bana lete hain.
-  const hashA = crypto.createHash("sha256").update(bufA).digest();
-  const hashB = crypto.createHash("sha256").update(bufB).digest();
-  return crypto.timingSafeEqual(hashA, hashB);
-};
 
 export const adminOnly = async (req, res, next) => {
   try {
@@ -49,14 +34,8 @@ export const adminOnly = async (req, res, next) => {
     }
 
     // ── Tarika A: header secret (Postman/scripts) ──
-    // 🔧 Round 1: do chhote lekin asli sudhaar —
-    //   1. header do baar aa jaye to Node ise ARRAY bana deta hai; String()
-    //      lagakar crash/bypass dono se bach rahe hain
-    //   2. `===` har character par turant ruk jata hai, jisse response ke time
-    //      se secret ek-ek akshar karke guess kiya ja sakta hai (timing attack).
-    //      timingSafeEqual hamesha poora time leta hai.
-    const headerSecret = String(req.headers["x-admin-secret"] ?? "");
-    if (configuredSecret && headerSecret && safeEqual(headerSecret, configuredSecret)) {
+    const headerSecret = req.headers["x-admin-secret"];
+    if (configuredSecret && headerSecret && headerSecret === configuredSecret) {
       req.isAdmin = true;
       return next();
     }
@@ -70,16 +49,14 @@ export const adminOnly = async (req, res, next) => {
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || "mera_super_secret_key");
     const user = await User.findById(decoded.userId).select("email");
 
-    // 🔧 Round 1: DONO taraf lowercase. Pehle sirf env wali value lowercase hoti
-    // thi — purana account jiska email DB me "Anuj@Gmail.com" tarah save hai,
-    // wo kabhi match hi nahi karta tha aur hamesha 403 milta tha (bina kisi hint ke).
-    const wantEmail = String(configuredEmail || "").toLowerCase().trim();
-    const haveEmail = String(user?.email || "").toLowerCase().trim();
-
-    if (!user || !wantEmail || haveEmail !== wantEmail) {
+    if (
+      !user ||
+      !configuredEmail ||
+      user.email !== configuredEmail.toLowerCase().trim()
+    ) {
       return res.status(403).json({
         success: false,
         message: "Ye route sirf admin ke liye hai.",

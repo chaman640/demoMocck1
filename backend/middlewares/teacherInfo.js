@@ -1,11 +1,13 @@
-// middlewares/teacherInfo.js
+// middlewares/teacherInfo.js — teacher ka login check
 import jwt from "jsonwebtoken";
 import Teacher from "../models/Teacher.js";
+// 🔒 Round 1: leaked fallback secret hataya — utils/jwtSecret.js dekhein
+import { JWT_SECRET } from "../utils/jwtSecret.js";
 
 export const teacherInfo = async (req, res, next) => {
   try {
-    // 1. Cookie se token nikalna — ⚠️ naam "teacherToken" hai, "token" NAHI
-    const token = req.cookies.teacherToken;
+    // 1. Cookie se token — ⚠️ naam "teacherToken" hai, "token" NAHI
+    const token = req.cookies?.teacherToken;
 
     if (!token) {
       return res.status(401).json({
@@ -14,11 +16,10 @@ export const teacherInfo = async (req, res, next) => {
       });
     }
 
-    // 2. Token verify karna
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "mera_super_secret_key");
-    // ⚠️ decoded ke andar key "teacherId" hai, "userId" NAHI
+    // 2. Token verify — ⚠️ decoded ke andar key "teacherId" hai, "userId" NAHI
+    const decoded = jwt.verify(token, JWT_SECRET);
 
-    // 3. Database se teacher ka data nikalna
+    // 3. Database se teacher ka data
     const teacher = await Teacher.findById(decoded.teacherId).select("-password");
 
     if (!teacher) {
@@ -28,25 +29,37 @@ export const teacherInfo = async (req, res, next) => {
       });
     }
 
-    // 4. Extra safety — beech mein hi remove ho gaya teacher ka token
-    //    abhi bhi valid ho sakta hai, isliye yahan bhi check
+    // 4. Extra safety — beech mein remove kiye gaye teacher ka purana token
+    //    abhi bhi valid ho sakta hai, isliye status yahan bhi check karte hain
     if (teacher.status !== "active") {
-  return res.status(403).json({
-    success: false,
-    message: "Ye account abhi active nahi hai.",
-  });
-}
-    // 5. Teacher data ko 'req' object mein attach karna
-    //    ⚠️ req.user mein NAHI daalna — student aur teacher context alag rehne chahiye
-    req.teacher = teacher;
+      return res.status(403).json({
+        success: false,
+        message: "Ye account abhi active nahi hai.",
+      });
+    }
 
-    // 6. Aage badho
+    // 5. ⚠️ req.user mein NAHI daalna — student aur teacher context alag rahein
+    req.teacher = teacher;
     next();
   } catch (error) {
-    console.error("Teacher Auth Error:", error.message);
-    return res.status(401).json({
+    if (error?.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Session khatam ho gaya hai. Kripya phir se login karein.",
+        code: "TOKEN_EXPIRED",
+      });
+    }
+    if (error?.name === "JsonWebTokenError") {
+      return res.status(401).json({
+        success: false,
+        message: "Login token galat hai. Kripya phir se login karein.",
+        code: "TOKEN_INVALID",
+      });
+    }
+    console.error("Teacher auth middleware error:", error?.message);
+    return res.status(500).json({
       success: false,
-      message: "Session expire ho gaya hai ya token galat hai. Phir se login karein.",
+      message: "Login check karne mein dikkat aa gayi. Thodi der baad try karein.",
     });
   }
 };

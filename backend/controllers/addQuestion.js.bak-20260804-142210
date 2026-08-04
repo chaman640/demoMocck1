@@ -1,15 +1,10 @@
 // controllers/addQuestion.js  (ADMIN — global question pool)
 import { Question } from "../models/rowQuestionSchema.js";
-import { errorDetail } from "../utils/safeError.js"; // 🔒 NAYA (Round 1)
-import { tooManyItems } from "../utils/limits.js"; // 🔒 NAYA (Round 1)
 
 export const addQuestion = async (req, res) => {
   try {
     // 1️⃣ Single object ya array — dono support
     const questionsData = Array.isArray(req.body) ? req.body : [req.body];
-
-    // 🔒 Round 1: bulk size ki hadd — wajah utils/limits.js mein likhi hai
-    if (tooManyItems(res, questionsData, "questions")) return;
 
     if (
       !questionsData ||
@@ -132,7 +127,7 @@ export const addQuestion = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "❌ Question save karne mein error aaya",
-      ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
+      error: error.message,
     });
   }
 };

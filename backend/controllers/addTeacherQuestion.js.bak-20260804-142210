@@ -1,6 +1,5 @@
 // controllers/addTeacherQuestion.js
 import mongoose from "mongoose";
-import { errorDetail } from "../utils/safeError.js"; // 🔒 NAYA (Round 1)
 import { Question } from "../models/rowQuestionSchema.js";
 import Coupon from "../models/Coupon.js";
 import CouponAccess from "../models/CouponAccess.js";
@@ -10,7 +9,6 @@ import {
   getKnownSubjects,
   canonicalizeSubject,
 } from "../utils/subjectName.js";
-import { tooManyItems } from "../utils/limits.js"; // 🔒 NAYA (Round 1)
 
 export const addTeacherQuestion = async (req, res) => {
   try {
@@ -36,9 +34,6 @@ export const addTeacherQuestion = async (req, res) => {
     if (!Array.isArray(questionsData) || questionsData.length === 0) {
       return res.status(400).json({ success: false, message: "Kam se kam ek question dena zaroori hai." });
     }
-
-    // 🔒 Round 1: bulk size ki hadd — wajah utils/limits.js mein likhi hai
-    if (tooManyItems(res, questionsData, "questions")) return;
 
     // ─────────────────────────────────────────────
     // STEP 1: Coupon dhundo — examName YAHIN se derive hoga
@@ -217,7 +212,7 @@ export const addTeacherQuestion = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server mein error aa gaya question add karte waqt.",
-      ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
+      error: error.message,
     });
   }
 };

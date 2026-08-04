@@ -1,9 +1,6 @@
 // controllers/addUser.js
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
-// 🔒 Round 1: leaked fallback secret ("mera_super_secret_key") hataya —
-// poori wajah utils/jwtSecret.js mein likhi hai.
-import { JWT_SECRET } from "../utils/jwtSecret.js";
 import bcrypt from "bcrypt";
 import { verifyOtpCode } from "../utils/otpService.js";
 import { authCookieOptions } from "../utils/cookieOptions.js"; // 👈 NAYA
@@ -73,7 +70,7 @@ export const addUser = async (req, res) => {
     // 6. JWT + cookie (auto-login)
     const token = jwt.sign(
       { userId: newUser._id },
-      JWT_SECRET,
+      process.env.JWT_SECRET || "mera_super_secret_key",
       { expiresIn: "7d" }
     );
 
