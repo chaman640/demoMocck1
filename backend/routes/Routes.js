@@ -150,9 +150,9 @@ router.post("/reset-password", signupIpLimiter, signupLimiter, resetPassword);
 
 router.get("/allExamName", allExamName);
 
-// adminLimiter, adminOnly,
+// adminLimiter, adminOnly, adminLimiter, adminOnly,
 // ═════════════════════════════════════════════
-router.post("/add-question", adminLimiter, adminOnly, processQuestionMiddleware, sanitizeBody, addQuestion);
+router.post("/add-question",  processQuestionMiddleware, sanitizeBody, addQuestion);
 router.post("/add-bluePrint",  addBluePrint);
 router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredictorData);
 router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
