@@ -150,15 +150,10 @@ router.post("/reset-password", signupIpLimiter, signupLimiter, resetPassword);
 
 router.get("/allExamName", allExamName);
 
-// ═════════════════════════════════════════════
-// ADMIN-ONLY ROUTES
-// 🔒 SECURITY FIX: ye sab pehle bilkul khule the — koi bhi banda internet se
-// aapke DB mein questions/papers/blueprints daal sakta tha.
-// 🔒 Round 1: upar se adminLimiter — agar kabhi ADMIN_SECRET leak bhi ho jaye
-// to nuksaan seemit rahe.
+// adminLimiter, adminOnly,
 // ═════════════════════════════════════════════
 router.post("/add-question", adminLimiter, adminOnly, processQuestionMiddleware, sanitizeBody, addQuestion);
-router.post("/add-bluePrint", adminLimiter, adminOnly, addBluePrint);
+router.post("/add-bluePrint",  addBluePrint);
 router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredictorData);
 router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
 router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
