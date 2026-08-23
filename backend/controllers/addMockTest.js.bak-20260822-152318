@@ -136,40 +136,25 @@ export const addMocktest = async (req, res) => {
     const usedQuestionIds = new Set(); // sirf already ATTEMPTED questions
 
     if (!isNewUser) {
-      // Pehla chakkar: kaunse sawaal ho chuke hain, aur kaunse GALAT hue
-      const wrongQuestionIds = [];
-
       for (const attempt of pastAttempts) {
-        for (const aq of attempt.attemptedQuestions || []) {
+        for (const aq of attempt.attemptedQuestions) {
           if (!aq.questionId) continue;
 
-          const idStr = aq.questionId.toString();
-          usedQuestionIds.add(idStr);
+          // BUG FIX 8: usedQuestionIds sirf yahan — Performance se
+          const idStr = aq.questionId._id
+            ? aq.questionId._id.toString()
+            : aq.questionId.toString();
+          if (idStr) usedQuestionIds.add(idStr);
 
-          if (aq.isCorrect === false) wrongQuestionIds.push(idStr);
-        }
-      }
-
-      // Doosra chakkar: sirf galat sawaalon ka subject/topic laao.
-      // (Ek hi sawaal kai baar galat ho sakta hai — ginti attempts se hi hogi,
-      //  bilkul pehle jaisi.)
-      if (wrongQuestionIds.length > 0) {
-        const uniqueWrongIds = [...new Set(wrongQuestionIds)];
-        const wrongMeta = await Question.find({ _id: { $in: uniqueWrongIds } })
-          .select("subjectName topicName")
-          .lean();
-
-        const metaById = new Map(wrongMeta.map((q) => [q._id.toString(), q]));
-
-        for (const idStr of wrongQuestionIds) {
-          const meta = metaById.get(idStr);
-          if (!meta) continue; // sawaal delete ho chuka hai
-          const subject = normalizeTopic(meta.subjectName);
-          const topic = normalizeTopic(meta.topicName);
-          if (subject && topic) {
-            if (!weakTopicMap[subject]) weakTopicMap[subject] = {};
-            if (!weakTopicMap[subject][topic]) weakTopicMap[subject][topic] = 0;
-            weakTopicMap[subject][topic]++;
+          // Weak topic map — sirf galat jawab
+          if (aq.isCorrect === false) {
+            const subject = normalizeTopic(aq.questionId.subjectName);
+            const topic = normalizeTopic(aq.questionId.topicName);
+            if (subject && topic) {
+              if (!weakTopicMap[subject]) weakTopicMap[subject] = {};
+              if (!weakTopicMap[subject][topic]) weakTopicMap[subject][topic] = 0;
+              weakTopicMap[subject][topic]++;
+            }
           }
         }
       }

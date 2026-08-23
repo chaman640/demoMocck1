@@ -361,26 +361,6 @@ const onDbReady = () => {
   dbEverConnected = true;
   clearTimeout(dbWatchdog);
   console.log("✅ Database ready — ab site poori tarah chalu hai");
-
-  // ⚡ Round 2: database ke index maujood hain ya nahi, background mein check.
-  //   • Jo index pehle se hai uspar kuch nahi hota (millisecond ka kaam)
-  //   • Naya/khaali database ho to yahin ban jayenge — script chalana
-  //     yaad nahi rakhna padega
-  //   • await nahi kar rahe, isliye site isi beech normal chalti rehti hai
-  //   • Band karna ho to Render mein AUTO_INDEX=false daal dein
-  if (String(process.env.AUTO_INDEX || "").toLowerCase() !== "false") {
-    ensureIndexes({ silent: true })
-      .then((r) => {
-        if (r.created.length) console.log(`⚡ ${r.created.length} naye database index bane`);
-        if (r.failed.length) {
-          console.warn(
-            `⚠️  ${r.failed.length} index nahi ban paye — detail ke liye ` +
-              `'node scripts/create-indexes.js' chalayein`
-          );
-        }
-      })
-      .catch((e) => console.warn("⚠️  Index check fail hua:", e.message));
-  }
 };
 
 // 🐛 FIX (pehle wale round se): agar connection is file ke chalne se PEHLE hi
