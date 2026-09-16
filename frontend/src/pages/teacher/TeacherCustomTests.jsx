@@ -468,10 +468,17 @@ const TeacherCustomTests = () => {
                     <p className="text-xs text-gray-500 mb-2">
                       {t.totalQuestions} sawaal &middot; {t.durationMinutes} min &middot; {t.subjectNames.join(", ")}
                     </p>
-                    <p className="text-[11px] text-gray-600">
+                    <p className="text-[11px] text-gray-600 mb-3">
                       Banaya by {t.createdByName} &middot;{" "}
                       {new Date(t.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                     </p>
+                    {/* 🆕 Results — leaderboard (kisne kitna score kiya) + question-wise analysis */}
+                    <button
+                      onClick={() => navigate(`/TeacherCustomTestResults/${t.testId}`)}
+                      className="w-full py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10"
+                    >
+                      📊 Results Dekhein
+                    </button>
                   </div>
                 ))}
               </div>

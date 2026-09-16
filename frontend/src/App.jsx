@@ -33,6 +33,7 @@ import TeacherAddQuestion from './pages/teacher/TeacherAddQuestion';
 import TeacherPYQPapers from './pages/teacher/TeacherPYQPapers';
 import TeacherPYQPaperFill from './pages/teacher/TeacherPYQPaperFill';
 import TeacherCustomTests from './pages/teacher/TeacherCustomTests';
+import TeacherCustomTestResults from './pages/teacher/TeacherCustomTestResults'; // 🆕
 import TeacherStudentSearch from './pages/teacher/TeacherStudentSearch';
 import TeacherStudentAnalysis from './pages/teacher/TeacherStudentAnalysis';
 import TeacherStudentSubjectAnalysis from './pages/teacher/TeacherStudentSubjectAnalysis';
@@ -141,6 +142,7 @@ const App = () => {
               element={<TeacherPYQPaperFill />}
             />
             <Route path="/TeacherCustomTests" element={<TeacherCustomTests />} />
+            <Route path="/TeacherCustomTestResults/:testId" element={<TeacherCustomTestResults />} /> {/* 🆕 */}
             <Route path="/TeacherStudentSearch" element={<TeacherStudentSearch />} />
             <Route path="/TeacherStudentAnalysis/:studentId" element={<TeacherStudentAnalysis />} />
             <Route

@@ -118,6 +118,7 @@ import { logoutTeacher } from "../controllers/logoutTeacher.js";
 import { getTeacherPYQPapers } from "../controllers/getTeacherPYQPapers.js";
 import { getTeacherPYQPaperById } from "../controllers/getTeacherPYQPaperById.js";
 import { getTeacherCustomTests } from "../controllers/getTeacherCustomTests.js";
+import { getCustomTestLeaderboard, getCustomTestQuestionAnalysis } from "../controllers/getCustomTestResults.js"; // 🆕
 
 import { sendSignupOtp } from "../controllers/sendSignupOtp.js";
 import { requestResetOtp } from "../controllers/requestResetOtp.js";
@@ -301,6 +302,9 @@ router.get("/teacher/previous-year-paper/:paperId", teacherInfo, getTeacherPYQPa
 
 router.post("/teacher/custom-test/create", teacherInfo, writeLimiter, createCustomTest);
 router.get("/teacher/custom-test/list", teacherInfo, getTeacherCustomTests);
+// 🆕 Ek specific Custom Test ka leaderboard + question-wise analysis
+router.get("/teacher/custom-test/:testId/results", teacherInfo, getCustomTestLeaderboard);
+router.get("/teacher/custom-test/:testId/question-analysis", teacherInfo, getCustomTestQuestionAnalysis);
 
 // ── Students / analysis (teacher) ──
 router.get("/teacher/search-student", teacherInfo, searchStudentByPhone);

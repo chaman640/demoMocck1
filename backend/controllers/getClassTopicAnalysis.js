@@ -3,6 +3,7 @@ import {
   resolveFilteredStudentIds,
   getAllowedSubjectsForTeacher,
   getTopicWiseBreakdown,
+  getTestTypeComparison, // 🆕
 } from "../utils/classAnalytics.js";
 
 export const getClassTopicAnalysis = async (req, res) => {
@@ -16,12 +17,17 @@ export const getClassTopicAnalysis = async (req, res) => {
       return res.status(200).json({
         success: true,
         message: "Is batch mein abhi koi student nahi hai.",
-        data: { topics: [], totalBatchStudents, selectedCount: 0 },
+        data: { topics: [], testTypeComparison: [], totalBatchStudents, selectedCount: 0 },
       });
     }
 
     const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
-    const topics = await getTopicWiseBreakdown(studentIds, examName, allowedSubjects);
+
+    // 🆕 topics ab Mock + PYQ + Custom Test teenon se merge hokar aate hain
+    const [topics, testTypeComparison] = await Promise.all([
+      getTopicWiseBreakdown(studentIds, examName, allowedSubjects),
+      getTestTypeComparison(studentIds, examName),
+    ]);
 
     return res.status(200).json({
       success: true,
@@ -33,6 +39,7 @@ export const getClassTopicAnalysis = async (req, res) => {
         totalWithData,
         selectedCount,
         topics,
+        testTypeComparison, // 🆕
       },
     });
   } catch (error) {

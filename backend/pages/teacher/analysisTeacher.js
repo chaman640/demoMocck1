@@ -1,4 +1,10 @@
-// pages/teacher/analysisTeacher.js
+// backend/pages/teacher/analysisTeacher.js
+//
+// 🆕 REDESIGN — teacher ab student ka sirf "last 3 mocks ka average" nahi,
+// poora lifetime picture dekh sakta hai: trend (improve/decline), cross-subject
+// weak topics (ek click mein), aur Mock/PYQ/Custom Test teenon ka comparison —
+// taaki pata chale student kis TYPE ke test mein sabse zyada struggle karta hai.
+//
 // Teacher-facing analysis — Main/Sub Teacher apne active-coupon ke
 // students ka overview/subject/topic analysis dekh sakte hain.
 // STRICT PRIVACY: target student ka activeCoupon teacher ke
@@ -10,6 +16,7 @@ import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
 import HiddenQuestion from "../../models/HiddenQuestion.js";
+import { getTestTypeComparison } from "../../utils/classAnalytics.js"; // 🆕 reuse
 
 // ─────────────────────────────────────────────
 // Reusable helper — teacher ke activeCoupon ke against student verify
@@ -20,11 +27,7 @@ const verifyStudentAccess = async (teacher, studentId) => {
     return { allowed: false, status: 400, message: "Invalid Student ID." };
   }
   if (!teacher.activeCoupon) {
-    return {
-      allowed: false,
-      status: 400,
-      message: "Pehle apna active group/coupon select karein.",
-    };
+    return { allowed: false, status: 400, message: "Pehle apna active group/coupon select karein." };
   }
 
   const student = await User.findById(studentId).select("name phone exam activeCoupon");
@@ -32,22 +35,36 @@ const verifyStudentAccess = async (teacher, studentId) => {
     return { allowed: false, status: 404, message: "Student nahi mila." };
   }
 
-  if (
-    !student.activeCoupon ||
-    student.activeCoupon.toString() !== teacher.activeCoupon.toString()
-  ) {
-    return {
-      allowed: false,
-      status: 403,
-      message: "Ye student aapke active batch mein nahi hai.",
-    };
+  if (!student.activeCoupon || student.activeCoupon.toString() !== teacher.activeCoupon.toString()) {
+    return { allowed: false, status: 403, message: "Ye student aapke active batch mein nahi hai." };
   }
 
   return { allowed: true, student };
 };
 
+// 🆕 Same helper jo student-side analysicUser.js mein hai — % based average
+function averagePercent(tests, blueprintByName) {
+  const percentages = [];
+  for (const test of tests) {
+    const bp = blueprintByName[test.blueprintName];
+    if (!bp) continue;
+    const maxMarks = bp.totalQuestions * bp.marksPerQuestion;
+    if (maxMarks <= 0) continue;
+    percentages.push(Math.max(0, (test.totalScore / maxMarks) * 100));
+  }
+  if (percentages.length === 0) return null;
+  return percentages.reduce((s, p) => s + p, 0) / percentages.length;
+}
+
+function scoreFromPercent(percent, primaryBlueprint) {
+  if (percent == null || !primaryBlueprint) return { score: null, outOf: null };
+  const outOf = Math.round(primaryBlueprint.totalQuestions * primaryBlueprint.marksPerQuestion);
+  return { score: Math.round((percent / 100) * outOf), outOf };
+}
+
 // ─────────────────────────────────────────────
-// TEACHER — Overview: average score, lifetime graph, subject list (last 3)
+// TEACHER — Overview: lifetime average, trend, subject list, cross-subject
+// weak topics, test-type comparison (Mock/PYQ/Custom Test)
 // Route: GET /teacher/analysis/overview/:studentId/:examName
 // ─────────────────────────────────────────────
 export const getStudentOverview = async (req, res) => {
@@ -59,70 +76,68 @@ export const getStudentOverview = async (req, res) => {
       return res.status(check.status).json({ success: false, message: check.message });
     }
 
-    const allTests = await Performance.find({ userId: studentId, examName }).sort({
-      createdAt: -1,
-    });
+    const allTests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 });
+
+    // 🆕 Test-type comparison chalti hai chahe mock diya ho ya nahi —
+    // ho sakta hai student sirf Custom Test/PYQ deta ho, mock kabhi nahi
+    const testTypeComparison = await getTestTypeComparison([new mongoose.Types.ObjectId(studentId)], examName);
 
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
         message: "Is student ne abhi tak koi mock nahi diya hai.",
         studentName: check.student.name,
-        data: null,
+        data: { mockDataAvailable: false, testTypeComparison },
       });
     }
 
     const last3Tests = allTests.slice(0, 3);
+    const previous3Tests = allTests.slice(3, 6); // 🆕 trend ke liye
 
     const examBlueprints = await Blueprint.find({ examName }).select(
-      "blueprintName totalQuestions marksPerQuestion mockType"
+      "blueprintName totalQuestions marksPerQuestion negativeMarking mockType"
     );
     const blueprintByName = {};
-    examBlueprints.forEach((bp) => {
-      blueprintByName[bp.blueprintName] = bp;
-    });
+    examBlueprints.forEach((bp) => { blueprintByName[bp.blueprintName] = bp; });
 
-    const testPercentages = [];
-    for (const test of last3Tests) {
-      const bp = blueprintByName[test.blueprintName];
-      if (!bp) continue;
-      const maxMarks = bp.totalQuestions * bp.marksPerQuestion;
-      if (maxMarks <= 0) continue;
-      testPercentages.push(Math.max(0, (test.totalScore / maxMarks) * 100));
-    }
+    const primaryBlueprint = examBlueprints.find((b) => b.mockType === "Full") || examBlueprints[0] || null;
 
-    const primaryBlueprint =
-      examBlueprints.find((b) => b.mockType === "Full") || examBlueprints[0] || null;
-
-    let averageScore = null;
-    let averageScoreOutOf = null;
-
-    if (testPercentages.length > 0 && primaryBlueprint) {
-      const avgPercent = testPercentages.reduce((s, p) => s + p, 0) / testPercentages.length;
-      averageScoreOutOf = Math.round(
-        primaryBlueprint.totalQuestions * primaryBlueprint.marksPerQuestion
-      );
-      averageScore = Math.round((avgPercent / 100) * averageScoreOutOf);
+    const recentPercent = averagePercent(last3Tests, blueprintByName);
+    let averageScore, averageScoreOutOf;
+    if (recentPercent != null && primaryBlueprint) {
+      ({ score: averageScore, outOf: averageScoreOutOf } = scoreFromPercent(recentPercent, primaryBlueprint));
     } else {
       const totalScoreSum = last3Tests.reduce((acc, t) => acc + t.totalScore, 0);
       averageScore = Number((totalScoreSum / last3Tests.length).toFixed(2));
+      averageScoreOutOf = null;
+    }
+
+    // 🆕 Lifetime average
+    const lifetimePercent = averagePercent(allTests, blueprintByName);
+    const { score: lifetimeAverageScore, outOf: lifetimeAverageScoreOutOf } =
+      scoreFromPercent(lifetimePercent, primaryBlueprint);
+
+    // 🆕 Trend
+    let trend = null;
+    if (previous3Tests.length > 0) {
+      const previousPercent = averagePercent(previous3Tests, blueprintByName);
+      if (recentPercent != null && previousPercent != null) {
+        const diff = recentPercent - previousPercent;
+        trend = {
+          direction: diff > 2 ? "improving" : diff < -2 ? "declining" : "same",
+          changePercent: Number(diff.toFixed(1)),
+        };
+      }
     }
 
     const graphData = allTests
-      .map((test) => ({
-        performanceId: test._id,
-        score: test.totalScore,
-        date: test.createdAt,
-        blueprintName: test.blueprintName,
-      }))
+      .map((test) => ({ performanceId: test._id, score: test.totalScore, date: test.createdAt, blueprintName: test.blueprintName }))
       .reverse();
 
     const subjectMap = {};
     last3Tests.forEach((test) => {
       (test.subjectAnalysis || []).forEach((sub) => {
-        if (!subjectMap[sub.subjectName]) {
-          subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
-        }
+        if (!subjectMap[sub.subjectName]) subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
         subjectMap[sub.subjectName].totalAcc += sub.accuracy;
         subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
         subjectMap[sub.subjectName].count += 1;
@@ -132,21 +147,89 @@ export const getStudentOverview = async (req, res) => {
     const subjectAnalysis = Object.keys(subjectMap).map((name) => ({
       subjectName: name,
       averageAccuracy: Number((subjectMap[name].totalAcc / subjectMap[name].count).toFixed(2)),
-      averageTimePerQuestion: Number(
-        (subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)
-      ),
+      averageTimePerQuestion: Number((subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)),
     }));
+
+    // 🆕 Lifetime totals + negative marking impact
+    let totalCorrectLifetime = 0, totalWrongLifetime = 0, totalUnattemptedLifetime = 0, marksLostToNegativeLifetime = 0;
+    for (const test of allTests) {
+      totalCorrectLifetime += test.correctCount || 0;
+      totalWrongLifetime += test.wrongCount || 0;
+      totalUnattemptedLifetime += test.unattemptedCount || 0;
+      const bp = blueprintByName[test.blueprintName];
+      if (bp && bp.negativeMarking > 0) marksLostToNegativeLifetime += (test.wrongCount || 0) * bp.negativeMarking;
+    }
+    marksLostToNegativeLifetime = Number(marksLostToNegativeLifetime.toFixed(2));
+
+    // 🆕 Cross-subject weak topics — lifetime, sirf mock-pool questions se
+    // (PYQ/Custom Test ke embedded questions class-analysis mein already
+    // cover ho rahe hain; yahan is student ki mock-based weak-topic list hai)
+    const allQuestionIds = allTests.flatMap((test) => test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean));
+    const questionDocs = await RowQuestion.find({ _id: { $in: allQuestionIds } }).select("_id topicName subjectName");
+    const questionMetaMap = {};
+    for (const doc of questionDocs) questionMetaMap[doc._id.toString()] = { topicName: doc.topicName, subjectName: doc.subjectName };
+
+    const topicGroups = {};
+    for (const test of allTests) {
+      for (const aq of test.attemptedQuestions) {
+        if (!aq.questionId) continue;
+        const meta = questionMetaMap[aq.questionId.toString()];
+        if (!meta || !meta.topicName) continue;
+        const key = `${meta.subjectName}::${meta.topicName}`;
+        if (!topicGroups[key]) {
+          topicGroups[key] = { subjectName: meta.subjectName, topicName: meta.topicName, correct: 0, wrong: 0, total: 0, totalTime: 0, timedCount: 0 };
+        }
+        const g = topicGroups[key];
+        g.total++;
+        if (aq.isCorrect === true) g.correct++;
+        else if (aq.isCorrect === false) g.wrong++;
+        if (typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0) { g.totalTime += aq.timeTakenInSeconds; g.timedCount++; }
+      }
+    }
+
+    const topWeakTopics = Object.values(topicGroups)
+      .filter((t) => t.total > 0 && (t.wrong > 0 || t.totalTime / Math.max(t.timedCount, 1) > 30))
+      .map((t) => {
+        const avgTime = t.timedCount === 0 ? 0 : Number((t.totalTime / t.timedCount).toFixed(2));
+        return {
+          subjectName: t.subjectName,
+          topicName: t.topicName,
+          efficiency: Number(((t.correct / t.total) * 100).toFixed(2)),
+          totalAttempted: t.total,
+          wrongCount: t.wrong,
+          averageTimePerQuestion: avgTime,
+          weaknessScore: t.wrong * 2 + avgTime / 30,
+          reason: t.wrong > 0 && avgTime > 30
+            ? "Galat bhi kar raha/rahi hai aur time bhi zyada lag raha hai"
+            : t.wrong > 0
+            ? "Is topic mein galat answers zyada hain"
+            : "Is topic mein time zyada lag raha hai",
+        };
+      })
+      .sort((a, b) => b.weaknessScore - a.weaknessScore)
+      .slice(0, 6)
+      .map(({ weaknessScore, ...rest }) => rest);
 
     return res.status(200).json({
       success: true,
       studentName: check.student.name,
       studentPhone: check.student.phone,
       data: {
+        mockDataAvailable: true,
         averageScore,
         averageScoreOutOf,
+        lifetimeAverageScore,
+        lifetimeAverageScoreOutOf,
         totalTestsGiven: allTests.length,
+        totalCorrectLifetime,
+        totalWrongLifetime,
+        totalUnattemptedLifetime,
+        marksLostToNegativeLifetime,
+        trend,
         graphData,
         subjectAnalysis,
+        topWeakTopics,
+        testTypeComparison, // 🆕
       },
     });
   } catch (error) {
@@ -156,7 +239,7 @@ export const getStudentOverview = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// TEACHER — Ek specific mock ka poora breakdown
+// TEACHER — Ek specific mock ka pura breakdown (🆕 negative marking added)
 // Route: GET /teacher/analysis/mock-detail/:studentId/:performanceId
 // ─────────────────────────────────────────────
 export const getStudentMockDetail = async (req, res) => {
@@ -172,43 +255,36 @@ export const getStudentMockDetail = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid Performance ID" });
     }
 
-    const performance = await Performance.findOne({
-      _id: performanceId,
-      userId: studentId, // 👈 safety — sirf isi student ka performance doc allow
-    }).populate({ path: "attemptedQuestions.questionId", model: RowQuestion });
+    const performance = await Performance.findOne({ _id: performanceId, userId: studentId }).populate({
+      path: "attemptedQuestions.questionId",
+      model: RowQuestion,
+    });
 
     if (!performance) {
       return res.status(404).json({ success: false, message: "Performance nahi mila." });
     }
 
-    const blueprint = await Blueprint.findOne({
-      blueprintName: performance.blueprintName,
-      examName: performance.examName,
-    });
+    const blueprint = await Blueprint.findOne({ blueprintName: performance.blueprintName, examName: performance.examName });
     if (!blueprint) {
       return res.status(404).json({ success: false, message: "Blueprint nahi mila." });
     }
 
     const totalQuestions = blueprint.totalQuestions;
     let totalTimeTaken = 0;
-    for (const aq of performance.attemptedQuestions) {
-      totalTimeTaken += aq.timeTakenInSeconds ?? 0;
-    }
-    const averageTimePerQuestion =
-      totalQuestions === 0 ? 0 : Number((totalTimeTaken / totalQuestions).toFixed(2));
-    const accuracy =
-      totalQuestions === 0
-        ? 0
-        : Number(((performance.correctCount / totalQuestions) * 100).toFixed(2));
+    for (const aq of performance.attemptedQuestions) totalTimeTaken += aq.timeTakenInSeconds ?? 0;
+    const averageTimePerQuestion = totalQuestions === 0 ? 0 : Number((totalTimeTaken / totalQuestions).toFixed(2));
+    const accuracy = totalQuestions === 0 ? 0 : Number(((performance.correctCount / totalQuestions) * 100).toFixed(2));
+
+    // 🆕 Negative marking breakdown
+    const marksLostToNegative = Number((performance.wrongCount * (blueprint.negativeMarking || 0)).toFixed(2));
+    const scoreIfLeftBlankInsteadOfWrong = Number((performance.correctCount * blueprint.marksPerQuestion).toFixed(2));
 
     const questionBreakdown = performance.attemptedQuestions.map((aq) => {
       const q = aq.questionId;
       return {
         questionId: q ? q._id : aq.questionId,
         question: q ? q.question : null,
-        options: q
-          ? { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 }
-          : null,
+        options: q ? { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 } : null,
         correctOption: q ? q.correctOption : null,
         userAnswer: aq.userAnswer,
         isCorrect: aq.isCorrect,
@@ -233,6 +309,10 @@ export const getStudentMockDetail = async (req, res) => {
         accuracy,
         totalTimeTaken,
         averageTimePerQuestion,
+        // 🆕
+        negativeMarking: blueprint.negativeMarking,
+        marksLostToNegative,
+        scoreIfLeftBlankInsteadOfWrong,
       },
       questionBreakdown,
     });
@@ -243,7 +323,7 @@ export const getStudentMockDetail = async (req, res) => {
 };
 
 // ─────────────────────────────────────────────
-// TEACHER — Subject-wise Analysis
+// TEACHER — Subject-wise Analysis (koi change nahi — already sahi tha)
 // Route: GET /teacher/analysis/subject/:studentId/:examName/:subjectName
 // ─────────────────────────────────────────────
 export const getStudentSubjectAnalysis = async (req, res) => {
@@ -255,9 +335,7 @@ export const getStudentSubjectAnalysis = async (req, res) => {
       return res.status(check.status).json({ success: false, message: check.message });
     }
 
-    const last3Tests = await Performance.find({ userId: studentId, examName })
-      .sort({ createdAt: -1 })
-      .limit(3);
+    const last3Tests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 }).limit(3);
 
     if (!last3Tests || last3Tests.length === 0) {
       return res.status(200).json({
@@ -268,9 +346,7 @@ export const getStudentSubjectAnalysis = async (req, res) => {
       });
     }
 
-    let totalAccuracy = 0,
-      totalTime = 0,
-      subjectFoundCount = 0;
+    let totalAccuracy = 0, totalTime = 0, subjectFoundCount = 0;
     const graphData = [];
 
     for (const test of last3Tests) {
@@ -284,18 +360,11 @@ export const getStudentSubjectAnalysis = async (req, res) => {
     }
     graphData.reverse();
 
-    const averageAccuracy =
-      subjectFoundCount === 0 ? 0 : Number((totalAccuracy / subjectFoundCount).toFixed(2));
-    const averageTimePerQuestion =
-      subjectFoundCount === 0 ? 0 : Number((totalTime / subjectFoundCount).toFixed(2));
+    const averageAccuracy = subjectFoundCount === 0 ? 0 : Number((totalAccuracy / subjectFoundCount).toFixed(2));
+    const averageTimePerQuestion = subjectFoundCount === 0 ? 0 : Number((totalTime / subjectFoundCount).toFixed(2));
 
-    const allQuestionIds = last3Tests.flatMap((test) =>
-      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
-    );
-    const questionDocs = await RowQuestion.find({
-      _id: { $in: allQuestionIds },
-      subjectName,
-    }).select("_id topicName");
+    const allQuestionIds = last3Tests.flatMap((test) => test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean));
+    const questionDocs = await RowQuestion.find({ _id: { $in: allQuestionIds }, subjectName }).select("_id topicName");
 
     const topicNameMap = {};
     for (const doc of questionDocs) topicNameMap[doc._id.toString()] = doc.topicName;
@@ -306,16 +375,7 @@ export const getStudentSubjectAnalysis = async (req, res) => {
         if (!aq.questionId) continue;
         const topicName = topicNameMap[aq.questionId.toString()];
         if (!topicName) continue;
-        if (!topicGroups[topicName]) {
-          topicGroups[topicName] = {
-            correct: 0,
-            wrong: 0,
-            unattempted: 0,
-            total: 0,
-            totalTime: 0,
-            timedCount: 0,
-          };
-        }
+        if (!topicGroups[topicName]) topicGroups[topicName] = { correct: 0, wrong: 0, unattempted: 0, total: 0, totalTime: 0, timedCount: 0 };
         topicGroups[topicName].total++;
         if (aq.isCorrect === true) topicGroups[topicName].correct++;
         else if (aq.isCorrect === false) topicGroups[topicName].wrong++;
@@ -353,39 +413,26 @@ export const getStudentSubjectAnalysis = async (req, res) => {
         efficiency: t.efficiency,
         wrongCount: t.wrongCount,
         averageTimePerQuestion: t.averageTimePerQuestion,
-        reason:
-          t.wrongCount > 0 && t.averageTimePerQuestion > 30
-            ? "Galat bhi kar raha/rahi hai aur time bhi zyada lag raha hai"
-            : t.wrongCount > 0
-            ? "Is topic mein galat answers zyada hain"
-            : "Is topic mein time zyada lag raha hai",
+        reason: t.wrongCount > 0 && t.averageTimePerQuestion > 30
+          ? "Galat bhi kar raha/rahi hai aur time bhi zyada lag raha hai"
+          : t.wrongCount > 0
+          ? "Is topic mein galat answers zyada hain"
+          : "Is topic mein time zyada lag raha hai",
       }));
 
     return res.status(200).json({
       success: true,
       studentName: check.student.name,
-      data: {
-        subjectName,
-        averageAccuracy,
-        averageTimePerQuestion,
-        totalTestsConsidered: subjectFoundCount,
-        graphData,
-        topicList,
-        weakTopics,
-      },
+      data: { subjectName, averageAccuracy, averageTimePerQuestion, totalTestsConsidered: subjectFoundCount, graphData, topicList, weakTopics },
     });
   } catch (error) {
     console.error("getStudentSubjectAnalysis error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Subject analysis fetch karte waqt error aaya.",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Subject analysis fetch karte waqt error aaya.", error: error.message });
   }
 };
 
 // ─────────────────────────────────────────────
-// TEACHER — Topic-wise Analysis
+// TEACHER — Topic-wise Analysis (koi change nahi — already sahi tha)
 // Route: GET /teacher/analysis/topic/:studentId/:examName/:subjectName/:topicName
 // ─────────────────────────────────────────────
 export const getStudentTopicAnalysis = async (req, res) => {
@@ -397,9 +444,7 @@ export const getStudentTopicAnalysis = async (req, res) => {
       return res.status(check.status).json({ success: false, message: check.message });
     }
 
-    const allTests = await Performance.find({ userId: studentId, examName }).sort({
-      createdAt: -1,
-    });
+    const allTests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 });
 
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
@@ -410,14 +455,8 @@ export const getStudentTopicAnalysis = async (req, res) => {
       });
     }
 
-    const allQuestionIds = allTests.flatMap((test) =>
-      test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
-    );
-    const questionDocs = await RowQuestion.find({
-      _id: { $in: allQuestionIds },
-      subjectName,
-      topicName,
-    }).select(
+    const allQuestionIds = allTests.flatMap((test) => test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean));
+    const questionDocs = await RowQuestion.find({ _id: { $in: allQuestionIds }, subjectName, topicName }).select(
       "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName"
     );
 
@@ -427,15 +466,8 @@ export const getStudentTopicAnalysis = async (req, res) => {
     const hiddenDocs = await HiddenQuestion.find({ userId: studentId }).select("questionId");
     const hiddenQuestionIds = new Set(hiddenDocs.map((h) => h.questionId.toString()));
 
-    const goodAtQuestions = [],
-      wrongQuestions = [],
-      unattemptedQuestions = [];
-    let totalAttempted = 0,
-      totalCorrect = 0,
-      totalWrong = 0,
-      totalUnattempted = 0,
-      totalTime = 0,
-      timedCount = 0;
+    const goodAtQuestions = [], wrongQuestions = [], unattemptedQuestions = [];
+    let totalAttempted = 0, totalCorrect = 0, totalWrong = 0, totalUnattempted = 0, totalTime = 0, timedCount = 0;
 
     for (const test of allTests) {
       for (const aq of test.attemptedQuestions) {
@@ -455,28 +487,16 @@ export const getStudentTopicAnalysis = async (req, res) => {
           mockDate: test.createdAt,
           questionId: qDoc._id,
           question: qDoc.question,
-          options: {
-            option1: qDoc.option1,
-            option2: qDoc.option2,
-            option3: qDoc.option3,
-            option4: qDoc.option4,
-          },
+          options: { option1: qDoc.option1, option2: qDoc.option2, option3: qDoc.option3, option4: qDoc.option4 },
           correctOption: qDoc.correctOption,
           userAnswer: aq.userAnswer,
           answerExplain: qDoc.answerExplain,
           timeTakenInSeconds: aq.timeTakenInSeconds,
         };
 
-        if (aq.isCorrect === true) {
-          totalCorrect++;
-          goodAtQuestions.push(entry);
-        } else if (aq.isCorrect === false) {
-          totalWrong++;
-          wrongQuestions.push(entry);
-        } else {
-          totalUnattempted++;
-          unattemptedQuestions.push(entry);
-        }
+        if (aq.isCorrect === true) { totalCorrect++; goodAtQuestions.push(entry); }
+        else if (aq.isCorrect === false) { totalWrong++; wrongQuestions.push(entry); }
+        else { totalUnattempted++; unattemptedQuestions.push(entry); }
       }
     }
 
@@ -502,10 +522,6 @@ export const getStudentTopicAnalysis = async (req, res) => {
     });
   } catch (error) {
     console.error("getStudentTopicAnalysis error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Topic analysis fetch karte waqt error aaya.",
-      error: error.message,
-    });
+    return res.status(500).json({ success: false, message: "Topic analysis fetch karte waqt error aaya.", error: error.message });
   }
 };

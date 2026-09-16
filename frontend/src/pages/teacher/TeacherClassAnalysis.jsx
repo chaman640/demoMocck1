@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
 import ActiveCouponSwitcher from "../../components/ActiveCouponSwitcher";
@@ -13,6 +14,7 @@ const PageSkeleton = () => (
     <div className="max-w-2xl mx-auto space-y-4">
       <SkeletonBlock className="w-48 h-7" />
       <SkeletonBlock className="w-full h-16 rounded-xl" />
+      <SkeletonBlock className="w-full h-32 rounded-2xl" />
       <SkeletonBlock className="w-full h-40 rounded-2xl" />
     </div>
   </div>
@@ -31,6 +33,71 @@ const wrongColor = (pct) => {
   return "text-green-400 bg-green-500/10 border-green-500/30";
 };
 
+const sourceLabelColor = {
+  "Mock Test": "text-[#A78BFA] bg-[#A78BFA]/10 border-[#A78BFA]/30",
+  "Previous Year Paper": "text-blue-400 bg-blue-500/10 border-blue-500/30",
+  "Custom Test": "text-orange-400 bg-orange-500/10 border-orange-500/30",
+};
+
+// 🆕 Test-Type Comparison — Mock vs PYQ vs Custom Test, ek nazar mein
+const accuracyBarColor = (acc) => (acc >= 70 ? "#34D399" : acc >= 40 ? "#FBBF24" : "#F87171");
+
+const TestTypeComparisonChart = ({ data }) => {
+  const withData = (data || []).filter((d) => d.totalAttempts > 0);
+  if (withData.length === 0) {
+    return (
+      <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
+        <p className="text-sm text-gray-400">Abhi kisi bhi test-type mein attempt data nahi hai.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
+      <div className="px-4 py-3 border-b border-gray-800">
+        <h3 className="font-semibold text-sm">Test-Type Comparison</h3>
+        <p className="text-[11px] text-gray-500 mt-0.5">Batch kis type ke test mein sabse zyada struggle kar rahi hai</p>
+      </div>
+      <div className="px-2 py-4">
+        <ResponsiveContainer width="100%" height={Math.max(100, withData.length * 50)}>
+          <BarChart data={withData} layout="vertical" margin={{ top: 0, right: 30, left: 10, bottom: 0 }}>
+            <XAxis type="number" domain={[0, 100]} tick={{ fill: "#6B7280", fontSize: 11 }} />
+            <YAxis type="category" dataKey="testType" tick={{ fill: "#D1D5DB", fontSize: 12 }} width={110} />
+            <Tooltip
+              contentStyle={{ background: "#0A0D14", border: "1px solid #1F2937", borderRadius: 8, fontSize: 12 }}
+              formatter={(value, name, props) => [`${value}% accuracy (${props.payload.totalAttempts} attempts)`, props.payload.testType]}
+            />
+            <Bar dataKey="accuracy" radius={[0, 6, 6, 0]} barSize={20}>
+              {withData.map((d, i) => (
+                <Cell key={i} fill={accuracyBarColor(d.accuracy)} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+};
+
+// 🆕 Ek topic ke andar kis test-type se kitni galtiyan aayi — chhote badges
+const SourceBreakdownBadges = ({ bySource }) => {
+  if (!bySource) return null;
+  const items = [
+    { key: "mock", label: "Mock", count: bySource.mock },
+    { key: "pyq", label: "PYQ", count: bySource.pyq },
+    { key: "customTest", label: "Custom", count: bySource.customTest },
+  ].filter((i) => i.count > 0);
+  if (items.length === 0) return null;
+  return (
+    <div className="flex gap-1.5 mt-1">
+      {items.map((i) => (
+        <span key={i.key} className="text-[9px] px-1.5 py-0.5 rounded bg-[#1F2937] text-gray-400">
+          {i.label}: {i.count}
+        </span>
+      ))}
+    </div>
+  );
+};
+
 const TeacherClassAnalysis = () => {
   const navigate = useNavigate();
 
@@ -42,11 +109,11 @@ const TeacherClassAnalysis = () => {
   const [minPercentile, setMinPercentile] = useState(25);
   const [maxPercentile, setMaxPercentile] = useState(75);
 
-  const [topicPhase, setTopicPhase] = useState("idle"); // idle | loading | loaded | error
+  const [topicPhase, setTopicPhase] = useState("idle");
   const [topicData, setTopicData] = useState(null);
   const [topicError, setTopicError] = useState("");
 
-  const [drillDown, setDrillDown] = useState(null); // { subjectName, topicName }
+  const [drillDown, setDrillDown] = useState(null);
   const [questionPhase, setQuestionPhase] = useState("idle");
   const [questionData, setQuestionData] = useState(null);
   const [questionError, setQuestionError] = useState("");
@@ -152,7 +219,7 @@ const TeacherClassAnalysis = () => {
 
           <div>
             <h1 className="text-xl font-bold mb-1">{drillDown.topicName}</h1>
-            <p className="text-gray-400 text-sm">{drillDown.subjectName} &middot; question-level breakdown</p>
+            <p className="text-gray-400 text-sm">{drillDown.subjectName} &middot; question-level breakdown (sabhi test-types se)</p>
           </div>
 
           {questionPhase === "loading" && (
@@ -180,11 +247,17 @@ const TeacherClassAnalysis = () => {
               ) : (
                 <div className="space-y-4">
                   {questionData.questions.map((q) => (
-                    <div key={q.questionId} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
-                      <div className="flex items-center justify-between mb-3 gap-3">
-                        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${wrongColor(q.wrongPercentage)}`}>
-                          {q.wrongPercentage}% galat
-                        </span>
+                    <div key={`${q.sourceType}-${q.questionId}`} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+                      <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${wrongColor(q.wrongPercentage)}`}>
+                            {q.wrongPercentage}% galat
+                          </span>
+                          {/* 🆕 Ye sawaal kis test-type/paper ka hai */}
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full border ${sourceLabelColor[q.sourceType] || "text-gray-400 bg-gray-500/10 border-gray-500/30"}`}>
+                            {q.sourceType}{q.sourceName ? ` · ${q.sourceName}` : ""}
+                          </span>
+                        </div>
                         <span className="text-[11px] text-gray-500">{q.totalAttempts} attempts</span>
                       </div>
                       <p className="text-sm text-gray-200 mb-4 leading-relaxed">{q.question}</p>
@@ -202,10 +275,7 @@ const TeacherClassAnalysis = () => {
                                 <span className="text-gray-500 flex-shrink-0 ml-2">{pickPct}%</span>
                               </div>
                               <div className="h-1.5 bg-[#1F2937] rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full ${isCorrect ? "bg-green-500" : "bg-red-500/70"}`}
-                                  style={{ width: `${pickPct}%` }}
-                                />
+                                <div className={`h-full ${isCorrect ? "bg-green-500" : "bg-red-500/70"}`} style={{ width: `${pickPct}%` }} />
                               </div>
                             </div>
                           );
@@ -229,7 +299,7 @@ const TeacherClassAnalysis = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold mb-1">Class Analysis</h1>
-          <p className="text-gray-400 text-sm">Kaunse topics mein poori class ko sabse zyada dikkat hai</p>
+          <p className="text-gray-400 text-sm">Mock Test, Previous Year Papers aur Custom Tests — sabhi mila ke, kaunse topics mein poori class ko sabse zyada dikkat hai</p>
         </div>
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
@@ -240,7 +310,6 @@ const TeacherClassAnalysis = () => {
           </div>
         ) : (
           <>
-            {/* Filter tabs */}
             <div className="flex gap-2 overflow-x-auto pb-1">
               {FILTERS.map((f) => (
                 <button
@@ -255,37 +324,17 @@ const TeacherClassAnalysis = () => {
               ))}
             </div>
 
-            {/* Custom range inputs */}
             {filter === "custom" && (
               <div className="bg-[#111827] border border-gray-800 rounded-xl p-4 flex items-center gap-3">
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-500 uppercase mb-1">Min Percentile</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    value={minPercentile}
-                    onChange={(e) => setMinPercentile(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 rounded-lg outline-none text-white"
-                  />
+                  <input type="number" min="0" max="99" value={minPercentile} onChange={(e) => setMinPercentile(e.target.value)} className="w-full px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 rounded-lg outline-none text-white" />
                 </div>
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-500 uppercase mb-1">Max Percentile</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={maxPercentile}
-                    onChange={(e) => setMaxPercentile(e.target.value)}
-                    className="w-full px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 rounded-lg outline-none text-white"
-                  />
+                  <input type="number" min="1" max="100" value={maxPercentile} onChange={(e) => setMaxPercentile(e.target.value)} className="w-full px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 rounded-lg outline-none text-white" />
                 </div>
-                <button
-                  onClick={fetchTopics}
-                  className="px-4 py-2.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium flex-shrink-0 mt-4"
-                >
-                  Apply
-                </button>
+                <button onClick={fetchTopics} className="px-4 py-2.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium flex-shrink-0 mt-4">Apply</button>
               </div>
             )}
 
@@ -296,9 +345,7 @@ const TeacherClassAnalysis = () => {
             )}
 
             {topicPhase === "error" && (
-              <div className="p-4 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">
-                {topicError}
-              </div>
+              <div className="p-4 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">{topicError}</div>
             )}
 
             {topicPhase === "loaded" && topicData && (
@@ -306,6 +353,9 @@ const TeacherClassAnalysis = () => {
                 <p className="text-xs text-gray-500">
                   {topicData.selectedCount} students ka data &middot; batch mein total {topicData.totalBatchStudents} students
                 </p>
+
+                {/* 🆕 Test-Type Comparison */}
+                <TestTypeComparisonChart data={topicData.testTypeComparison} />
 
                 {topicData.topics.length === 0 ? (
                   <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
@@ -315,7 +365,7 @@ const TeacherClassAnalysis = () => {
                   <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-800">
                       <h3 className="font-semibold text-sm">Topic-wise Error Breakdown</h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Sabse zyada galti wale topics upar</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Sabse zyada galti wale topics upar &middot; Mock/PYQ/Custom badge se pata chalega kahan se aa rahi hai</p>
                     </div>
                     <div className="divide-y divide-gray-800">
                       {topicData.topics.map((t, i) => (
@@ -326,9 +376,8 @@ const TeacherClassAnalysis = () => {
                         >
                           <div className="min-w-0 flex-1">
                             <p className="text-sm text-gray-200 truncate">{t.topicName}</p>
-                            <p className="text-[11px] text-gray-500 mt-0.5">
-                              {t.subjectName} &middot; {t.totalAttempts} attempts
-                            </p>
+                            <p className="text-[11px] text-gray-500 mt-0.5">{t.subjectName} &middot; {t.totalAttempts} attempts</p>
+                            <SourceBreakdownBadges bySource={t.bySource} />
                           </div>
                           <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${wrongColor(t.wrongPercentage)}`}>
                             {t.wrongPercentage}% galat
