@@ -389,10 +389,18 @@ const QuestionCard = ({ q, index, onDelete, deleting }) => {
       </div>
 
       {/* Question */}
-      <p className="text-sm sm:text-base md:text-lg font-medium text-gray-200 mb-4 sm:mb-5 leading-relaxed">
-        <span className="text-gray-500 mr-2">Q{index + 1}.</span>
-        {q.question}
-      </p>
+      <div className="mb-4 sm:mb-5">
+        <p className="text-sm sm:text-base md:text-lg font-medium text-gray-200 leading-relaxed">
+          <span className="text-gray-500 mr-2">Q{index + 1}.</span>
+          {q.question}
+        </p>
+        {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
+        {q.askedIn && (
+          <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
+            📌 {q.askedIn}
+          </span>
+        )}
+      </div>
 
       {/* Options */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-4 sm:mb-5">

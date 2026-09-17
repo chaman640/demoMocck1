@@ -82,6 +82,7 @@ export const addQuestion = async (req, res) => {
         examName,
         questionPhoto: q.questionPhoto || null,
         answerExplainWithPhoto: q.answerExplainWithPhoto || null,
+        askedIn: q.askedIn ? String(q.askedIn).trim() : null, // 🆕
       });
     });
 

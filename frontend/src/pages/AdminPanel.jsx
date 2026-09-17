@@ -111,6 +111,96 @@ const JsonActionCard = ({ title, description, endpoint, placeholder }) => {
   );
 };
 
+// ─────────────────────────────────────────────
+// 🆕 Manage Exam Names — ab admin khud naya exam add/remove kar sakta hai,
+// code change/redeploy ki zaroorat nahi
+// ─────────────────────────────────────────────
+const ManageExamNamesCard = () => {
+  const [exams, setExams] = useState(null); // null = loading
+  const [newName, setNewName] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+
+  const loadExams = () => {
+    api
+      .get("/admin/exam-names")
+      .then((res) => setExams(res.data.data))
+      .catch(() => setExams([]));
+  };
+
+  useEffect(() => { loadExams(); }, []);
+
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setStatus("submitting");
+    setMessage("");
+    try {
+      await api.post("/admin/exam-names", { name: newName.trim() });
+      setNewName("");
+      loadExams();
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Error aaya.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    setMessage("");
+    try {
+      await api.delete(`/admin/exam-names/${id}`);
+      setExams((prev) => prev.filter((e) => e._id !== id));
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Delete nahi ho paaya.");
+    }
+  };
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
+      <h3 className="font-semibold text-base mb-1">Exam Names Manage Karein</h3>
+      <p className="text-xs text-gray-500 mb-4">Yahan add kiya naya exam turant signup/dropdown mein dikhne lagega</p>
+
+      {message && (
+        <div className="mb-4 p-3 rounded-lg text-xs text-center bg-red-500/10 text-red-400">{message}</div>
+      )}
+
+      <form onSubmit={handleAdd} className="flex gap-2 mb-4">
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder="Jaise: UPSSSC PET"
+          className="flex-1 px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600"
+        />
+        <button type="submit" disabled={status === "submitting"} className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm transition-colors disabled:opacity-50 flex-shrink-0">
+          Add
+        </button>
+      </form>
+
+      {exams === null ? (
+        <SkeletonBlock className="w-full h-24 rounded-xl" />
+      ) : exams.length === 0 ? (
+        <p className="text-xs text-gray-500 text-center py-4">Abhi koi exam nahi hai.</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {exams.map((e) => (
+            <span key={e._id} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-[#1F2937] text-sm text-gray-200">
+              {e.name}
+              <button
+                onClick={() => handleDelete(e._id)}
+                title="Delete"
+                className="w-4 h-4 flex items-center justify-center rounded-full text-gray-500 hover:text-red-400 hover:bg-red-500/10 text-xs leading-none"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = () => {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("checking"); // checking | ready
@@ -155,6 +245,8 @@ const AdminPanel = () => {
         </div>
 
         <CreateMainTeacherCard />
+
+        <ManageExamNamesCard />
 
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Content (Advanced)</p>

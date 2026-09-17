@@ -72,6 +72,7 @@ import { requestTeacherResetOtp, resetTeacherPassword } from "../controllers/tea
 // ── Admin (magic-link login) ────────────────────
 import { requestAdminLogin, verifyAdminLogin, getAdminSession, adminLogout } from "../controllers/adminAuth.js"; // 🆕
 import { adminCreateMainTeacher } from "../controllers/adminCreateMainTeacher.js"; // 🆕
+import { listExamNamesAdmin, addExamName, deleteExamName } from "../controllers/manageExamNames.js"; // 🆕
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
@@ -179,6 +180,11 @@ router.get("/admin/session", getAdminSession);
 router.post("/admin/logout", adminLogout);
 // Admin-only — naya Main Teacher banao (invite email jaati hai)
 router.post("/admin/create-main-teacher", adminLimiter, adminOnly, adminCreateMainTeacher);
+// 🆕 Exam names — Admin Panel se manage (add/delete). Public dropdown
+// abhi bhi "/allExamName" (upar) hai, wo yahi collection padhta hai.
+router.get("/admin/exam-names", adminOnly, listExamNamesAdmin);
+router.post("/admin/exam-names", adminLimiter, adminOnly, addExamName);
+router.delete("/admin/exam-names/:id", adminLimiter, adminOnly, deleteExamName);
 
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)

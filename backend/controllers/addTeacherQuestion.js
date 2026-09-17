@@ -183,6 +183,7 @@ export const addTeacherQuestion = async (req, res) => {
         correctOption: Number(q.correctOption),
         answerExplain: q.answerExplain,
         answerExplainWithPhoto: q.answerExplainWithPhoto || null,
+        askedIn: q.askedIn ? String(q.askedIn).trim() : null, // 🆕
         subjectName: finalSubject, // 👈 hamesha "sahi" spelling
         topicName: finalTopic,
         questionNumber: counterMap[key],

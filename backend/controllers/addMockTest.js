@@ -1,9 +1,23 @@
 // controllers/addMocktest.js
+//
+// 🆕 REDESIGN — Batch-Exclusive-With-Fallback
+//
+// PEHLE: student agar kisi batch (coupon) mein tha, uska POORA mock test
+// sirf uske teacher ke daale hue questions se banta tha. Agar teacher ne
+// kisi subject mein kam/koi question na daala ho, us subject mein sawaal
+// hi nahi aate the (ya poora mock chhota reh jaata).
+//
+// AB: har subject ke liye PEHLE teacher/batch ka apna pool try hota hai.
+// Agar wahan `questionCount` poora nahi ho paata, bacha hua hissa admin
+// ke GLOBAL question bank se fill hota hai. Matlab:
+//   - Teacher ne jo daala, student ko wahi pehle dikhega
+//   - Teacher ka pool khatam/kam ho to admin ka global bank kaam aayega
+//   - Free/no-batch student jaisa pehle tha waisa hi — seedha global pool
 import mongoose from "mongoose";
 import Blueprint from "../models/bluePrint.js";
 import Performance from "../models/Performance.js";
-import User from "../models/User.js"; // 👈 NAYA — activeCoupon nikalne ke liye
-import Coupon from "../models/Coupon.js"; // 👈 NAYA — coupon ka exam verify karne ke liye
+import User from "../models/User.js";
+import Coupon from "../models/Coupon.js";
 import { Question } from "../models/rowQuestionSchema.js";
 
 // ─────────────────────────────────────────────
@@ -20,18 +34,227 @@ const fisherYatesShuffle = (arr) => {
 
 // ─────────────────────────────────────────────
 // HELPER 2: String IDs → ObjectId array
-// BUG FIX 2: Invalid IDs filter karo — null/undefined/broken string crash karte hain
 // ─────────────────────────────────────────────
 const toObjectIds = (idIterable) =>
   Array.from(idIterable)
-    .filter((id) => id && mongoose.Types.ObjectId.isValid(id)) // invalid IDs skip
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
     .map((id) => new mongoose.Types.ObjectId(id));
 
 // ─────────────────────────────────────────────
 // HELPER 3: Topic name normalize karo
-// BUG FIX 7: "Sandhi", "sandhi", "SANDHI" → sab "sandhi" ho jayenge
 // ─────────────────────────────────────────────
 const normalizeTopic = (t) => (t ? t.trim().toLowerCase() : "");
+
+const MAX_EXTRA_PER_TOPIC = 2; // base 1 + max 2 extra = total max 3 per topic
+const MAX_PER_TOPIC = 1 + MAX_EXTRA_PER_TOPIC; // = 3
+
+// ─────────────────────────────────────────────
+// 🆕 CORE: Ek subject ke liye questions select karta hai — bilkul wahi
+// weak-topic-priority + base/extra allocation algorithm jo pehle seedha
+// controller ke andar tha, ab reusable function mein hai taaki isse
+// batch-pool aur global-pool dono ke liye alag-alag chalaya ja sake.
+//
+// excludeIds — in dono se bachna hai: (a) student ke purane attempted
+// sawaal, (b) is subject mein pehle pass (batch pool) se already select
+// hue sawaal, taaki global-fallback pass wahi sawaal dobara na uthaye.
+// ─────────────────────────────────────────────
+async function selectQuestionsForSubject({
+  examName,
+  subjectConfig,
+  couponFilter,
+  excludeIds,
+  weakTopicMap,
+  isNewUser,
+}) {
+  const { subjectName, questionCount, importantTopics = [] } = subjectConfig;
+  const importantTopicsNorm = importantTopics.map(normalizeTopic);
+  const excludeIdsArray = toObjectIds(excludeIds);
+
+  // Phase 1: Unused questions (jo pehle attempt/select nahi hue)
+  const unusedQuestions = await Question.aggregate([
+    {
+      $match: {
+        examName: { $in: [examName] },
+        subjectName: subjectName,
+        _id: { $nin: excludeIdsArray },
+        ...couponFilter,
+      },
+    },
+    {
+      $project: {
+        _id: 1, question: 1, option1: 1, option2: 1, option3: 1, option4: 1,
+        correctOption: 1, topicName: 1, subjectName: 1, questionNumber: 1,
+      },
+    },
+    { $group: { _id: "$topicName", questions: { $push: "$$ROOT" } } },
+    { $project: { topicName: "$_id", questions: { $slice: ["$questions", MAX_PER_TOPIC] } } },
+  ]);
+
+  // Phase 2: Fallback — jin topics ke unused questions nahi mile
+  const unusedTopicNames = unusedQuestions.map((g) => g._id);
+
+  const allTopicsDistinct = await Question.distinct("topicName", {
+    examName: { $in: [examName] },
+    subjectName: subjectName,
+    ...couponFilter,
+  });
+
+  if (allTopicsDistinct.length === 0) {
+    return { questions: [], allTopicsDistinct: [] }; // is pool mein is subject ka koi question hi nahi
+  }
+
+  const topicsWithNoUnused = allTopicsDistinct.filter((t) => !unusedTopicNames.includes(t));
+
+  let fallbackQuestions = [];
+  if (topicsWithNoUnused.length > 0) {
+    fallbackQuestions = await Question.aggregate([
+      {
+        $match: {
+          examName: { $in: [examName] },
+          subjectName: subjectName,
+          topicName: { $in: topicsWithNoUnused },
+          ...couponFilter,
+        },
+      },
+      {
+        $project: {
+          _id: 1, question: 1, option1: 1, option2: 1, option3: 1, option4: 1,
+          correctOption: 1, topicName: 1, subjectName: 1, questionNumber: 1,
+        },
+      },
+      { $group: { _id: "$topicName", questions: { $push: "$$ROOT" } } },
+      { $project: { topicName: "$_id", questions: { $slice: ["$questions", MAX_PER_TOPIC * 3] } } },
+    ]);
+  }
+
+  // Topic question pool banao: { topicName: [shuffled questions] }
+  const topicQuestionPool = {};
+  for (const group of [...unusedQuestions, ...fallbackQuestions]) {
+    const topicName = group._id || group.topicName;
+    if (!topicName) continue;
+    const shuffled = fisherYatesShuffle(group.questions);
+    topicQuestionPool[topicName] = shuffled.slice(0, MAX_PER_TOPIC);
+  }
+
+  const topicPointer = {};
+  Object.keys(topicQuestionPool).forEach((t) => (topicPointer[t] = 0));
+
+  const topicSelectedCount = {};
+  allTopicsDistinct.forEach((t) => (topicSelectedCount[t] = 0));
+
+  const selectedIdsThisSubject = new Set();
+
+  const pickFromTopic = (topic) => {
+    const pool = topicQuestionPool[topic];
+    if (!pool) return null;
+    const ptr = topicPointer[topic] || 0;
+    if (ptr >= pool.length) return null;
+    const q = pool[ptr];
+    topicPointer[topic] = ptr + 1;
+    return q;
+  };
+
+  // ── BASE ALLOCATION — topics sorted by weak severity ──
+  let baseAllocated = 0;
+  let orderedTopicsForBase = [...allTopicsDistinct];
+  if (!isNewUser) {
+    const subjectNorm = normalizeTopic(subjectName);
+    const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
+    orderedTopicsForBase.sort((a, b) => {
+      const wa = weakTopicsThisSubject[normalizeTopic(a)] || 0;
+      const wb = weakTopicsThisSubject[normalizeTopic(b)] || 0;
+      return wb - wa;
+    });
+  }
+
+  for (const topic of orderedTopicsForBase) {
+    if (baseAllocated >= questionCount) break;
+    const q = pickFromTopic(topic);
+    if (q) {
+      selectedIdsThisSubject.add(q._id.toString());
+      topicSelectedCount[topic] = 1;
+      baseAllocated++;
+    }
+  }
+
+  // ── EXTRA — priority + severity ──
+  let extraNeeded = questionCount - baseAllocated;
+  let extraTopicPool = [];
+
+  if (extraNeeded <= 0) {
+    extraTopicPool = [];
+  } else if (isNewUser) {
+    const importantInDB = allTopicsDistinct.filter((t) => importantTopicsNorm.includes(normalizeTopic(t)));
+    const nonImportantTopics = allTopicsDistinct.filter((t) => !importantTopicsNorm.includes(normalizeTopic(t)));
+    extraTopicPool = [...importantInDB, ...nonImportantTopics];
+  } else {
+    const subjectNorm = normalizeTopic(subjectName);
+    const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
+    const importantInDB = allTopicsDistinct.filter((t) => importantTopicsNorm.includes(normalizeTopic(t)));
+
+    const p1 = importantInDB
+      .filter((t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0)
+      .sort((a, b) => (weakTopicsThisSubject[normalizeTopic(b)] || 0) - (weakTopicsThisSubject[normalizeTopic(a)] || 0));
+    const p2 = importantInDB.filter((t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0);
+    const p3 = allTopicsDistinct
+      .filter((t) => !importantTopicsNorm.includes(normalizeTopic(t)) && (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0)
+      .sort((a, b) => (weakTopicsThisSubject[normalizeTopic(b)] || 0) - (weakTopicsThisSubject[normalizeTopic(a)] || 0));
+    const p4 = allTopicsDistinct.filter((t) => !importantTopicsNorm.includes(normalizeTopic(t)) && (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0);
+
+    extraTopicPool = [...p1, ...p2, ...p3, ...p4];
+  }
+
+  if (extraTopicPool.length > 0 && extraNeeded > 0) {
+    let extraPoolIndex = 0;
+    let loopGuard = 0;
+    const maxLoopIterations = extraTopicPool.length * MAX_EXTRA_PER_TOPIC * 2;
+
+    while (extraNeeded > 0 && loopGuard < maxLoopIterations) {
+      loopGuard++;
+      const topic = extraTopicPool[extraPoolIndex % extraTopicPool.length];
+      extraPoolIndex++;
+
+      const actualBaseCount = topicSelectedCount[topic] > 0 ? 1 : 0;
+      const currentCount = topicSelectedCount[topic] || 0;
+      const extraAlreadyTaken = currentCount - actualBaseCount;
+      if (extraAlreadyTaken >= MAX_EXTRA_PER_TOPIC) continue;
+
+      const q = pickFromTopic(topic);
+      if (q) {
+        const qId = q._id.toString();
+        if (!selectedIdsThisSubject.has(qId)) {
+          selectedIdsThisSubject.add(qId);
+          topicSelectedCount[topic] = (topicSelectedCount[topic] || 0) + 1;
+          extraNeeded--;
+        }
+      }
+    }
+  }
+
+  // ── Final questions — already-fetched pool se nikalo (no extra DB call) ──
+  const allFetchedQuestions = [
+    ...unusedQuestions.flatMap((g) => g.questions),
+    ...fallbackQuestions.flatMap((g) => g.questions),
+  ];
+
+  // 🔒 correctOption yahan nahi bhejte — DevTools Network tab mein cheating
+  // rokne ke liye. isCorrect backend (addPerformence.js) khud check karta hai.
+  const questions = allFetchedQuestions
+    .filter((q) => selectedIdsThisSubject.has(q._id.toString()))
+    .map((q) => ({
+      _id: q._id,
+      question: q.question,
+      option1: q.option1,
+      option2: q.option2,
+      option3: q.option3,
+      option4: q.option4,
+      topicName: q.topicName,
+      subjectName: q.subjectName,
+      questionNumber: q.questionNumber,
+    }));
+
+  return { questions, allTopicsDistinct };
+}
 
 export const addMocktest = async (req, res) => {
   try {
@@ -40,9 +263,6 @@ export const addMocktest = async (req, res) => {
     // ─────────────────────────────────────────────
     const { examName, blueprintName } = req.body;
 
-    // 🔒 SECURITY FIX: userId ab request body se NAHI aata.
-    // Pehle koi bhi kisi aur ka userId bhej kar uske past attempts ke hisaab
-    // se "personalized" mock generate karva sakta tha (data leak + galat data).
     if (!req.user || !req.user._id) {
       return res.status(401).json({ success: false, message: "Login zaroori hai!" });
     }
@@ -56,13 +276,9 @@ export const addMocktest = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1: Blueprint dhundo — dono fields se exact match
+    // STEP 1: Blueprint dhundo
     // ─────────────────────────────────────────────
-    const blueprint = await Blueprint.findOne({
-      examName: examName,
-      blueprintName: blueprintName,
-    });
-
+    const blueprint = await Blueprint.findOne({ examName, blueprintName });
     if (!blueprint) {
       return res.status(404).json({
         success: false,
@@ -71,24 +287,11 @@ export const addMocktest = async (req, res) => {
     }
 
     // ─────────────────────────────────────────────
-    // STEP 1.5: 👇 NAYA — User ka activeCoupon nikalo, coupon-aware
-    // question-pool filter banao.
-    //
-    // Logic:
-    // - Agar student kisi batch (coupon) mein enrolled hai AUR us coupon
-    //   ka exam wahi hai jo abhi request kiya gaya hai → sirf usi batch
-    //   ke exclusive questions milenge (coupon: activeCouponId).
-    // - Agar student kisi batch mein nahi hai, YA uska activeCoupon kisi
-    //   dusre exam ka hai (jaise beech mein exam badal liya lekin batch
-    //   nahi chhoda) → global/free pool use hoga (coupon: null), taaki
-    //   mock test kabhi khaali na aaye.
+    // STEP 1.5: User ka activeCoupon nikalo (batch-scoping ke liye)
     // ─────────────────────────────────────────────
     const user = await User.findById(userId).select("activeCoupon");
     if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User nahi mila!",
-      });
+      return res.status(404).json({ success: false, message: "User nahi mila!" });
     }
 
     let activeCouponId = null;
@@ -99,71 +302,42 @@ export const addMocktest = async (req, res) => {
       }
     }
 
-    // Ye object har Question query ke $match mein spread hoga
-    const couponFilter = activeCouponId
-      ? { coupon: activeCouponId }
-      : { coupon: null };
-
     // ─────────────────────────────────────────────
-    // STEP 2: Past attempts nikalo (ab bina populate ke)
+    // STEP 2: Past attempts nikalo
     // ─────────────────────────────────────────────
-    // ⚡ SPEED FIX (Round 2) — ye is poore controller ka sabse bhaari hissa tha.
-    //
-    // PEHLE: .populate() student ke HAR purane test ke HAR sawaal ka poora
-    // record database se uthata tha. 50 test × 100 sawaal = 5,000 records —
-    // aur ye har baar hota tha jab koi student naya mock banata tha.
-    // 1 lakh students par yahi ek line server ko ghutno par la deti.
-    //
-    // AB: sirf 2 chhoti queries —
-    //   1. purane attempts se sirf questionId + sahi/galat (.lean() = halka)
-    //   2. sirf GALAT sawaalon ka subject/topic (weak topic ke liye itna hi chahiye)
-    // Jo sawaal sahi hue unka detail ab kabhi mangwaya hi nahi jata.
-    const pastAttempts = await Performance.find({
-      userId: userId,
-      examName: examName,
-    })
+    const pastAttempts = await Performance.find({ userId, examName })
       .select("attemptedQuestions.questionId attemptedQuestions.isCorrect")
       .lean();
 
     const isNewUser = pastAttempts.length === 0;
 
     // ─────────────────────────────────────────────
-    // STEP 3 + 4: Weak Topics Map + Used IDs — ek hi loop mein
-    // BUG FIX 7: topic names normalize karke store karo
-    // BUG FIX 8: usedQuestionIds sirf Performance se — generate karte waqt add NAHI
+    // STEP 3 + 4: Weak Topics Map + Used IDs
     // ─────────────────────────────────────────────
-    const weakTopicMap = {};   // { subject_normalized: { topic_normalized: wrongCount } }
-    const usedQuestionIds = new Set(); // sirf already ATTEMPTED questions
+    const weakTopicMap = {};
+    const usedQuestionIds = new Set();
 
     if (!isNewUser) {
-      // Pehla chakkar: kaunse sawaal ho chuke hain, aur kaunse GALAT hue
       const wrongQuestionIds = [];
-
       for (const attempt of pastAttempts) {
         for (const aq of attempt.attemptedQuestions || []) {
           if (!aq.questionId) continue;
-
           const idStr = aq.questionId.toString();
           usedQuestionIds.add(idStr);
-
           if (aq.isCorrect === false) wrongQuestionIds.push(idStr);
         }
       }
 
-      // Doosra chakkar: sirf galat sawaalon ka subject/topic laao.
-      // (Ek hi sawaal kai baar galat ho sakta hai — ginti attempts se hi hogi,
-      //  bilkul pehle jaisi.)
       if (wrongQuestionIds.length > 0) {
         const uniqueWrongIds = [...new Set(wrongQuestionIds)];
         const wrongMeta = await Question.find({ _id: { $in: uniqueWrongIds } })
           .select("subjectName topicName")
           .lean();
-
         const metaById = new Map(wrongMeta.map((q) => [q._id.toString(), q]));
 
         for (const idStr of wrongQuestionIds) {
           const meta = metaById.get(idStr);
-          if (!meta) continue; // sawaal delete ho chuka hai
+          if (!meta) continue;
           const subject = normalizeTopic(meta.subjectName);
           const topic = normalizeTopic(meta.topicName);
           if (subject && topic) {
@@ -177,309 +351,54 @@ export const addMocktest = async (req, res) => {
 
     // ─────────────────────────────────────────────
     // STEP 5: Har subject ke liye questions select karo
+    // 🆕 Batch mein hai to PEHLE batch-exclusive pool try, phir jo kami
+    // reh jaaye wo global (admin) pool se poori karo.
     // ─────────────────────────────────────────────
     const finalMockSubjects = [];
-    const MAX_EXTRA_PER_TOPIC = 2; // base 1 + max 2 extra = total max 3 per topic
-    const MAX_PER_TOPIC = 1 + MAX_EXTRA_PER_TOPIC; // = 3
-
-    // BUG FIX 6: usedIdsArray ek baar banao subjects loop se BAHAR
-    // Sab subjects ke liye yahi array use hoga — dobara toObjectIds call nahi
     const usedIdsArray = toObjectIds(usedQuestionIds);
+    let anyGlobalFallbackUsed = false;
 
     for (const subjectConfig of blueprint.subjects) {
-      const { subjectName, questionCount, importantTopics = [] } = subjectConfig;
+      const primaryFilter = activeCouponId ? { coupon: activeCouponId } : { coupon: null };
 
-      // BUG FIX 7: importantTopics bhi normalize karo comparison ke liye
-      const importantTopicsNorm = importantTopics.map(normalizeTopic);
-
-      // ── 5a. Ek hi aggregate mein sab topics ke questions fetch karo ──
-      // BUG FIX 3: distinct + aggregate(unused) = 2 calls, pehle 3 thein
-      // BUG FIX 4: $project PEHLE lagao — $push: "$$ROOT" se pehle sirf zaruri fields lo
-      //            Isse Mongo RAM waste nahi karega poore documents push karke
-      // BUG FIX 5+6: $sample aggregate ke andar nahi, JS-side fisherYates se random
-
-      // Phase 1: Unused questions (jo pehle attempt nahi kiye)
-      const unusedQuestions = await Question.aggregate([
-        {
-          $match: {
-            examName: { $in: [examName] },
-            subjectName: subjectName,
-            _id: { $nin: usedIdsArray },
-            ...couponFilter, // 👈 NAYA — batch-scoped ya free-pool
-          },
-        },
-        {
-          // BUG FIX 4: $project PEHLE — sirf ye fields chahiye, baaki sab skip
-          $project: {
-            _id: 1,
-            question: 1,
-            option1: 1,
-            option2: 1,
-            option3: 1,
-            option4: 1,
-            correctOption: 1,
-            topicName: 1,
-            subjectName: 1,
-            questionNumber: 1,
-          },
-        },
-        {
-          $group: {
-            _id: "$topicName",
-            questions: { $push: "$$ROOT" }, // ab sirf projected fields push hongi
-          },
-        },
-        {
-          $project: {
-            topicName: "$_id",
-            questions: { $slice: ["$questions", MAX_PER_TOPIC] },
-          },
-        },
-      ]);
-
-      // Phase 2: Fallback — jin topics ke unused questions nahi mile
-      // BUG FIX 3: distinct ki jagah unusedQuestions se hi topic list nikalo
-      const unusedTopicNames = unusedQuestions.map((g) => g._id);
-
-      // Sabhi topics dhundho — ek distinct call (unavoidable, distinct alag info deta hai)
-      const allTopicsDistinct = await Question.distinct("topicName", {
-        examName: { $in: [examName] },
-        subjectName: subjectName,
-        ...couponFilter, // 👈 NAYA
+      const primaryResult = await selectQuestionsForSubject({
+        examName,
+        subjectConfig,
+        couponFilter: primaryFilter,
+        excludeIds: usedQuestionIds,
+        weakTopicMap,
+        isNewUser,
       });
 
-      if (allTopicsDistinct.length === 0) continue; // is subject mein koi question hi nahi
+      let combinedQuestions = primaryResult.questions;
 
-      const topicsWithNoUnused = allTopicsDistinct.filter(
-        (t) => !unusedTopicNames.includes(t)
-      );
+      // 🆕 Fallback — sirf batch-students ke liye, aur sirf jab batch ka
+      // pool kam pada ho. Free/no-batch student pehle se hi global pool
+      // use kar raha hota hai (primaryFilter khud hi { coupon: null } hai),
+      // isliye unke liye ye block chalta hi nahi.
+      if (activeCouponId && combinedQuestions.length < subjectConfig.questionCount) {
+        const stillNeeded = subjectConfig.questionCount - combinedQuestions.length;
+        const alreadyPickedIds = combinedQuestions.map((q) => q._id.toString());
 
-      // BUG FIX 5: Fallback mein bhi random chahiye — JS-side shuffle karunga
-      let fallbackQuestions = [];
-      if (topicsWithNoUnused.length > 0) {
-        fallbackQuestions = await Question.aggregate([
-          {
-            $match: {
-              examName: { $in: [examName] },
-              subjectName: subjectName,
-              topicName: { $in: topicsWithNoUnused },
-              ...couponFilter, // 👈 NAYA
-            },
-          },
-          {
-            // BUG FIX 4: $project pehle yahan bhi
-            $project: {
-              _id: 1,
-              question: 1,
-              option1: 1,
-              option2: 1,
-              option3: 1,
-              option4: 1,
-              correctOption: 1,
-              topicName: 1,
-              subjectName: 1,
-              questionNumber: 1,
-            },
-          },
-          {
-            $group: {
-              _id: "$topicName",
-              questions: { $push: "$$ROOT" },
-            },
-          },
-          {
-            $project: {
-              topicName: "$_id",
-              // MAX_PER_TOPIC se zyada fetch karo taaki shuffle ke baad variety ho
-              // BUG FIX 5: zyada lo, phir JS mein shuffle karke slice karo
-              questions: { $slice: ["$questions", MAX_PER_TOPIC * 3] },
-            },
-          },
-        ]);
-      }
-
-      // Topic question pool banao: { topicName: [shuffled questions] }
-      // BUG FIX 5: dono phases mein fisherYates shuffle — deterministic nahi rahega
-      const topicQuestionPool = {};
-      for (const group of [...unusedQuestions, ...fallbackQuestions]) {
-        const topicName = group._id || group.topicName;
-        if (!topicName) continue;
-        // Shuffle karo — unused aur fallback dono
-        const shuffled = fisherYatesShuffle(group.questions);
-        // Max 3 rakhna hai
-        topicQuestionPool[topicName] = shuffled.slice(0, MAX_PER_TOPIC);
-      }
-
-      // Pointer: har topic ke liye next pick index
-      const topicPointer = {};
-      Object.keys(topicQuestionPool).forEach((t) => (topicPointer[t] = 0));
-
-      // Tracker: kitne select hue per topic
-      const topicSelectedCount = {};
-      allTopicsDistinct.forEach((t) => (topicSelectedCount[t] = 0));
-
-      // Is subject ke selected IDs — same-subject duplicate rokne ke liye
-      const selectedIdsThisSubject = new Set();
-
-      // Helper: pool se next question lo
-      const pickFromTopic = (topic) => {
-        const pool = topicQuestionPool[topic];
-        if (!pool) return null;
-        const ptr = topicPointer[topic] || 0;
-        if (ptr >= pool.length) return null;
-        const q = pool[ptr];
-        topicPointer[topic] = ptr + 1;
-        return q;
-      };
-
-      // ── 5b. BASE ALLOCATION ──
-      let baseAllocated = 0;
-
-      // BUG FIX 7: Topics sorted by weak severity (normalize karke compare)
-      let orderedTopicsForBase = [...allTopicsDistinct];
-      if (!isNewUser) {
-        const subjectNorm = normalizeTopic(subjectName);
-        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
-        orderedTopicsForBase.sort((a, b) => {
-          const wa = weakTopicsThisSubject[normalizeTopic(a)] || 0;
-          const wb = weakTopicsThisSubject[normalizeTopic(b)] || 0;
-          return wb - wa;
+        const fallbackResult = await selectQuestionsForSubject({
+          examName,
+          subjectConfig: { ...subjectConfig, questionCount: stillNeeded },
+          couponFilter: { coupon: null }, // global/admin pool
+          excludeIds: new Set([...usedQuestionIds, ...alreadyPickedIds]),
+          weakTopicMap,
+          isNewUser,
         });
-      }
 
-      for (const topic of orderedTopicsForBase) {
-        if (baseAllocated >= questionCount) break;
-
-        const q = pickFromTopic(topic);
-        if (q) {
-          const qId = q._id.toString();
-          selectedIdsThisSubject.add(qId);
-          // BUG FIX 8: usedQuestionIds mein ADD NAHI — sirf selectedIds track karo
-          topicSelectedCount[topic] = 1;
-          baseAllocated++;
+        if (fallbackResult.questions.length > 0) {
+          anyGlobalFallbackUsed = true;
+          combinedQuestions = [...combinedQuestions, ...fallbackResult.questions];
         }
       }
 
-      // ── 5c. Extra count ──
-      let extraNeeded = questionCount - baseAllocated;
-
-      // ── 5d. Extra Pool (priority + severity) ──
-      let extraTopicPool = [];
-
-      // BUG FIX 1: Agar extraNeeded === 0 ya extraTopicPool empty hoga
-      // to while loop chalega hi nahi (maxLoopIterations = 0)
-      // lekin explicit guard bhi lagao safety ke liye
-      if (extraNeeded <= 0) {
-        extraTopicPool = []; // koi extra nahi chahiye
-      } else if (isNewUser) {
-        const importantInDB = allTopicsDistinct.filter((t) =>
-          importantTopicsNorm.includes(normalizeTopic(t))
-        );
-        const nonImportantTopics = allTopicsDistinct.filter(
-          (t) => !importantTopicsNorm.includes(normalizeTopic(t))
-        );
-        extraTopicPool = [...importantInDB, ...nonImportantTopics];
-      } else {
-        const subjectNorm = normalizeTopic(subjectName);
-        const weakTopicsThisSubject = weakTopicMap[subjectNorm] || {};
-
-        const importantInDB = allTopicsDistinct.filter((t) =>
-          importantTopicsNorm.includes(normalizeTopic(t))
-        );
-
-        const p1 = importantInDB
-          .filter((t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0)
-          .sort((a, b) =>
-            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
-            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
-          );
-
-        const p2 = importantInDB.filter(
-          (t) => (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
-        );
-
-        const p3 = allTopicsDistinct
-          .filter(
-            (t) =>
-              !importantTopicsNorm.includes(normalizeTopic(t)) &&
-              (weakTopicsThisSubject[normalizeTopic(t)] || 0) > 0
-          )
-          .sort((a, b) =>
-            (weakTopicsThisSubject[normalizeTopic(b)] || 0) -
-            (weakTopicsThisSubject[normalizeTopic(a)] || 0)
-          );
-
-        const p4 = allTopicsDistinct.filter(
-          (t) =>
-            !importantTopicsNorm.includes(normalizeTopic(t)) &&
-            (weakTopicsThisSubject[normalizeTopic(t)] || 0) === 0
-        );
-
-        extraTopicPool = [...p1, ...p2, ...p3, ...p4];
-      }
-
-      // ── 5e. Extra questions lo round-robin se ──
-      // BUG FIX 1: extraTopicPool empty check EXPLICIT — 0 % 0 = NaN avoid
-      if (extraTopicPool.length > 0 && extraNeeded > 0) {
-        let extraPoolIndex = 0;
-        let loopGuard = 0;
-        const maxLoopIterations = extraTopicPool.length * MAX_EXTRA_PER_TOPIC * 2;
-
-        while (extraNeeded > 0 && loopGuard < maxLoopIterations) {
-          loopGuard++;
-
-          // BUG FIX 1: extraTopicPool.length guaranteed > 0 yahan
-          const topic = extraTopicPool[extraPoolIndex % extraTopicPool.length];
-          extraPoolIndex++;
-
-          const actualBaseCount = topicSelectedCount[topic] > 0 ? 1 : 0;
-          const currentCount = topicSelectedCount[topic] || 0;
-          const extraAlreadyTaken = currentCount - actualBaseCount;
-
-          if (extraAlreadyTaken >= MAX_EXTRA_PER_TOPIC) continue;
-
-          const q = pickFromTopic(topic);
-          if (q) {
-            const qId = q._id.toString();
-            if (!selectedIdsThisSubject.has(qId)) {
-              selectedIdsThisSubject.add(qId);
-              // BUG FIX 8: yahan bhi usedQuestionIds mein ADD NAHI
-              topicSelectedCount[topic] = (topicSelectedCount[topic] || 0) + 1;
-              extraNeeded--;
-            }
-          }
-        }
-      }
-
-      // ── 5f. Final questions — already fetched pool se nikalo (no extra DB call) ──
-      const allFetchedQuestions = [
-        ...unusedQuestions.flatMap((g) => g.questions),
-        ...fallbackQuestions.flatMap((g) => g.questions),
-      ];
-
-      // 👇 BUG FIX (security): correctOption yahan se HATA diya gaya —
-      // pehle ye seedha frontend ko chala jaata tha, aur DevTools ke
-      // Network tab mein test dete waqt hi sahi jawab dikh jaata tha.
-      // Ab isCorrect backend (addPerformence.js) khud DB se check karega.
-      const finalQuestions = allFetchedQuestions
-        .filter((q) => selectedIdsThisSubject.has(q._id.toString()))
-        .map((q) => ({
-          _id: q._id,
-          question: q.question,
-          option1: q.option1,
-          option2: q.option2,
-          option3: q.option3,
-          option4: q.option4,
-          topicName: q.topicName,
-          subjectName: q.subjectName,
-          questionNumber: q.questionNumber,
-        }));
-
-      // ── 5g. Final shuffle ──
-      const shuffledFinal = fisherYatesShuffle(finalQuestions);
+      const shuffledFinal = fisherYatesShuffle(combinedQuestions);
 
       finalMockSubjects.push({
-        subjectName,
+        subjectName: subjectConfig.subjectName,
         questionCount: shuffledFinal.length,
         questions: shuffledFinal,
       });
@@ -488,20 +407,13 @@ export const addMocktest = async (req, res) => {
     // ─────────────────────────────────────────────
     // STEP 6 + 7: Response
     // ─────────────────────────────────────────────
-    const totalActualQuestions = finalMockSubjects.reduce(
-      (sum, s) => sum + s.questions.length,
-      0
-    );
+    const totalActualQuestions = finalMockSubjects.reduce((sum, s) => sum + s.questions.length, 0);
 
-    // 🐛 BUG FIX: agar ek bhi question na mile (naya batch, ya coupon ke
-    // liye abhi questions add nahi hue) to pehle backend 200 + khaali
-    // subjects bhejta tha, aur MockTest.jsx `nonEmptySubjects[0].questions[0]`
-    // par TypeError de kar white screen ho jata tha. Ab saaf error milta hai.
     if (totalActualQuestions === 0) {
       return res.status(404).json({
         success: false,
         message: activeCouponId
-          ? "Aapki batch ke liye abhi is exam ke questions add nahi hue hain. Apne teacher se kahein."
+          ? "Aapki batch aur global bank — dono mein is exam ke liye abhi questions nahi hain. Apne teacher ya admin se kahein."
           : "Is exam/blueprint ke liye abhi questions available nahi hain.",
       });
     }
@@ -520,7 +432,11 @@ export const addMocktest = async (req, res) => {
         totalQuestionsExpected: blueprint.totalQuestions,
         totalQuestionsActual: totalActualQuestions,
         isPersonalized: !isNewUser,
-        isBatchContent: !!activeCouponId, // 👈 NAYA — frontend chahe to "batch-exclusive" badge dikha sakta hai
+        isBatchContent: !!activeCouponId,
+        // 🆕 true = kuch questions batch ke pool se kam pade the, global
+        // bank se bhare gaye. Frontend chahe to ek chhota badge/note
+        // dikha sakta hai jaise "kuch sawaal general bank se hain".
+        includesGlobalFallback: anyGlobalFallbackUsed,
         subjects: finalMockSubjects,
       },
     });

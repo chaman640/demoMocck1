@@ -17,6 +17,9 @@ const questionSchema = new mongoose.Schema(
     // Spelling thik kar di: 'answerExplain'
     answerExplain: { type: String, required: true },
     answerExplainWithPhoto: { type: String, required: false },
+    // 🆕 NAYA — optional: ye sawaal pehle kis exam/saal mein pucha ja chuka
+    // hai (jaise "UPSSSC PET 2019"). Question ke niche dikhta hai.
+    askedIn: { type: String, required: false, default: null, trim: true },
     subjectName: { type: String, required: true },
     examName: { type: [String], required: true }, 
     coupon: {

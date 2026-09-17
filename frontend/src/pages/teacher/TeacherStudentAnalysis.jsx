@@ -416,7 +416,15 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
         <span className="text-xs text-gray-500">{q.topicName}</span>
         <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>{statusLabel}</span>
       </div>
-      <p className="text-base mb-5 leading-relaxed">{q.question}</p>
+      <div className="mb-5">
+        <p className="text-base leading-relaxed">{q.question}</p>
+        {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
+        {q.askedIn && (
+          <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
+            📌 {q.askedIn}
+          </span>
+        )}
+      </div>
       <div className="space-y-2.5 mb-4">
         {[1, 2, 3, 4].map((n) => {
           const optText = q.options?.[`option${n}`];

@@ -29,6 +29,7 @@ const EMPTY_FORM = {
   option4: "",
   correctOption: "",
   answerExplain: "",
+  askedIn: "", // 🆕 optional — "UPSSSC PET 2019" jaisa
 };
 
 const TeacherAddQuestion = () => {
@@ -128,6 +129,7 @@ const TeacherAddQuestion = () => {
       fd.append("option4", form.option4.trim());
       fd.append("correctOption", form.correctOption);
       fd.append("answerExplain", form.answerExplain.trim());
+      if (form.askedIn.trim()) fd.append("askedIn", form.askedIn.trim()); // 🆕 optional
       if (questionPhoto) fd.append("questionPhoto", questionPhoto);
       if (answerPhoto) fd.append("answerExplainWithPhoto", answerPhoto);
 
@@ -258,6 +260,23 @@ const TeacherAddQuestion = () => {
                   onChange={(e) => setQuestionPhoto(e.target.files?.[0] || null)}
                   className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
                 />
+              </div>
+
+              {/* 🆕 Ye sawaal pehle kis exam/saal mein aa chuka hai — optional,
+                  student ko sawaal ke niche isi label ke roop mein dikhega */}
+              <div>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
+                  Pehle Kab Pucha Gaya? (optional)
+                </label>
+                <input
+                  type="text"
+                  name="askedIn"
+                  value={form.askedIn}
+                  onChange={handleChange}
+                  placeholder="jaise: UPSSSC PET 2019"
+                  className={inputClass}
+                />
+                <p className="text-[11px] text-gray-500 mt-1">Agar ye ek PYQ hai, to yahan bata dein — student ko sawaal ke niche dikhega.</p>
               </div>
 
               <div className="space-y-3">

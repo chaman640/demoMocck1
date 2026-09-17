@@ -347,6 +347,7 @@ export const getPerformanceAnalysis = async (req, res) => {
         isCorrect: aq.isCorrect,
         answerExplain: q ? q.answerExplain : null,
         answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
+        askedIn: q ? q.askedIn : null, // 🆕
         topicName: q ? q.topicName : null,
         subjectName: q ? q.subjectName : null,
         timeTakenInSeconds: aq.timeTakenInSeconds,
@@ -548,7 +549,7 @@ export const getTopicAnalysis = async (req, res) => {
       _id: { $in: allQuestionIds },
       subjectName: subjectName,
       topicName: topicName,
-    }).select("_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto topicName subjectName");
+    }).select("_id question option1 option2 option3 option4 correctOption answerExplain answerExplainWithPhoto askedIn topicName subjectName");
 
     const questionMap = {};
     for (const doc of questionDocs) {
@@ -593,6 +594,7 @@ export const getTopicAnalysis = async (req, res) => {
           userAnswer: aq.userAnswer,
           answerExplain: qDoc.answerExplain,
           answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
+          askedIn: qDoc.askedIn ?? null, // 🆕
           timeTakenInSeconds: aq.timeTakenInSeconds,
         };
 

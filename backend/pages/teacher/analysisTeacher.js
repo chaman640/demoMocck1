@@ -289,6 +289,7 @@ export const getStudentMockDetail = async (req, res) => {
         userAnswer: aq.userAnswer,
         isCorrect: aq.isCorrect,
         answerExplain: q ? q.answerExplain : null,
+        askedIn: q ? q.askedIn : null, // 🆕
         topicName: q ? q.topicName : null,
         subjectName: q ? q.subjectName : null,
         timeTakenInSeconds: aq.timeTakenInSeconds,
@@ -457,7 +458,7 @@ export const getStudentTopicAnalysis = async (req, res) => {
 
     const allQuestionIds = allTests.flatMap((test) => test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean));
     const questionDocs = await RowQuestion.find({ _id: { $in: allQuestionIds }, subjectName, topicName }).select(
-      "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName"
+      "_id question option1 option2 option3 option4 correctOption answerExplain askedIn topicName subjectName"
     );
 
     const questionMap = {};
@@ -491,6 +492,7 @@ export const getStudentTopicAnalysis = async (req, res) => {
           correctOption: qDoc.correctOption,
           userAnswer: aq.userAnswer,
           answerExplain: qDoc.answerExplain,
+          askedIn: qDoc.askedIn ?? null, // 🆕
           timeTakenInSeconds: aq.timeTakenInSeconds,
         };
 

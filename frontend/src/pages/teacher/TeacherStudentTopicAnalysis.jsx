@@ -188,7 +188,15 @@ const QuestionCard = ({ q }) => {
         <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>{statusLabel}</span>
         <span className="text-[10px] text-gray-500 font-mono">Time: {q.timeTakenInSeconds ?? "—"}s</span>
       </div>
-      <p className="text-sm sm:text-base text-gray-200 mb-5 leading-relaxed">{q.question}</p>
+      <div className="mb-5">
+        <p className="text-sm sm:text-base text-gray-200 leading-relaxed">{q.question}</p>
+        {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
+        {q.askedIn && (
+          <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
+            📌 {q.askedIn}
+          </span>
+        )}
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-5">
         {[1, 2, 3, 4].map((n) => {
           const isCorrect = q.correctOption === n;
