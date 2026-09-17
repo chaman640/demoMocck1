@@ -1,9 +1,15 @@
-// utils/otpService.js
-// Reusable OTP infrastructure — signup-verification aur forgot-password
-// dono isi service ko use karte hain. OTP hamesha hash karke store hota hai
-// (plaintext kabhi DB mein nahi jata), aur verify hote hi consume ho jata hai.
+// backend/utils/otpService.js
+// Reusable OTP infrastructure — signup-verification, student forgot-password,
+// aur teacher forgot-password — teenon isi service ko use karte hain. OTP
+// hamesha hash karke store hota hai (plaintext kabhi DB mein nahi jata), aur
+// verify hote hi consume ho jata hai.
+//
+// 🆕 CHANGE — pehle OTP SMS provider (2Factor/Fast2SMS) se phone par jaata
+// tha, jo paisa lagta hai. Ab free email service (nodemailer/SMTP) se email
+// par jaata hai — koi paid API key nahi chahiye.
 import bcrypt from "bcrypt";
 import Otp from "../models/Otp.js";
+import { sendOtpEmail } from "./mailer.js";
 
 const OTP_EXPIRY_MINUTES = 5;
 const RESEND_COOLDOWN_SECONDS = 60;
@@ -11,50 +17,14 @@ const MAX_VERIFY_ATTEMPTS = 5;
 
 const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
 
-const sendOtpViaSmsProvider = async (phone, otpCode) => {
-  const apiKey = process.env.FAST2SMS_API_KEY; // 2Factor API key
-
-  // 🐛 FIX: pehle key missing hone par URL ".../undefined/SMS/..." ban jata tha
-  // aur provider ka generic error 502 ban ke aata tha — debug karna mushkil.
-  // Ab saaf message milta hai ki .env mein key set nahi hai.
-  if (!apiKey) {
-    const err = new Error(
-      "SMS service configure nahi hai (backend/.env mein FAST2SMS_API_KEY set karein)."
-    );
-    err.statusCode = 500;
-    throw err;
-  }
-
-  const url = `https://2factor.in/API/V1/${apiKey}/SMS/${phone}/${otpCode}`;
-
-  // 🐛 FIX: pehle fetch ke around koi try/catch nahi tha — network fail hone par
-  // raw "fetch failed" error 500 ban jata tha. Ab friendly message.
-  let data;
-  try {
-    const response = await fetch(url);
-    data = await response.json();
-  } catch (e) {
-    console.error("SMS provider network error:", e.message);
-    const err = new Error("SMS bhejne mein network error aaya. Thodi der baad try karein.");
-    err.statusCode = 502;
-    throw err;
-  }
-
-  if (data.Status !== "Success") {
-    console.error("2Factor error:", data);
-    const err = new Error("SMS bhejne mein error aaya. Thodi der baad try karein.");
-    err.statusCode = 502;
-    throw err;
-  }
-  return data;
-};
-
 // ─────────────────────────────────────────────
-// OTP generate → hash karke DB mein save → SMS bhejo
-// Resend-cooldown enforce karta hai (spam/cost-abuse se bachne ke liye)
+// OTP generate → hash karke DB mein save → email bhejo
+// Resend-cooldown enforce karta hai (spam se bachne ke liye)
 // ─────────────────────────────────────────────
-export const createAndSendOtp = async (phone, purpose) => {
-  const recent = await Otp.findOne({ phone, purpose }).sort({ createdAt: -1 });
+export const createAndSendOtp = async (email, purpose) => {
+  const identifier = String(email).toLowerCase().trim();
+
+  const recent = await Otp.findOne({ identifier, purpose }).sort({ createdAt: -1 });
   if (recent) {
     const secondsSinceLastSend = (Date.now() - recent.createdAt.getTime()) / 1000;
     if (secondsSinceLastSend < RESEND_COOLDOWN_SECONDS) {
@@ -68,21 +38,20 @@ export const createAndSendOtp = async (phone, purpose) => {
   const otpCode = generateOtpCode();
   const otpHash = await bcrypt.hash(otpCode, 10);
 
-  await Otp.deleteMany({ phone, purpose }); // purana OTP invalidate
+  await Otp.deleteMany({ identifier, purpose }); // purana OTP invalidate
 
   const created = await Otp.create({
-    phone,
+    identifier,
     purpose,
     otpHash,
     expiresAt: new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000),
   });
 
   try {
-    await sendOtpViaSmsProvider(phone, otpCode);
+    await sendOtpEmail(identifier, otpCode, purpose);
   } catch (err) {
-    // 🐛 FIX: SMS fail hone par OTP row DB mein pada reh jata tha.
-    // Uska side-effect: agle 60 second tak resend-cooldown block kar deta tha
-    // ("kripya 55 second baad try karein") jabki user ko OTP mila hi nahi tha.
+    // Email fail hone par OTP row ko turant hata do, warna 60 second ka
+    // resend-cooldown block karega jabki user ko OTP mila hi nahi
     await Otp.deleteOne({ _id: created._id }).catch(() => {});
     throw err;
   }
@@ -93,8 +62,9 @@ export const createAndSendOtp = async (phone, purpose) => {
 // ─────────────────────────────────────────────
 // OTP verify. Match hone par record consume (delete) ho jata hai.
 // ─────────────────────────────────────────────
-export const verifyOtpCode = async (phone, purpose, inputOtp) => {
-  const record = await Otp.findOne({ phone, purpose }).sort({ createdAt: -1 });
+export const verifyOtpCode = async (email, purpose, inputOtp) => {
+  const identifier = String(email).toLowerCase().trim();
+  const record = await Otp.findOne({ identifier, purpose }).sort({ createdAt: -1 });
 
   if (!record) {
     const err = new Error("Koi OTP request nahi mili. Pehle OTP mangwayein.");

@@ -1,26 +1,30 @@
 // controllers/requestResetOtp.js
+//
+// 🆕 CHANGE — pehle phone par SMS OTP jaata tha, ab email par (free).
 import User from "../models/User.js";
 import { createAndSendOtp } from "../utils/otpService.js";
 
 export const requestResetOtp = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { email } = req.body;
 
-        if (!phone || phone.length !== 10) {
-            return res.status(400).json({ success: false, message: "Sahi 10-digit phone number dalein!" });
+        if (!email || !/^\S+@\S+\.\S+$/.test(String(email).trim())) {
+            return res.status(400).json({ success: false, message: "Sahi email address dalein!" });
         }
 
-        const user = await User.findOne({ phone });
+        const normalizedEmail = String(email).toLowerCase().trim();
+
+        const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
             return res.status(404).json({
                 success: false,
-                message: "Is phone number se koi account nahi mila.",
+                message: "Is email se koi account nahi mila.",
             });
         }
 
-        await createAndSendOtp(phone, "reset");
+        await createAndSendOtp(normalizedEmail, "reset");
 
-        return res.status(200).json({ success: true, message: "OTP bhej diya gaya hai!" });
+        return res.status(200).json({ success: true, message: "OTP email par bhej diya gaya hai!" });
     } catch (error) {
         console.error("requestResetOtp error:", error);
         return res.status(error.statusCode || 500).json({

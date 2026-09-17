@@ -40,12 +40,28 @@ import TeacherStudentSubjectAnalysis from './pages/teacher/TeacherStudentSubject
 import TeacherStudentTopicAnalysis from './pages/teacher/TeacherStudentTopicAnalysis';
 import TeacherClassAnalysis from './pages/teacher/TeacherClassAnalysis';
 import TeacherCoupons from './pages/teacher/TeacherCoupons';
+import TeacherForgotPassword from './pages/teacher/TeacherForgotPassword'; // 🆕
 
+// 🆕 Admin pages (magic-link login)
+import AdminLogin from './pages/AdminLogin';
+import AdminVerify from './pages/AdminVerify';
+import AdminPanel from './pages/AdminPanel';
+
+// 🆕 CHANGE — pehle staleTime sirf 30 second tha, matlab 30 second se
+// purana koi bhi page dobara khulte hi turant refetch ho jata tha (isliye
+// "har baar navigate karne par data reload hota hai" jaisa mehsoos hota
+// tha). Ab 2 minute — is dauraan wapas aane par cache se turant dikhega,
+// aur usi 2 minute ke baad bhi background mein khud refresh ho jayega
+// (refetchOnMount default "true" hi hai) bina screen ko blank/loading
+// dikhाye. refetchOnWindowFocus band kiya — tab switch karte hi baar baar
+// network call jaana annoying tha.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 1000,
+      staleTime: 2 * 60 * 1000, // 2 minute tak "fresh" — turant cache se dikhega
+      gcTime: 15 * 60 * 1000, // 15 minute tak cache memory mein rakha rahega
       retry: 1,
+      refetchOnWindowFocus: false,
     },
   },
 });
@@ -112,6 +128,11 @@ const App = () => {
             <Route path="/Signup" element={<Singup />} />
             <Route path="/ForgotPassword" element={<ForgotPassword />} />
 
+            {/* 🆕 Admin — passwordless magic-link login */}
+            <Route path="/AdminLogin" element={<AdminLogin />} />
+            <Route path="/AdminVerify" element={<AdminVerify />} />
+            <Route path="/AdminPanel" element={<AdminPanel />} />
+
             <Route path="/Challenge" element={<Challenge />} />
             <Route path="/Challenge/:code" element={<Challenge />} />
             <Route path="/Challenge/:code/review" element={<ChallengeReview />} />
@@ -131,6 +152,7 @@ const App = () => {
             {/* ── Teacher ── */}
             <Route path="/TeacherLogin" element={<TeacherLogin />} />
             <Route path="/TeacherSignup" element={<TeacherSignup />} />
+            <Route path="/TeacherForgotPassword" element={<TeacherForgotPassword />} /> {/* 🆕 */}
             <Route path="/AcceptInvite/:token" element={<AcceptInvite />} />
             <Route path="/TeacherDashboard" element={<TeacherDashboard />} />
             <Route path="/TeacherContent" element={<TeacherContent />} />

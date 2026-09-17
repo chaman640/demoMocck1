@@ -1,34 +1,32 @@
 // middlewares/adminOnly.js
 // ─────────────────────────────────────────────
-// KYUN BANAYI: pehle ye routes BILKUL KHULE the (koi auth nahi) —
+// Ye routes admin-only hain:
 //   /add-question, /add-bluePrint, /add-previous-year-test,
-//   /add-rank-predictor-data, /add-current-affair, /add-current-affair-quiz, /add-user
-// Matlab internet pe koi bhi banda aapke database mein questions, blueprints,
-// papers daal sakta tha ya spam kar sakta tha. Ab in par ye middleware laga hai.
+//   /add-rank-predictor-data, /add-current-affair, /add-current-affair-quiz,
+//   /admin/create-main-teacher
 //
 // ADMIN BANNE KE 2 TARIKE (.env mein set karein):
 //
 //  A) Postman / script se kaam karne ke liye  →  ADMIN_SECRET=koi_lamba_random_string
 //     Request mein header bhejein:  x-admin-secret: koi_lamba_random_string
 //
-//  B) Apne normal student account se           →  ADMIN_EMAIL=aapka@email.com
-//     Bas us account se website pe login rahein, cookie se verify ho jayega.
+//  B) 🆕 Browser se — Admin Login page (frontend) se "Send Login Link" dabao,
+//     ADMIN_EMAIL par ek magic link aata hai, click karte hi 12-ghante ki
+//     admin-session cookie (`adminToken`) set ho jaati hai. Purana tarika
+//     (student account ka email match) hata diya gaya hai — ab koi password
+//     kahin store nahi hota, har baar session khatam hone par naya email
+//     link mangwana padta hai.
 //
 // Dono mein se kam se kam EK set karna zaroori hai, warna admin routes band rahenge.
 // ─────────────────────────────────────────────
 import crypto from "crypto";
 import jwt from "jsonwebtoken";
-// 🔒 Round 1: leaked fallback secret ("mera_super_secret_key") hataya —
-// poori wajah utils/jwtSecret.js mein likhi hai.
 import { JWT_SECRET } from "../utils/jwtSecret.js";
-import User from "../models/User.js";
 
 /** Length bataye bina, constant time me do string compare karta hai. */
 const safeEqual = (a, b) => {
   const bufA = Buffer.from(String(a));
   const bufB = Buffer.from(String(b));
-  // timingSafeEqual alag lambai par throw karta hai, isliye pehle dono ko
-  // ek hi lambai ka hash bana lete hain.
   const hashA = crypto.createHash("sha256").update(bufA).digest();
   const hashB = crypto.createHash("sha256").update(bufB).digest();
   return crypto.timingSafeEqual(hashA, hashB);
@@ -39,7 +37,6 @@ export const adminOnly = async (req, res, next) => {
     const configuredSecret = process.env.ADMIN_SECRET;
     const configuredEmail = process.env.ADMIN_EMAIL;
 
-    // Agar dono hi configure nahi hain to saaf batao — silently open mat chhodo
     if (!configuredSecret && !configuredEmail) {
       return res.status(503).json({
         success: false,
@@ -49,37 +46,35 @@ export const adminOnly = async (req, res, next) => {
     }
 
     // ── Tarika A: header secret (Postman/scripts) ──
-    // 🔧 Round 1: do chhote lekin asli sudhaar —
-    //   1. header do baar aa jaye to Node ise ARRAY bana deta hai; String()
-    //      lagakar crash/bypass dono se bach rahe hain
-    //   2. `===` har character par turant ruk jata hai, jisse response ke time
-    //      se secret ek-ek akshar karke guess kiya ja sakta hai (timing attack).
-    //      timingSafeEqual hamesha poora time leta hai.
     const headerSecret = String(req.headers["x-admin-secret"] ?? "");
     if (configuredSecret && headerSecret && safeEqual(headerSecret, configuredSecret)) {
       req.isAdmin = true;
       return next();
     }
 
-    // ── Tarika B: logged-in user ka email ADMIN_EMAIL se match kare ──
-    const token = req.cookies?.token;
-    if (!token) {
+    // ── Tarika B: 🆕 admin-session cookie (magic-link se mili) ──
+    const adminToken = req.cookies?.adminToken;
+    if (!adminToken) {
       return res.status(401).json({
         success: false,
-        message: "Admin access chahiye. Login karein ya x-admin-secret header bhejein.",
+        message: "Admin access chahiye. Admin Login page se email link mangwayein, ya x-admin-secret header bhejein.",
       });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.userId).select("email");
+    let decoded;
+    try {
+      decoded = jwt.verify(adminToken, JWT_SECRET);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        message: "Admin session expire ho chuki hai. Naya login link mangwayein.",
+      });
+    }
 
-    // 🔧 Round 1: DONO taraf lowercase. Pehle sirf env wali value lowercase hoti
-    // thi — purana account jiska email DB me "Anuj@Gmail.com" tarah save hai,
-    // wo kabhi match hi nahi karta tha aur hamesha 403 milta tha (bina kisi hint ke).
     const wantEmail = String(configuredEmail || "").toLowerCase().trim();
-    const haveEmail = String(user?.email || "").toLowerCase().trim();
+    const haveEmail = String(decoded?.email || "").toLowerCase().trim();
 
-    if (!user || !wantEmail || haveEmail !== wantEmail) {
+    if (!decoded?.isAdmin || !wantEmail || haveEmail !== wantEmail) {
       return res.status(403).json({
         success: false,
         message: "Ye route sirf admin ke liye hai.",
@@ -87,7 +82,7 @@ export const adminOnly = async (req, res, next) => {
     }
 
     req.isAdmin = true;
-    req.adminUser = user;
+    req.adminEmail = decoded.email;
     return next();
   } catch (error) {
     console.error("adminOnly error:", error.message);

@@ -63,9 +63,15 @@ import {
 import { sanitizeBody } from "../middlewares/sanitize.js";
 
 // ── Teacher ───────────────────────────────────
-import { addTeacher } from "../controllers/addTeacher.js";
+// 🗑️ addTeacher (self-signup) hata diya — ab sirf admin naya Main Teacher
+// banata hai, "adminCreateMainTeacher" (neeche) ke through.
 import { loginTeacher } from "../controllers/teacherAuthentication.js";
 import { teacherInfo } from "../middlewares/teacherInfo.js";
+import { requestTeacherResetOtp, resetTeacherPassword } from "../controllers/teacherPasswordReset.js"; // 🆕
+
+// ── Admin (magic-link login) ────────────────────
+import { requestAdminLogin, verifyAdminLogin, getAdminSession, adminLogout } from "../controllers/adminAuth.js"; // 🆕
+import { adminCreateMainTeacher } from "../controllers/adminCreateMainTeacher.js"; // 🆕
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
@@ -151,14 +157,28 @@ router.post("/reset-password", signupIpLimiter, signupLimiter, resetPassword);
 
 router.get("/allExamName", allExamName);
 
-// adminLimiter, adminOnly, adminLimiter, adminOnly,
 // ═════════════════════════════════════════════
-router.post("/add-question",  processQuestionMiddleware, sanitizeBody, addQuestion);
-router.post("/add-bluePrint",  addBluePrint);
+// 🐛 SECURITY FIX: ye dono routes pehle BILKUL KHULE the (koi adminOnly
+// check hi nahi tha) — internet par koi bhi bina auth ke questions/blueprints
+// daal sakta tha. Ab dono admin-only hain, baaki add-* routes ki tarah.
+router.post("/add-question", adminLimiter, adminOnly, processQuestionMiddleware, sanitizeBody, addQuestion);
+router.post("/add-bluePrint", adminLimiter, adminOnly, addBluePrint);
 router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredictorData);
 router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
 router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
 router.post("/add-current-affair-quiz", adminLimiter, adminOnly, addCurrentAffairQuiz);
+
+// ═════════════════════════════════════════════
+// 🆕 ADMIN ROUTES — passwordless magic-link login
+// ═════════════════════════════════════════════
+// PUBLIC — koi bhi request kar sakta hai, lekin link sirf ADMIN_EMAIL par
+// jaata hai, isliye asal access sirf us inbox tak hai
+router.post("/admin/request-login", otpIpLimiter, otpLimiter, requestAdminLogin);
+router.post("/admin/verify-login", signupIpLimiter, signupLimiter, verifyAdminLogin);
+router.get("/admin/session", getAdminSession);
+router.post("/admin/logout", adminLogout);
+// Admin-only — naya Main Teacher banao (invite email jaati hai)
+router.post("/admin/create-main-teacher", adminLimiter, adminOnly, adminCreateMainTeacher);
 
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)
@@ -167,15 +187,9 @@ router.get("/me", userInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.user });
 });
 
-router.get("/is-admin", userInfo, (req, res) => {
-  // 🔧 Round 1: dono taraf lowercase. Pehle sirf env wali value lowercase hoti
-  // thi — purana account jiska email DB me "Anuj@Gmail.com" tarah save hai,
-  // wo kabhi admin match hi nahi karta tha (aur koi hint bhi nahi milta tha).
-  const configuredEmail = String(process.env.ADMIN_EMAIL || "").toLowerCase().trim();
-  const isAdminUser =
-    !!configuredEmail && String(req.user.email || "").toLowerCase().trim() === configuredEmail;
-  res.status(200).json({ success: true, isAdmin: isAdminUser });
-});
+// 🗑️ REMOVED: "/is-admin" (student-account-email based) — admin ab
+// magic-link session se hota hai (neeche "ADMIN ROUTES" section), student
+// account ka email match hone ka ab koi matlab nahi raha.
 
 router.post("/user-update", userInfo, writeLimiter, updateUserInfo);
 
@@ -255,11 +269,18 @@ router.get("/my-batch", userInfo, getMyBatch);
 // ═════════════════════════════════════════════
 // TEACHER ROUTES
 // ═════════════════════════════════════════════
-router.post("/teacher-signup", signupIpLimiter, signupLimiter, addTeacher);
+// 🗑️ REMOVED: "/teacher-signup" (Main Teacher self-signup). Ab sirf Admin
+// naya Main Teacher bana sakta hai (neeche "ADMIN ROUTES" section mein
+// "/admin/create-main-teacher") — us se invite email jaati hai, teacher
+// "/accept-invite" se hi apna account activate karta hai, sub-teacher ki
+// tarah.
 router.post("/teacher-login", loginIpLimiter, loginLimiter, loginEmailLimiter, loginTeacher);
 router.post("/teacher-logout", logoutTeacher);
 // PUBLIC — invite link se aata hai, isliye limit zaroori hai
 router.post("/accept-invite", signupIpLimiter, signupLimiter, acceptInvite);
+// 🆕 Teacher forgot-password — email OTP se (student wale jaisa hi flow)
+router.post("/teacher/request-reset-otp", otpIpLimiter, otpLimiter, requestTeacherResetOtp);
+router.post("/teacher/reset-password", signupIpLimiter, signupLimiter, resetTeacherPassword);
 
 router.get("/teacher-me", teacherInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.teacher });

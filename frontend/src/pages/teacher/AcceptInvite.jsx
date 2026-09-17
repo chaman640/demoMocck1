@@ -61,7 +61,9 @@ const AcceptInvite = () => {
           <div className="w-14 h-14 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-2xl mb-4">
             🎉
           </div>
-          <h1 className="text-2xl font-bold">Sub-Teacher Invite</h1>
+          {/* 🆕 Generic — ye page ab Main Teacher (admin invite) aur
+              Sub-Teacher (Main Teacher invite) dono ke liye use hota hai */}
+          <h1 className="text-2xl font-bold">Teacher Invite</h1>
           <p className="text-gray-400 text-sm mt-1">
             Apna account activate karne ke liye details bharein
           </p>

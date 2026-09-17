@@ -104,10 +104,10 @@ const TeacherLogin = () => {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-500 mt-6">
-            Naya Main Teacher account?{" "}
-            <Link to="/TeacherSignup" className="text-[#A78BFA] font-medium hover:underline">
-              Sign Up
+          {/* 🆕 Forgot Password link */}
+          <p className="text-center text-xs text-gray-500 mt-5">
+            <Link to="/TeacherForgotPassword" className="text-[#A78BFA] font-medium hover:underline">
+              Password bhool gaye?
             </Link>
           </p>
         </div>

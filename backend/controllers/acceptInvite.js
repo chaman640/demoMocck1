@@ -1,14 +1,12 @@
 // controllers/acceptInvite.js
-// PUBLIC route — sub-teacher ke paas abhi tak koi account/session nahi hai,
-// isliye ye teacherInfo middleware ke BINA chalega.
+// PUBLIC route — teacher (main ya sub) ke paas abhi tak koi account/session
+// nahi hai, isliye ye teacherInfo middleware ke BINA chalega.
 import bcrypt from "bcrypt";
-import { errorDetail } from "../utils/safeError.js"; // 🔒 NAYA (Round 1)
+import { errorDetail } from "../utils/safeError.js";
 import jwt from "jsonwebtoken";
-// 🔒 Round 1: leaked fallback secret ("mera_super_secret_key") hataya —
-// poori wajah utils/jwtSecret.js mein likhi hai.
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 import Teacher from "../models/Teacher.js";
-import { authCookieOptions } from "../utils/cookieOptions.js"; // 👈 NAYA
+import { authCookieOptions } from "../utils/cookieOptions.js";
 
 export const acceptInvite = async (req, res) => {
   try {
@@ -63,12 +61,18 @@ export const acceptInvite = async (req, res) => {
     if (!teacher.inviteTokenExpiry || teacher.inviteTokenExpiry < new Date()) {
       return res.status(410).json({
         success: false,
-        message: "Ye invite link expire ho chuka hai. Apne Main Teacher se naya link mangwayein.",
+        message:
+          teacher.role === "main"
+            ? "Ye invite link expire ho chuka hai. Admin se naya link mangwayein."
+            : "Ye invite link expire ho chuka hai. Apne Main Teacher se naya link mangwayein.",
       });
     }
 
     // ─────────────────────────────────────────────
     // STEP 3: Email kisi aur teacher ke paas to nahi hai
+    // 🆕 Main Teacher invite mein email pehle se hi asli hota hai (admin ne
+    // wahi diya tha), isliye check bas dusre kisi doosre teacher account se
+    // clash na ho ye dekhta hai — apna khud ka email bhi allow hai.
     // ─────────────────────────────────────────────
     const emailTaken = await Teacher.findOne({
       email: normalizedEmail,
@@ -94,10 +98,12 @@ export const acceptInvite = async (req, res) => {
     teacher.inviteToken = null;
     teacher.inviteTokenExpiry = null;
 
-    // 🐛 FIX: role explicitly "sub" set kar rahe hain. Agar kabhi purana doc
-    // bina role ke ban gaya ho to teacherInfo/checkCouponAccess mein
-    // "Aapki teacher role valid nahi hai" wala 403 aa jata tha.
-    if (teacher.role !== "sub") teacher.role = "sub";
+    // 🐛 FIX: pehle ye line role ko HAMESHA "sub" kar deti thi, chahe invite
+    // Main Teacher ka hi kyun na ho ("teacher.role !== 'sub' → 'sub'"). Isse
+    // Admin ke banaye Main Teacher invite bhi accept hote hi sub-teacher ban
+    // jaate — sirf tab default lagao jab role vaaki dono valid values mein
+    // se koi na ho (corrupted/missing data ka fallback).
+    if (teacher.role !== "sub" && teacher.role !== "main") teacher.role = "sub";
 
     await teacher.save();
 
@@ -136,7 +142,7 @@ export const acceptInvite = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Server mein error aa gaya account activate karte waqt.",
-      ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
+      ...errorDetail(error),
     });
   }
 };

@@ -89,7 +89,7 @@ const Singup = () => {
 
     setSendingOtp(true);
     try {
-      await api.post(SEND_OTP_ENDPOINT, { phone: formData.phone });
+      await api.post(SEND_OTP_ENDPOINT, { email: formData.email }); // 🆕 email par OTP
       showToast("OTP bhej diya gaya hai!");
       setStep("otp");
       setResendCooldown(60);
@@ -104,7 +104,7 @@ const Singup = () => {
     if (resendCooldown > 0) return;
     setSendingOtp(true);
     try {
-      await api.post(SEND_OTP_ENDPOINT, { phone: formData.phone });
+      await api.post(SEND_OTP_ENDPOINT, { email: formData.email }); // 🆕 email par OTP
       showToast("OTP dobara bhej diya gaya hai!");
       setResendCooldown(60);
     } catch (err) {
@@ -182,12 +182,12 @@ const Singup = () => {
       <div className="flex-1 flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6 sm:p-8">
           <h2 className="text-xl font-bold text-[#1E293B] mb-1">
-            {step === "details" ? "Account Banayein" : "Phone Verify Karein"}
+            {step === "details" ? "Account Banayein" : "Email Verify Karein"}
           </h2>
           <p className="text-xs text-[#64748B] mb-6">
             {step === "details"
-              ? "Apni details bharein, phone pe OTP bheja jayega"
-              : `${formData.phone} pe bheja gaya 6-digit code dalein`}
+              ? "Apni details bharein, email pe OTP bheja jayega"
+              : `${formData.email} pe bheja gaya 6-digit code dalein`}
           </p>
 
           {/* ══════════════ STEP 1: DETAILS FORM ══════════════ */}

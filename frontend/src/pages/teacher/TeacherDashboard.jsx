@@ -1,9 +1,16 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
 import ActiveCouponSwitcher from "../../components/ActiveCouponSwitcher";
 
+// 🆕 CHANGE — pehle ye page har baar navigate karne par useEffect se
+// dobara fetch karta tha, chahe data abhi-abhi load hua ho. Ab React Query
+// use karta hai: pehli baar load hone ke baad data cache mein rehta hai,
+// dubara is page par aane par turant (cache se) dikh jata hai, aur agar
+// data "stale" ho chuka ho (2 minute se purana) to background mein khud
+// refresh ho jata hai — UI turant blank/loading nahi dikhata.
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
 );
@@ -30,46 +37,39 @@ const StatCard = ({ label, value, sub }) => (
 
 const TeacherDashboard = () => {
   const navigate = useNavigate();
-  const [phase, setPhase] = useState("loading");
-  const [teacher, setTeacher] = useState(null);
-  const [dashboard, setDashboard] = useState(null);
-  const [errorMsg, setErrorMsg] = useState("");
+  const queryClient = useQueryClient();
 
-  const load = useCallback(async () => {
-    setPhase("loading");
-    try {
+  const { data, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["teacher-dashboard"],
+    queryFn: async () => {
       const [meRes, dashRes] = await Promise.all([
         api.get("/teacher-me"),
         api.get("/teacher/dashboard"),
       ]);
-      setTeacher(meRes.data.data);
-      setDashboard(dashRes.data.data);
-      setPhase("view");
-    } catch (err) {
-      if (err.response?.status === 401) {
-        navigate("/TeacherLogin");
-        return;
-      }
-      setErrorMsg(err.response?.data?.message || "Dashboard load nahi ho paaya.");
-      setPhase("error");
-    }
-  }, [navigate]);
+      return { teacher: meRes.data.data, dashboard: dashRes.data.data };
+    },
+    retry: (failureCount, err) => err?.response?.status !== 401 && failureCount < 1,
+  });
 
-  useEffect(() => { load(); }, [load]);
+  React.useEffect(() => {
+    if (error?.response?.status === 401) navigate("/TeacherLogin");
+  }, [error, navigate]);
 
   const handleLogout = async () => {
     try { await api.post("/teacher-logout"); } catch {}
+    queryClient.clear(); // 🆕 purane teacher ka cached data agle login mein na dikhe
     navigate("/TeacherLogin");
   };
 
-  if (phase === "loading") return <DashboardSkeleton />;
+  if (isLoading) return <DashboardSkeleton />;
 
-  if (phase === "error") {
+  if (isError || !data) {
+    if (error?.response?.status === 401) return null; // redirect ho raha hai
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{errorMsg}</p>
-          <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
+          <p className="text-gray-300">{error?.response?.data?.message || "Dashboard load nahi ho paaya."}</p>
+          <button onClick={() => refetch()} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
             Dobara Try Karein
           </button>
         </div>
@@ -78,6 +78,7 @@ const TeacherDashboard = () => {
     );
   }
 
+  const { teacher, dashboard } = data;
   const isMain = dashboard.role === "main";
 
   return (
@@ -101,8 +102,8 @@ const TeacherDashboard = () => {
           </button>
         </div>
 
-        {/* Active Batch switcher */}
-        <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={load} />
+        {/* Active Batch switcher — 🆕 batch badalne par refetch() se turant naya data aata hai */}
+        <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={refetch} />
 
         {/* ── MAIN TEACHER VIEW ── */}
         {isMain && (

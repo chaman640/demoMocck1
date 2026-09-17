@@ -1,12 +1,10 @@
 // controllers/addUser.js
 import User from "../models/User.js";
 import jwt from "jsonwebtoken";
-// 🔒 Round 1: leaked fallback secret ("mera_super_secret_key") hataya —
-// poori wajah utils/jwtSecret.js mein likhi hai.
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 import bcrypt from "bcrypt";
 import { verifyOtpCode } from "../utils/otpService.js";
-import { authCookieOptions } from "../utils/cookieOptions.js"; // 👈 NAYA
+import { authCookieOptions } from "../utils/cookieOptions.js";
 
 export const addUser = async (req, res) => {
   try {
@@ -20,8 +18,6 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 🐛 FIX: pehle backend password length check nahi karta tha — sirf frontend
-    // pe validation thi, matlab Postman se 1-char password chal jata tha.
     if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
@@ -29,8 +25,6 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 🐛 FIX: phone/email normalize karo, warna " 9876543210" jaise input se
-    // duplicate account ban sakte the (unique index bhi bach jata tha)
     const normalizedEmail = String(email).toLowerCase().trim();
     const normalizedPhone = String(phone).trim();
 
@@ -52,8 +46,8 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 3. OTP verify — galat/expire OTP par account NAHI banega
-    await verifyOtpCode(normalizedPhone, "signup", otp);
+    // 3. OTP verify — 🆕 ab email ke against verify hota hai (pehle phone tha)
+    await verifyOtpCode(normalizedEmail, "signup", otp);
 
     // 4. Password hash
     const salt = await bcrypt.genSalt(10);
@@ -77,9 +71,6 @@ export const addUser = async (req, res) => {
       { expiresIn: "7d" }
     );
 
-    // 🐛 FIX: pehle yahan `secure: true` hardcoded tha — local http dev pe
-    // browser cookie set hi nahi karta tha, isliye signup ke turant baad
-    // har API call 401 deti thi.
     return res
       .status(201)
       .cookie("token", token, authCookieOptions())
@@ -95,7 +86,6 @@ export const addUser = async (req, res) => {
         },
       });
   } catch (error) {
-    // Duplicate-key race condition
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
