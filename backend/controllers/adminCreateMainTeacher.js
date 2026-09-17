@@ -59,7 +59,7 @@ export const adminCreateMainTeacher = async (req, res) => {
     });
     await newTeacher.save();
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.FRONTEND_URL || req.headers.origin || "http://localhost:5173"; // 🆕 same fix
     const link = `${frontendUrl}/#/AcceptInvite/${inviteToken}`;
 
     await sendTeacherInviteEmail(normalizedEmail, link, { role: "main", teacherName: name });

@@ -5,6 +5,9 @@ import api from "../api/api";
 // 👆 top imports mein add karo
 import BottomNav from "../components/BottomNav";
 
+// 🆕 Naya logo (BatchMock.in rebrand)
+const LOGO_URL = "/logo.svg";
+
 // ... HomePage function ke andar, navItems array aur uska use pura hata do ...
 // ─────────────────────────────────────────────
 // Skeleton building blocks — baaki app mein jaisa pattern hai
@@ -216,10 +219,8 @@ const HomePage = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
       {/* Header */}
       <header className="flex items-center px-4 py-3.5 border-b border-gray-800">
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-xs">
-          mt
-        </div>
-        <span className="ml-2.5 text-base font-bold tracking-tight">mockTest.in</span>
+        <img src={LOGO_URL} alt="BatchMock.in" className="w-8 h-8 object-contain rounded-lg" />
+        <span className="ml-2.5 text-base font-bold tracking-tight">BatchMock.in</span>
       </header>
 
       <main className="px-4 py-5 max-w-lg mx-auto">

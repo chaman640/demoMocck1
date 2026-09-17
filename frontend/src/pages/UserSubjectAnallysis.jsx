@@ -4,6 +4,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
 
+// 🆕 Naya logo (BatchMock.in rebrand)
+const LOGO_URL = "/logo.svg";
+
 // ──────────────────────────────────────────────
 // Seconds ko readable "Xm Ys" format me convert karta hai
 // ──────────────────────────────────────────────
@@ -208,8 +211,8 @@ const UserSubjectAnallysis = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
       <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-6xl mx-auto border-b border-gray-800">
         <div onClick={() => navigate("/HomePage")} className="flex items-center gap-2 cursor-pointer">
-          <div className="w-8 h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-sm flex-shrink-0">mt</div>
-          <span className="text-base sm:text-xl font-semibold tracking-wide">mockTest.in</span>
+          <img src={LOGO_URL} alt="BatchMock.in" className="w-8 h-8 object-contain rounded flex-shrink-0" />
+          <span className="text-base sm:text-xl font-semibold tracking-wide">BatchMock.in</span>
         </div>
         <button onClick={() => navigate("/UserAllAnalysis")} className="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors flex-shrink-0">&larr; Overview</button>
       </nav>

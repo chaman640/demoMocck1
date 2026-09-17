@@ -2,6 +2,9 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../api/api";
 
+// 🆕 Naya logo (BatchMock.in rebrand)
+const LOGO_URL = "/logo.svg";
+
 const REQUEST_OTP_ENDPOINT = "/teacher/request-reset-otp";
 const RESET_PASSWORD_ENDPOINT = "/teacher/reset-password";
 
@@ -119,9 +122,7 @@ const TeacherForgotPassword = () => {
 
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-lg mb-4">
-            mt
-          </div>
+          <img src={LOGO_URL} alt="BatchMock.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">{step === "email" ? "Password Bhool Gaye?" : "Naya Password Set Karein"}</h1>
           <p className="text-gray-400 text-sm mt-1">
             {step === "email" ? "Apna registered email dalein, OTP bheja jayega" : `${email} pe bheja gaya OTP aur naya password dalein`}

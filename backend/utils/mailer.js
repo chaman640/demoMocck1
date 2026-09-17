@@ -20,7 +20,7 @@
 //   4. backend/.env mein:
 //        BREVO_API_KEY=<step 2 ki key>
 //        BREVO_SENDER_EMAIL=<step 3 wala verified email>
-//        BREVO_SENDER_NAME=mockTest.in
+//        BREVO_SENDER_NAME=BatchMock.in
 //   ⚠️ Naye Brevo account par pehla email bhejne se pehle Brevo ki taraf se
 //   ek chhota manual approval lagta hai (thodi der lag sakti hai, kabhi-kabhi
 //   kuch ghante) — agar pehla try fail ho to thodi der baad dobara try karein.
@@ -42,7 +42,7 @@ export const sendEmail = async ({ to, subject, html, text }) => {
     throw err;
   }
 
-  const senderName = process.env.BREVO_SENDER_NAME || "mockTest.in";
+  const senderName = process.env.BREVO_SENDER_NAME || "BatchMock.in";
 
   let response;
   try {
@@ -86,7 +86,7 @@ export const sendEmail = async ({ to, subject, html, text }) => {
 // ─────────────────────────────────────────────
 const wrapTemplate = (title, bodyHtml) => `
   <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px; background: #0A0D14; color: #ffffff; border-radius: 16px;">
-    <div style="font-weight: 700; font-size: 18px; margin-bottom: 20px;">mockTest.in</div>
+    <div style="font-weight: 700; font-size: 18px; margin-bottom: 20px;">BatchMock.in</div>
     <h2 style="font-size: 18px; margin: 0 0 12px;">${title}</h2>
     ${bodyHtml}
     <p style="font-size: 11px; color: #6B7280; margin-top: 24px;">Agar ye request aapne nahi ki, to is email ko ignore karein.</p>
@@ -98,21 +98,21 @@ export const sendOtpEmail = async (toEmail, otpCode, purpose) => {
     purpose === "signup" ? "Signup verify karne ke liye" : purpose === "teacher_reset" ? "Teacher password reset ke liye" : "Password reset ke liye";
   await sendEmail({
     to: toEmail,
-    subject: `${otpCode} — aapka mockTest.in OTP`,
+    subject: `${otpCode} — aapka BatchMock.in OTP`,
     html: wrapTemplate(
       purposeText,
       `<p style="font-size: 14px; color: #D1D5DB;">Aapka OTP:</p>
        <div style="font-size: 32px; font-weight: 700; letter-spacing: 8px; background: #111827; padding: 16px; border-radius: 12px; text-align: center; margin: 12px 0;">${otpCode}</div>
        <p style="font-size: 12px; color: #6B7280;">Ye OTP 5 minute mein expire ho jayega.</p>`
     ),
-    text: `Aapka mockTest.in OTP: ${otpCode} (5 minute mein expire hoga)`,
+    text: `Aapka BatchMock.in OTP: ${otpCode} (5 minute mein expire hoga)`,
   });
 };
 
 export const sendAdminMagicLinkEmail = async (toEmail, link) => {
   await sendEmail({
     to: toEmail,
-    subject: "mockTest.in Admin Login Link",
+    subject: "BatchMock.in Admin Login Link",
     html: wrapTemplate(
       "Admin login karne ke liye click karein",
       `<a href="${link}" style="display: inline-block; background: #7C3AED; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 12px 0;">Admin Panel Kholein</a>
@@ -127,7 +127,7 @@ export const sendTeacherInviteEmail = async (toEmail, link, { role, teacherName 
   const roleText = role === "main" ? "Main Teacher" : "Sub-Teacher";
   await sendEmail({
     to: toEmail,
-    subject: `mockTest.in par ${roleText} ke roop mein invite`,
+    subject: `BatchMock.in par ${roleText} ke roop mein invite`,
     html: wrapTemplate(
       `Aapko ${roleText} banaya gaya hai`,
       `<p style="font-size: 14px; color: #D1D5DB;">${teacherName ? `Namaste ${teacherName},` : "Namaste,"} apna account activate karne ke liye niche click karein aur apna password set karein.</p>

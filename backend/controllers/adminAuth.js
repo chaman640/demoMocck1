@@ -17,6 +17,17 @@ const ADMIN_SESSION_HOURS = 12;
 
 const hashToken = (raw) => crypto.createHash("sha256").update(raw).digest("hex");
 
+// 🆕 FIX — pehle sirf process.env.FRONTEND_URL use hota tha, aur wo Render
+// (ya kisi bhi production host) par set na ho to hardcoded
+// "http://localhost:5173" par gir jaata tha — email mein wahi galat link
+// chala jaata tha. Ab agar FRONTEND_URL set nahi hai, to jis domain se
+// request aayi hai wahi (browser ka "Origin" header) use hota hai — jo
+// hamesha sahi hota hai, kyunki request khud usi frontend se aa rahi hai
+// jise admin use kar raha hai.
+const resolveFrontendUrl = (req) => {
+  return process.env.FRONTEND_URL || req.headers.origin || "http://localhost:5173";
+};
+
 const adminCookieOptions = () => ({
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
@@ -64,7 +75,7 @@ export const requestAdminLogin = async (req, res) => {
       expiresAt: new Date(Date.now() + TOKEN_VALID_MINUTES * 60 * 1000),
     });
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = resolveFrontendUrl(req);
     const link = `${frontendUrl}/#/AdminVerify?token=${rawToken}`;
 
     await sendAdminMagicLinkEmail(configuredEmail, link);

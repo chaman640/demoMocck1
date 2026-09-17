@@ -112,15 +112,15 @@ const Login = () => {
         
         {/* Top Header Logo */}
         <div className="flex items-center gap-2 mb-8 self-start fixed top-8 left-12">
-          <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-7 h-7 object-contain"/>
-          <span className="text-xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
+          <img src="/logo.svg" alt="BatchMock.in" className="w-7 h-7 object-contain"/>
+          <span className="text-xl font-bold tracking-tight text-[#0F172A]">BatchMock.in</span>
         </div>
 
         <div className="flex flex-col items-center text-center max-w-xl mx-auto mt-24">
           <h1 className="text-4xl font-extrabold text-[#0F172A] tracking-tight mb-3">Welcome Back!</h1>
-          <p className="text-lg text-[#64748B] mb-8 font-normal px-4">Continue your preparation and track your success journey with mockTest.in.</p>
-          <div className="w-full max-w-[420px] px-4 aspect-[4/3] flex items-center justify-center">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
+          <p className="text-lg text-[#64748B] mb-8 font-normal px-4">Continue your preparation and track your success journey with BatchMock.in.</p>
+          <div className="w-full max-w-[420px] px-4 flex items-center justify-center">
+            <img src="/poster.svg" alt="Student preparing for exams" className="w-full h-full object-contain"/>
           </div>
         </div>
 
@@ -165,12 +165,12 @@ const Login = () => {
         {/* Mobile Logo & Main Image */}
         <div className="flex lg:hidden flex-col items-center mb-6 mt-4">
           <div className="flex items-center gap-2 mb-2">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256635/Screenshot_from_2026-07-05_18-33-30_kg15w9.png" alt="mockTest.in Logo" className="w-8 h-8 object-contain"/>
-            <span className="text-2xl font-bold tracking-tight text-[#0F172A]">mockTest.in</span>
+            <img src="/logo.svg" alt="BatchMock.in" className="w-8 h-8 object-contain"/>
+            <span className="text-2xl font-bold tracking-tight text-[#0F172A]">BatchMock.in</span>
           </div>
           <p className="text-sm text-[#64748B] mb-6 font-normal px-4 text-center">Welcome Back!</p>
-          <div className="w-full max-w-[280px] aspect-[4/3] flex items-center justify-center mb-4">
-            <img src="https://res.cloudinary.com/drbsogdpu/image/upload/v1783256456/Screenshot_from_2026-07-05_18-29-52_mzctrf.png" alt="Student Studying" className="w-full h-full object-contain mix-blend-multiply"/>
+          <div className="w-full max-w-[280px] flex items-center justify-center mb-4">
+            <img src="/poster.svg" alt="Student preparing for exams" className="w-full h-full object-contain"/>
           </div>
         </div>
 

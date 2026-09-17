@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import api from "../api/api";
 
+// 🆕 Naya logo (BatchMock.in rebrand)
+const LOGO_URL = "/logo.svg";
+
 const AdminLogin = () => {
   const [status, setStatus] = useState("idle"); // idle | sending | sent
   const [error, setError] = useState("");
@@ -29,9 +32,7 @@ const AdminLogin = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-lg mb-4">
-            mt
-          </div>
+          <img src={LOGO_URL} alt="BatchMock.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">Admin Login</h1>
           <p className="text-gray-400 text-sm mt-1">Koi password nahi — email par login link jayega</p>
         </div>

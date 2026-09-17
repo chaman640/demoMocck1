@@ -134,9 +134,7 @@ const ForgotPassword = () => {
       )}
 
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] text-white flex-col justify-center px-16">
-        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center font-bold text-2xl mb-6">
-          mt
-        </div>
+        <img src="/logo.svg" alt="BatchMock.in" className="w-14 h-14 object-contain mb-6" />
         <h1 className="text-3xl font-bold mb-3">Password Reset Karein</h1>
         <p className="text-blue-100 text-sm leading-relaxed max-w-md">
           Chinta mat karein — apna email verify karke naya password set kar sakte hain, chand seconds mein.

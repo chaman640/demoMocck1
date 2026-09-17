@@ -1,5 +1,6 @@
 // controllers/addUser.js
 import User from "../models/User.js";
+import Coupon from "../models/Coupon.js"; // 🆕 coupon-based signup ke liye
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 import bcrypt from "bcrypt";
@@ -8,13 +9,25 @@ import { authCookieOptions } from "../utils/cookieOptions.js";
 
 export const addUser = async (req, res) => {
   try {
-    const { name, email, phone, password, address, exam, otp } = req.body;
+    const { name, email, phone, password, address, exam, couponCode, otp } = req.body;
 
-    // 1. Validation
-    if (!name || !email || !phone || !password || !address || !exam || !otp) {
+    // 1. Validation — 🆕 ab "exam" ya "couponCode" mein se koi EK hona zaroori hai
+    if (!name || !email || !phone || !password || !address || !otp) {
       return res.status(400).json({
         success: false,
         message: "Sabhi fields bharna zaroori hai!",
+      });
+    }
+    if (!exam && !couponCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Exam chunein ya coupon code dalein!",
+      });
+    }
+    if (exam && couponCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Exam aur coupon code dono ek saath nahi — koi ek chunein!",
       });
     }
 
@@ -46,25 +59,46 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 3. OTP verify — 🆕 ab email ke against verify hota hai (pehle phone tha)
+    // 3. 🆕 Coupon code diya hai to usse hi exam derive karo (aur account ko
+    // seedha us batch mein enroll bhi kar do — alag se "redeem" karne ki
+    // zaroorat nahi padegi)
+    let resolvedExam = exam;
+    let coupon = null;
+    if (couponCode) {
+      coupon = await Coupon.findOne({ code: String(couponCode).trim().toUpperCase() });
+      if (!coupon) {
+        return res.status(404).json({
+          success: false,
+          message: "Ye coupon code nahi mila. Sahi code check karein.",
+        });
+      }
+      resolvedExam = coupon.exam;
+    }
+
+    // 4. OTP verify — email ke against verify hota hai
     await verifyOtpCode(normalizedEmail, "signup", otp);
 
-    // 4. Password hash
+    // 5. Password hash
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 5. Save
+    // 6. Save — 🆕 coupon wale case mein activeCoupon + couponHistory bhi
+    // yahin set ho jaata hai, seedha signup ke sath hi
     const newUser = new User({
       name: String(name).trim(),
       email: normalizedEmail,
       phone: normalizedPhone,
       password: hashedPassword,
       address: String(address).trim(),
-      exam,
+      exam: resolvedExam,
+      ...(coupon && {
+        activeCoupon: coupon._id,
+        couponHistory: [{ coupon: coupon._id, examNameAtJoin: resolvedExam, joinedAt: new Date(), leftAt: null }],
+      }),
     });
     await newUser.save();
 
-    // 6. JWT + cookie (auto-login)
+    // 7. JWT + cookie (auto-login)
     const token = jwt.sign(
       { userId: newUser._id },
       JWT_SECRET,
@@ -76,13 +110,16 @@ export const addUser = async (req, res) => {
       .cookie("token", token, authCookieOptions())
       .json({
         success: true,
-        message: "User successfully registered & logged in!",
+        message: coupon
+          ? `Account ban gaya aur '${coupon.name}' batch mein enroll ho gaye!`
+          : "User successfully registered & logged in!",
         data: {
           _id: newUser._id,
           name: newUser.name,
           email: newUser.email,
           phone: newUser.phone,
           exam: newUser.exam,
+          activeCoupon: newUser.activeCoupon || null,
         },
       });
   } catch (error) {

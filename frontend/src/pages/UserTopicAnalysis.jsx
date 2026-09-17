@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/api";
 
+// 🆕 Naya logo (BatchMock.in rebrand)
+const LOGO_URL = "/logo.svg";
+
 // ──────────────────────────────────────────────
 // Skeleton loading building blocks
 // ──────────────────────────────────────────────
@@ -227,10 +230,8 @@ const UserTopicAnalysis = () => {
           onClick={() => navigate("/HomePage")}
           className="flex items-center gap-2 cursor-pointer flex-shrink-0"
         >
-          <div className="w-7 h-7 sm:w-8 sm:h-8 rounded bg-gradient-to-br from-[#8B5CF6] to-[#6D28D9] flex items-center justify-center font-bold text-xs sm:text-sm">
-            mt
-          </div>
-          <span className="text-sm sm:text-xl font-semibold tracking-wide">mockTest.in</span>
+          <img src={LOGO_URL} alt="BatchMock.in" className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded" />
+          <span className="text-sm sm:text-xl font-semibold tracking-wide">BatchMock.in</span>
         </div>
         <button
           onClick={() =>

@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A78BFA"/>
+      <stop offset="55%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="pageGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#EDE9FE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Shield -->
+  <path d="M100,8 L176,36 L176,104 C176,152 142,180 100,193 C58,180 24,152 24,104 L24,36 Z"
+        fill="url(#shieldGrad)" stroke="#0A0D14" stroke-width="4"/>
+  <!-- Inner shield line for depth -->
+  <path d="M100,20 L166,44 L166,102 C166,144 137,168 100,180 C63,168 34,144 34,102 L34,44 Z"
+        fill="none" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="2.5"/>
+
+  <!-- Open book -->
+  <g>
+    <path d="M100,58 C92,50 72,46 58,49 L58,96 C72,93 92,97 100,105 Z" fill="url(#pageGrad)" stroke="#0A0D14" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M100,58 C108,50 128,46 142,49 L142,96 C128,93 108,97 100,105 Z" fill="url(#pageGrad)" stroke="#0A0D14" stroke-width="3" stroke-linejoin="round"/>
+    <line x1="100" y1="58" x2="100" y2="105" stroke="#0A0D14" stroke-width="3"/>
+    <!-- page lines -->
+    <path d="M65,60 L92,64 M65,70 L92,74 M65,80 L92,84" stroke="#0A0D14" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round"/>
+    <path d="M135,60 L108,64 M135,70 L108,74 M135,80 L108,84" stroke="#0A0D14" stroke-opacity="0.35" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Checkmark badge (achievement) -->
+  <circle cx="100" cy="142" r="26" fill="#0A0D14"/>
+  <circle cx="100" cy="142" r="26" fill="none" stroke="#FFFFFF" stroke-opacity="0.5" stroke-width="2"/>
+  <path d="M87,142 L97,152 L115,130" fill="none" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
