@@ -2,6 +2,7 @@
 // Student coupon code dalke apne batch (teacher-group) mein enroll hota hai.
 // Route: POST /redeem-coupon (userInfo middleware ke peeche)
 import Coupon from "../models/Coupon.js";
+import { checkAndMatchAllowedStudent } from "../utils/batchAccess.js"; // 🆕
 
 export const redeemCoupon = async (req, res) => {
   try {
@@ -33,6 +34,23 @@ export const redeemCoupon = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: `Ye coupon '${coupon.exam}' exam ke liye hai, lekin aapka current exam '${req.user.exam}' hai.`,
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // STEP 2.5: 🆕 Invite-only batch check — agar teacher ne is batch ke
+    // liye students pehle se add kiye hain, sirf unhi ka phone/email
+    // yahan pass ho payega.
+    // ─────────────────────────────────────────────
+    const accessCheck = await checkAndMatchAllowedStudent(
+      coupon._id,
+      { phone: req.user.phone, email: req.user.email },
+      req.user._id
+    );
+    if (!accessCheck.allowed) {
+      return res.status(403).json({
+        success: false,
+        message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
       });
     }
 

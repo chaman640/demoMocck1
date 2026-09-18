@@ -52,6 +52,7 @@ export const getCustomTestAttemptDetail = async (req, res) => {
           userAnswer: aq.userAnswer,
           isCorrect: aq.isCorrect,
           answerExplain: q.answerExplain || null,
+          askedIn: q.askedIn || null, // 🆕
           topicName: q.topicName,
           subjectName: q.subjectName,
           timeTakenInSeconds: aq.timeTakenInSeconds,

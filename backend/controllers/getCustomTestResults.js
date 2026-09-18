@@ -150,6 +150,7 @@ export const getCustomTestQuestionAnalysis = async (req, res) => {
           options: { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 },
           correctOption: q.correctOption,
           answerExplain: q.answerExplain,
+          askedIn: q.askedIn ?? null, // 🆕
           totalAttempts: c.total,
           unattemptedCount: c.unattempted,
           wrongCount: c.wrong,

@@ -40,6 +40,7 @@ import TeacherStudentSubjectAnalysis from './pages/teacher/TeacherStudentSubject
 import TeacherStudentTopicAnalysis from './pages/teacher/TeacherStudentTopicAnalysis';
 import TeacherClassAnalysis from './pages/teacher/TeacherClassAnalysis';
 import TeacherCoupons from './pages/teacher/TeacherCoupons';
+import TeacherBatchStudents from './pages/teacher/TeacherBatchStudents'; // 🆕
 import TeacherForgotPassword from './pages/teacher/TeacherForgotPassword'; // 🆕
 
 // 🆕 Admin pages (magic-link login)
@@ -177,6 +178,7 @@ const App = () => {
             />
             <Route path="/TeacherClassAnalysis" element={<TeacherClassAnalysis />} />
             <Route path="/TeacherCoupons" element={<TeacherCoupons />} />
+            <Route path="/TeacherBatchStudents/:couponId" element={<TeacherBatchStudents />} /> {/* 🆕 */}
 
             {/* Galat URL par blank page ke bajaye ab helpful screen */}
             <Route path="*" element={<NotFound />} />

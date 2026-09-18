@@ -246,6 +246,16 @@ const TeacherCoupons = () => {
                       {switchingId === c._id ? "Switch ho raha hai..." : "Ise Active Batch Banayein"}
                     </button>
                   )}
+
+                  {/* 🆕 Sirf Main Teacher — is batch ke allowed students manage karo */}
+                  {isMain && (
+                    <button
+                      onClick={() => navigate(`/TeacherBatchStudents/${c._id}`, { state: { batchName: c.name } })}
+                      className="w-full mt-2 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-sm font-medium"
+                    >
+                      👥 Students Manage Karein
+                    </button>
+                  )}
                 </div>
               );
             })}

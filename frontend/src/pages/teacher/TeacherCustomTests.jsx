@@ -29,6 +29,7 @@ const EMPTY_Q_FORM = {
   option4: "",
   correctOption: "",
   answerExplain: "",
+  askedIn: "", // 🆕 optional — "UPSSSC PET 2019" jaisa
 };
 
 const TeacherCustomTests = () => {
@@ -414,6 +415,16 @@ const TeacherCustomTests = () => {
                         onChange={handleQChange}
                         rows={2}
                         placeholder="Explanation (optional)"
+                        className={inputClass}
+                      />
+
+                      {/* 🆕 Ye sawaal pehle kis exam/saal mein aa chuka hai — student ko sawaal ke niche dikhega */}
+                      <input
+                        type="text"
+                        name="askedIn"
+                        value={qForm.askedIn}
+                        onChange={handleQChange}
+                        placeholder="Pehle kab pucha gaya? jaise: UPSSSC PET 2019 (optional)"
                         className={inputClass}
                       />
 

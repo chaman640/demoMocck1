@@ -76,6 +76,7 @@ import { listExamNamesAdmin, addExamName, deleteExamName } from "../controllers/
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
+import { addAllowedStudent, listAllowedStudents, deleteAllowedStudent } from "../controllers/manageAllowedStudents.js"; // 🆕
 
 import { inviteSubTeacher } from "../controllers/inviteSubTeacher.js";
 import { acceptInvite } from "../controllers/acceptInvite.js";
@@ -297,6 +298,10 @@ router.get("/teacher/dashboard", teacherInfo, getTeacherDashboard);
 // ── Coupons / group ──
 router.post("/create-coupon", teacherInfo, writeLimiter, createCoupon);
 router.get("/my-coupons", teacherInfo, getMyCoupons);
+// 🆕 Batch ke liye pre-approved students manage karna (sirf Main Teacher)
+router.post("/teacher/batch-students", teacherInfo, writeLimiter, addAllowedStudent);
+router.get("/teacher/batch-students/:couponId", teacherInfo, listAllowedStudents);
+router.delete("/teacher/batch-students/:id", teacherInfo, writeLimiter, deleteAllowedStudent);
 router.post("/switch-active-coupon", teacherInfo, switchActiveCoupon);
 
 // ── Sub-teachers ──

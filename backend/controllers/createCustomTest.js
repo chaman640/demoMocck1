@@ -129,6 +129,7 @@ export const createCustomTest = async (req, res) => {
           option4: q.option4,
           correctOption: Number(q.correctOption),
           answerExplain: q.answerExplain || "",
+          askedIn: q.askedIn ? String(q.askedIn).trim() : null, // 🆕
           topicName: normalizeSubject(q.topicName) || "General",
           subjectName: finalName,
         })),

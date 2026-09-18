@@ -6,6 +6,7 @@ import { JWT_SECRET } from "../utils/jwtSecret.js";
 import bcrypt from "bcrypt";
 import { verifyOtpCode } from "../utils/otpService.js";
 import { authCookieOptions } from "../utils/cookieOptions.js";
+import { checkAndMatchAllowedStudent } from "../utils/batchAccess.js"; // 🆕
 
 export const addUser = async (req, res) => {
   try {
@@ -73,6 +74,19 @@ export const addUser = async (req, res) => {
         });
       }
       resolvedExam = coupon.exam;
+
+      // 🆕 Invite-only batch check — signup se account create karne se
+      // PEHLE hi reject karo, taaki koi stray account na bane bina batch ke
+      const accessCheck = await checkAndMatchAllowedStudent(coupon._id, {
+        phone: normalizedPhone,
+        email: normalizedEmail,
+      });
+      if (!accessCheck.allowed) {
+        return res.status(403).json({
+          success: false,
+          message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
+        });
+      }
     }
 
     // 4. OTP verify — email ke against verify hota hai
@@ -97,6 +111,11 @@ export const addUser = async (req, res) => {
       }),
     });
     await newUser.save();
+
+    // 🆕 Ab userId mil gaya — allowed-list entry par "matched" mark kar do
+    if (coupon) {
+      await checkAndMatchAllowedStudent(coupon._id, { phone: normalizedPhone, email: normalizedEmail }, newUser._id);
+    }
 
     // 7. JWT + cookie (auto-login)
     const token = jwt.sign(

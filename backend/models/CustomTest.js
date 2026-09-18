@@ -12,6 +12,9 @@ const customTestQuestionSchema = new mongoose.Schema(
     option4: { type: String, required: [true, "Option 4 zaroori hai"] },
     correctOption: { type: Number, required: [true, "Correct option (1-4) zaroori hai"], min: 1, max: 4 },
     answerExplain: { type: String, default: "" },
+    // 🆕 NAYA — optional: ye sawaal pehle kis exam/saal mein pucha ja chuka
+    // hai (jaise "UPSSSC PET 2019"). Question ke niche dikhta hai.
+    askedIn: { type: String, default: null, trim: true },
     topicName: { type: String, default: "General" },
     subjectName: { type: String, required: true },
   },

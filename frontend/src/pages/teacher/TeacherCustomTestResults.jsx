@@ -157,7 +157,13 @@ const TeacherCustomTestResults = () => {
                       <span className="text-xs text-gray-500">Q{q.questionNumber} &middot; {q.subjectName} &middot; {q.topicName}</span>
                       <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${wrongColor(q.wrongPercentage)}`}>{q.wrongPercentage}% galat</span>
                     </div>
-                    <p className="text-sm text-gray-200 mb-4 leading-relaxed">{q.question}</p>
+                    <p className="text-sm text-gray-200 mb-1 leading-relaxed">{q.question}</p>
+                    {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
+                    {q.askedIn && (
+                      <span className="inline-block mb-4 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
+                        📌 {q.askedIn}
+                      </span>
+                    )}
 
                     <div className="space-y-2 mb-4">
                       {[1, 2, 3, 4].map((n) => {
