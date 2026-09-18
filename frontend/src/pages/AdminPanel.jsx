@@ -201,6 +201,281 @@ const ManageExamNamesCard = () => {
   );
 };
 
+// ─────────────────────────────────────────────
+// 🆕 Add Question — seedha global Question Bank mein ek sawaal add karta hai
+// (koi script nahi chahiye, seedha browser se). Subject/topic ke liye
+// suggestions diye hain taaki chhote, specific topics use ho (bade
+// combined subject naam se system sahi se kaam nahi karta — max 3
+// questions per topic hi ek mock mein aa sakte hain).
+// ─────────────────────────────────────────────
+const SUBJECT_SUGGESTIONS = [
+  "History, Geography, Economy & Polity",
+  "Reasoning, Maths & DI",
+  "Static GK, Current Affairs & Science",
+  "Hindi & English",
+];
+
+const EMPTY_QUESTION_FORM = {
+  examName: "UPSSSC PET",
+  subjectName: "",
+  topicName: "",
+  question: "",
+  option1: "",
+  option2: "",
+  option3: "",
+  option4: "",
+  correctOption: "",
+  answerExplain: "",
+  askedIn: "",
+};
+
+const AddQuestionCard = () => {
+  const [form, setForm] = useState(EMPTY_QUESTION_FORM);
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+  const [countThisSession, setCountThisSession] = useState(0);
+
+  const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!form.subjectName.trim() || !form.topicName.trim() || !form.question.trim()) {
+      setMessage("❌ Subject, Topic aur Question — teeno zaroori hain.");
+      return;
+    }
+    if (!form.option1 || !form.option2 || !form.option3 || !form.option4 || !form.correctOption) {
+      setMessage("❌ Chaaron options aur sahi answer chunna zaroori hai.");
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      const fd = new FormData();
+      fd.append("examName", form.examName.trim());
+      fd.append("subjectName", form.subjectName.trim());
+      fd.append("topicName", form.topicName.trim());
+      fd.append("question", form.question.trim());
+      fd.append("option1", form.option1.trim());
+      fd.append("option2", form.option2.trim());
+      fd.append("option3", form.option3.trim());
+      fd.append("option4", form.option4.trim());
+      fd.append("correctOption", form.correctOption);
+      fd.append("answerExplain", form.answerExplain.trim());
+      if (form.askedIn.trim()) fd.append("askedIn", form.askedIn.trim());
+
+      await api.post("/add-question", fd, { headers: { "Content-Type": "multipart/form-data" } });
+
+      setMessage("✅ Question add ho gaya!");
+      setCountThisSession((c) => c + 1);
+      // 🆕 Subject/Exam/Topic yaad rakhta hai — agla question isi topic ka
+      // daalna ho to baar-baar type nahi karna padega
+      setForm((prev) => ({
+        ...EMPTY_QUESTION_FORM,
+        examName: prev.examName,
+        subjectName: prev.subjectName,
+        topicName: prev.topicName,
+      }));
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Error aaya.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
+
+  return (
+    <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="font-semibold text-base">➕ Question Add Karein</h3>
+        {countThisSession > 0 && <span className="text-xs text-green-400">{countThisSession} is session mein add hue</span>}
+      </div>
+      <p className="text-xs text-gray-500 mb-4">Subject/Topic mein CHHOTA, SPECIFIC naam dalein (jaise "Number System", "Percentage") — bada combined naam (jaise "Elementary Arithmetic") dalne se mock test mein sirf 3 hi kabhi use honge, chahe kitne bhi daal do.</p>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name" className={inputClass} />
+
+        <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject (jaise: Reasoning, Maths & DI)" list="subject-suggestions" className={inputClass} />
+        <datalist id="subject-suggestions">
+          {SUBJECT_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
+        </datalist>
+
+        <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic — CHHOTA/specific rakhein (jaise: Number System, Percentage)" className={inputClass} />
+
+        <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Question" className={inputClass} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <input name="option1" value={form.option1} onChange={handleChange} placeholder="Option 1" className={inputClass} />
+          <input name="option2" value={form.option2} onChange={handleChange} placeholder="Option 2" className={inputClass} />
+          <input name="option3" value={form.option3} onChange={handleChange} placeholder="Option 3" className={inputClass} />
+          <input name="option4" value={form.option4} onChange={handleChange} placeholder="Option 4" className={inputClass} />
+        </div>
+
+        <select name="correctOption" value={form.correctOption} onChange={handleChange} className={inputClass}>
+          <option value="">Sahi Answer Chunein</option>
+          <option value="1">Option 1</option>
+          <option value="2">Option 2</option>
+          <option value="3">Option 3</option>
+          <option value="4">Option 4</option>
+        </select>
+
+        <textarea name="answerExplain" value={form.answerExplain} onChange={handleChange} rows={2} placeholder="Explanation (optional)" className={inputClass} />
+
+        <input name="askedIn" value={form.askedIn} onChange={handleChange} placeholder='Pehle kab pucha gaya? jaise "UPSSSC PET 2019" (optional — sirf real ho to bharein)' className={inputClass} />
+
+        <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+          {status === "submitting" ? "Add ho raha hai..." : "Question Add Karein"}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// 🆕 Add Blueprint — mock test ka dhaancha banata hai (kitne subjects,
+// har subject mein kitne questions, marks, negative marking, time).
+// Subjects ko row-by-row add karte hain — total questions apne aap
+// jud kar dikhta hai taaki galti se number mismatch na ho.
+// ─────────────────────────────────────────────
+const EMPTY_SUBJECT_ROW = { subjectName: "", questionCount: "", importantTopics: "" };
+
+const AddBlueprintCard = () => {
+  const [examName, setExamName] = useState("");
+  const [blueprintName, setBlueprintName] = useState("");
+  const [mockType, setMockType] = useState("Full");
+  const [marksPerQuestion, setMarksPerQuestion] = useState("1");
+  const [negativeMarking, setNegativeMarking] = useState("0.25");
+  const [durationMinutes, setDurationMinutes] = useState("60");
+  const [subjects, setSubjects] = useState([{ ...EMPTY_SUBJECT_ROW }]);
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+
+  const totalQuestions = subjects.reduce((sum, s) => sum + (Number(s.questionCount) || 0), 0);
+  const totalMarks = totalQuestions * (Number(marksPerQuestion) || 0);
+
+  const updateSubject = (idx, field, value) => {
+    setSubjects((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
+  };
+  const addSubjectRow = () => setSubjects((prev) => [...prev, { ...EMPTY_SUBJECT_ROW }]);
+  const removeSubjectRow = (idx) => setSubjects((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!examName.trim() || !blueprintName.trim()) {
+      setMessage("❌ Exam Name aur Blueprint Name zaroori hain.");
+      return;
+    }
+    const validSubjects = subjects.filter((s) => s.subjectName.trim() && Number(s.questionCount) > 0);
+    if (validSubjects.length === 0) {
+      setMessage("❌ Kam se kam ek subject (naam + question count ke saath) dalein.");
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      await api.post("/add-bluePrint", {
+        examName: examName.trim(),
+        blueprintName: blueprintName.trim(),
+        mockType,
+        marksPerQuestion: Number(marksPerQuestion),
+        negativeMarking: Number(negativeMarking) || 0,
+        durationMinutes: Number(durationMinutes) || 0,
+        totalQuestions,
+        subjects: validSubjects.map((s) => ({
+          subjectName: s.subjectName.trim(),
+          questionCount: Number(s.questionCount),
+          importantTopics: s.importantTopics.split(",").map((t) => t.trim()).filter(Boolean),
+        })),
+      });
+      setMessage(`✅ '${blueprintName.trim()}' blueprint ban gaya! (${totalQuestions} questions, ${totalMarks} marks)`);
+      setBlueprintName("");
+      setSubjects([{ ...EMPTY_SUBJECT_ROW }]);
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Error aaya.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
+  const smallInputClass = "px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
+
+  return (
+    <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
+      <h3 className="font-semibold text-base mb-1">📐 Blueprint Add Karein</h3>
+      <p className="text-xs text-gray-500 mb-4">Ye mock test ka dhaancha hai — kitne questions, kaunse subject mein kitne, kitna time. Ek exam ke liye "Full Mock" aur alag-alag "Mini Mock" bhi bana sakte hain.</p>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
+        <input value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} placeholder="Blueprint Name (jaise: UPSSSC PET Full Mock 1)" className={inputClass} />
+
+        <div className="grid grid-cols-2 gap-3">
+          <select value={mockType} onChange={(e) => setMockType(e.target.value)} className={inputClass}>
+            <option value="Full">Full Mock</option>
+            <option value="Mini">Mini Mock</option>
+          </select>
+          <input type="number" min="0" value={durationMinutes} onChange={(e) => setDurationMinutes(e.target.value)} placeholder="Duration (minutes)" className={inputClass} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase mb-1">Marks Per Question</label>
+            <input type="number" step="0.5" min="0" value={marksPerQuestion} onChange={(e) => setMarksPerQuestion(e.target.value)} className={inputClass} />
+          </div>
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase mb-1">Negative Marking</label>
+            <input type="number" step="0.25" min="0" value={negativeMarking} onChange={(e) => setNegativeMarking(e.target.value)} className={inputClass} />
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-4 mb-2">Subjects</p>
+          <div className="space-y-2">
+            {subjects.map((s, idx) => (
+              <div key={idx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
+                <div className="flex gap-2">
+                  <input value={s.subjectName} onChange={(e) => updateSubject(idx, "subjectName", e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${smallInputClass} flex-1`} />
+                  <input type="number" min="1" value={s.questionCount} onChange={(e) => updateSubject(idx, "questionCount", e.target.value)} placeholder="Q count" className={`${smallInputClass} w-24`} />
+                  <button type="button" onClick={() => removeSubjectRow(idx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
+                </div>
+                <input value={s.importantTopics} onChange={(e) => updateSubject(idx, "importantTopics", e.target.value)} placeholder="Is subject ke topics, comma se alag (jaise: Reasoning, Elementary Arithmetic, Graph Analysis)" className={`${smallInputClass} w-full`} />
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addSubjectRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
+            + Aur Subject Jodein
+          </button>
+        </div>
+
+        <div className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 flex items-center justify-between text-sm">
+          <span className="text-gray-400">Total (auto-calculated):</span>
+          <span className="font-semibold text-[#A78BFA]">{totalQuestions} questions · {totalMarks} marks</span>
+        </div>
+
+        <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+          {status === "submitting" ? "Bana rahe hain..." : "Blueprint Banayein"}
+        </button>
+      </form>
+    </div>
+  );
+};
+
 const AdminPanel = () => {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("checking"); // checking | ready
@@ -244,9 +519,13 @@ const AdminPanel = () => {
           </button>
         </div>
 
-        <CreateMainTeacherCard />
-
         <ManageExamNamesCard />
+
+        <AddBlueprintCard />
+
+        <AddQuestionCard />
+
+        <CreateMainTeacherCard />
 
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Content (Advanced)</p>
