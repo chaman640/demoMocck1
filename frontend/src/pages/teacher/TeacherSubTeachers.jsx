@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
-import { SubjectHints } from "../../components/SubjectPicker";
+// import { SubjectHints } from "../../components/SubjectPicker"; // 🆕 HATA DIYA — ab subjects Blueprint se dropdown/checkbox mein aate hain, hints ki zaroorat nahi
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -35,15 +35,36 @@ const TeacherSubTeachers = () => {
 
   // ── Invite form state ──
   const [invitePhone, setInvitePhone] = useState("");
-  const [assignments, setAssignments] = useState([{ couponId: "", subjectsText: "" }]);
+  const [assignments, setAssignments] = useState([{ couponId: "", subjects: [] }]);
   const [inviteError, setInviteError] = useState("");
   const [inviting, setInviting] = useState(false);
   const [inviteLink, setInviteLink] = useState("");
   const [linkCopied, setLinkCopied] = useState(false);
 
+  // 🆕 Coupon ke exam ke Blueprint subjects — cache karke rakhte hain
+  // (couponId -> [subjectName, ...]) taaki baar-baar fetch na karna pade.
+  // Ab subject FREE-TYPE nahi hota, isi list se checkbox se chuna jaata
+  // hai — taaki spelling mismatch (jo sub-teacher ko sawaal dikhna band
+  // kar deta tha) kabhi na ho.
+  const [subjectsByCoupon, setSubjectsByCoupon] = useState({});
+  const [subjectsLoadingFor, setSubjectsLoadingFor] = useState(null);
+
+  const fetchSubjectsForCoupon = useCallback(async (couponId) => {
+    if (!couponId || subjectsByCoupon[couponId]) return;
+    setSubjectsLoadingFor(couponId);
+    try {
+      const res = await api.get(`/teacher/coupon-subjects/${couponId}`);
+      setSubjectsByCoupon((prev) => ({ ...prev, [couponId]: res.data.data || [] }));
+    } catch {
+      setSubjectsByCoupon((prev) => ({ ...prev, [couponId]: [] }));
+    } finally {
+      setSubjectsLoadingFor(null);
+    }
+  }, [subjectsByCoupon]);
+
   // ── Per sub-teacher manage-state ──
   const [expandedId, setExpandedId] = useState(null);
-  const [assignForm, setAssignForm] = useState({ couponId: "", subjectsText: "" });
+  const [assignForm, setAssignForm] = useState({ couponId: "", subjects: [] });
   const [assignError, setAssignError] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [revokingKey, setRevokingKey] = useState(null); // `${subTeacherId}-${couponId}-${subject}`
@@ -86,13 +107,23 @@ const TeacherSubTeachers = () => {
 
   // ── Invite form helpers ──
   const addAssignmentRow = () => {
-    setAssignments((prev) => [...prev, { couponId: "", subjectsText: "" }]);
+    setAssignments((prev) => [...prev, { couponId: "", subjects: [] }]);
   };
   const removeAssignmentRow = (idx) => {
     setAssignments((prev) => prev.filter((_, i) => i !== idx));
   };
-  const updateAssignmentRow = (idx, field, value) => {
-    setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, [field]: value } : a)));
+  const updateAssignmentCoupon = (idx, couponId) => {
+    setAssignments((prev) => prev.map((a, i) => (i === idx ? { ...a, couponId, subjects: [] } : a)));
+    fetchSubjectsForCoupon(couponId);
+  };
+  const toggleAssignmentSubject = (idx, subject) => {
+    setAssignments((prev) =>
+      prev.map((a, i) =>
+        i === idx
+          ? { ...a, subjects: a.subjects.includes(subject) ? a.subjects.filter((s) => s !== subject) : [...a.subjects, subject] }
+          : a
+      )
+    );
   };
 
   const handleInvite = async (e) => {
@@ -107,11 +138,8 @@ const TeacherSubTeachers = () => {
 
     // Sirf wahi assignments bhejo jinme coupon + subjects dono bhare hon
     const cleanAssignments = assignments
-      .filter((a) => a.couponId && a.subjectsText.trim())
-      .map((a) => ({
-        couponId: a.couponId,
-        subjects: a.subjectsText.split(",").map((s) => s.trim()).filter(Boolean),
-      }));
+      .filter((a) => a.couponId && a.subjects.length > 0)
+      .map((a) => ({ couponId: a.couponId, subjects: a.subjects }));
 
     setInviting(true);
     try {
@@ -123,7 +151,7 @@ const TeacherSubTeachers = () => {
       const link = `${window.location.origin}${window.location.pathname}#/AcceptInvite/${token}`;
       setInviteLink(link);
       setInvitePhone("");
-      setAssignments([{ couponId: "", subjectsText: "" }]);
+      setAssignments([{ couponId: "", subjects: [] }]);
       await load();
     } catch (err) {
       setInviteError(err.response?.data?.message || "Invite nahi bhej paaye.");
@@ -141,26 +169,36 @@ const TeacherSubTeachers = () => {
   // ── Manage-access helpers ──
   const toggleExpand = (id) => {
     setExpandedId((prev) => (prev === id ? null : id));
-    setAssignForm({ couponId: "", subjectsText: "" });
+    setAssignForm({ couponId: "", subjects: [] });
     setAssignError("");
+  };
+
+  const updateAssignFormCoupon = (couponId) => {
+    setAssignForm({ couponId, subjects: [] });
+    fetchSubjectsForCoupon(couponId);
+  };
+  const toggleAssignFormSubject = (subject) => {
+    setAssignForm((prev) => ({
+      ...prev,
+      subjects: prev.subjects.includes(subject) ? prev.subjects.filter((s) => s !== subject) : [...prev.subjects, subject],
+    }));
   };
 
   const handleAssign = async (subTeacherId) => {
     setAssignError("");
-    if (!assignForm.couponId || !assignForm.subjectsText.trim()) {
+    if (!assignForm.couponId || assignForm.subjects.length === 0) {
       setAssignError("Coupon aur kam se kam ek subject zaroori hai!");
       return;
     }
-    const subjects = assignForm.subjectsText.split(",").map((s) => s.trim()).filter(Boolean);
 
     setAssigning(true);
     try {
       await api.post("/manage-coupon-access/assign", {
         subTeacherId,
         couponId: assignForm.couponId,
-        subjects,
+        subjects: assignForm.subjects,
       });
-      setAssignForm({ couponId: "", subjectsText: "" });
+      setAssignForm({ couponId: "", subjects: [] });
       await load();
     } catch (err) {
       setAssignError(err.response?.data?.message || "Access assign nahi ho paaya.");
@@ -293,40 +331,61 @@ const TeacherSubTeachers = () => {
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
                 Coupon / Subject Assign Karein (optional, baad mein bhi kar sakte hain)
               </label>
-              {/* 👇 subject ke sahi naam — galat spelling dene par sub-teacher
-                  us subject me kabhi kaam nahi kar pata tha (403) */}
-              <SubjectHints />
-              <div className="space-y-2">
-                {assignments.map((a, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <select
-                      value={a.couponId}
-                      onChange={(e) => updateAssignmentRow(idx, "couponId", e.target.value)}
-                      className="flex-1 px-3 py-2 text-xs bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white appearance-none cursor-pointer"
-                    >
-                      <option value="">Coupon chunein</option>
-                      {coupons.map((c) => (
-                        <option key={c._id} value={c._id}>{c.name}</option>
-                      ))}
-                    </select>
-                    <input
-                      type="text"
-                      value={a.subjectsText}
-                      onChange={(e) => updateAssignmentRow(idx, "subjectsText", e.target.value)}
-                      placeholder="Hindi, Maths"
-                      className="flex-1 px-3 py-2 text-xs bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600"
-                    />
-                    {assignments.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeAssignmentRow(idx)}
-                        className="text-red-400 text-sm px-2 flex-shrink-0"
-                      >
-                        ✕
-                      </button>
-                    )}
-                  </div>
-                ))}
+              {/* 🆕 Ab subject list Blueprint se aati hai (checkbox se
+                  chunte hain) — free-type nahi karte, isliye spelling
+                  mismatch (jo sub-teacher ko 403 deta tha) ab ho hi nahi sakta */}
+              <div className="space-y-3">
+                {assignments.map((a, idx) => {
+                  const subjectList = subjectsByCoupon[a.couponId] || [];
+                  return (
+                    <div key={idx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
+                      <div className="flex gap-2">
+                        <select
+                          value={a.couponId}
+                          onChange={(e) => updateAssignmentCoupon(idx, e.target.value)}
+                          className="flex-1 px-3 py-2 text-xs bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white appearance-none cursor-pointer"
+                        >
+                          <option value="">Coupon chunein</option>
+                          {coupons.map((c) => (
+                            <option key={c._id} value={c._id}>{c.name}</option>
+                          ))}
+                        </select>
+                        {assignments.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => removeAssignmentRow(idx)}
+                            className="text-red-400 text-sm px-2 flex-shrink-0"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+
+                      {a.couponId && subjectsLoadingFor === a.couponId && (
+                        <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
+                      )}
+                      {a.couponId && subjectsLoadingFor !== a.couponId && subjectList.length === 0 && (
+                        <p className="text-[11px] text-amber-400">⚠️ Is coupon ke exam ke liye koi Blueprint nahi mila — Admin se blueprint banwayein.</p>
+                      )}
+                      {subjectList.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {subjectList.map((subj) => (
+                            <button
+                              key={subj}
+                              type="button"
+                              onClick={() => toggleAssignmentSubject(idx, subj)}
+                              className={`px-2.5 py-1 rounded-full text-[11px] border ${
+                                a.subjects.includes(subj) ? "bg-[#7C3AED] border-[#7C3AED] text-white" : "bg-[#111827] border-gray-700 text-gray-400"
+                              }`}
+                            >
+                              {subj}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <button
                 type="button"
@@ -425,32 +484,49 @@ const TeacherSubTeachers = () => {
                             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
                               Naya Access Assign Karein
                             </p>
-                            <SubjectHints label="Sahi subject naam" />
                             {assignError && (
                               <p className="text-xs text-red-400 mb-2">{assignError}</p>
                             )}
-                            <div className="flex flex-col sm:flex-row gap-2">
+                            <div className="space-y-2">
                               <select
                                 value={assignForm.couponId}
-                                onChange={(e) => setAssignForm((p) => ({ ...p, couponId: e.target.value }))}
-                                className="flex-1 px-3 py-2 text-xs bg-[#111827] border border-gray-700 rounded-lg outline-none text-white appearance-none cursor-pointer"
+                                onChange={(e) => updateAssignFormCoupon(e.target.value)}
+                                className="w-full px-3 py-2 text-xs bg-[#111827] border border-gray-700 rounded-lg outline-none text-white appearance-none cursor-pointer"
                               >
                                 <option value="">Coupon chunein</option>
                                 {coupons.map((c) => (
                                   <option key={c._id} value={c._id}>{c.name}</option>
                                 ))}
                               </select>
-                              <input
-                                type="text"
-                                value={assignForm.subjectsText}
-                                onChange={(e) => setAssignForm((p) => ({ ...p, subjectsText: e.target.value }))}
-                                placeholder="Hindi, Maths"
-                                className="flex-1 px-3 py-2 text-xs bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600"
-                              />
+
+                              {/* 🆕 Subject ab checkbox se — Blueprint se aata hai, free-type nahi */}
+                              {assignForm.couponId && subjectsLoadingFor === assignForm.couponId && (
+                                <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
+                              )}
+                              {assignForm.couponId && subjectsLoadingFor !== assignForm.couponId && (subjectsByCoupon[assignForm.couponId] || []).length === 0 && (
+                                <p className="text-[11px] text-amber-400">⚠️ Is coupon ke exam ke liye koi Blueprint nahi mila — Admin se blueprint banwayein.</p>
+                              )}
+                              {(subjectsByCoupon[assignForm.couponId] || []).length > 0 && (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {(subjectsByCoupon[assignForm.couponId] || []).map((subj) => (
+                                    <button
+                                      key={subj}
+                                      type="button"
+                                      onClick={() => toggleAssignFormSubject(subj)}
+                                      className={`px-2.5 py-1 rounded-full text-[11px] border ${
+                                        assignForm.subjects.includes(subj) ? "bg-[#7C3AED] border-[#7C3AED] text-white" : "bg-[#0A0D14] border-gray-700 text-gray-400"
+                                      }`}
+                                    >
+                                      {subj}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+
                               <button
                                 onClick={() => handleAssign(t._id)}
                                 disabled={assigning}
-                                className="px-4 py-2 text-xs rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50 flex-shrink-0"
+                                className="w-full px-4 py-2 text-xs rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] disabled:opacity-50"
                               >
                                 {assigning ? "..." : "Assign"}
                               </button>

@@ -147,9 +147,11 @@ export const getCustomTestQuestionAnalysis = async (req, res) => {
           subjectName: subj.subjectName,
           topicName: q.topicName,
           question: q.question,
+          questionPhoto: q.questionPhoto || null, // 🆕
           options: { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 },
           correctOption: q.correctOption,
           answerExplain: q.answerExplain,
+          answerExplainWithPhoto: q.answerExplainWithPhoto || null, // 🆕
           askedIn: q.askedIn ?? null, // 🆕
           totalAttempts: c.total,
           unattemptedCount: c.unattempted,

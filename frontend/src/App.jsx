@@ -29,7 +29,7 @@ import AcceptInvite from './pages/teacher/AcceptInvite';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherContent from './pages/teacher/TeacherContent';
 import TeacherSubTeachers from './pages/teacher/TeacherSubTeachers';
-import TeacherAddQuestion from './pages/teacher/TeacherAddQuestion';
+// import TeacherAddQuestion from './pages/teacher/TeacherAddQuestion'; // 🆕 HATA DIYA — ab sirf Admin Question Bank mein sawaal add karta hai
 import TeacherPYQPapers from './pages/teacher/TeacherPYQPapers';
 import TeacherPYQPaperFill from './pages/teacher/TeacherPYQPaperFill';
 import TeacherCustomTests from './pages/teacher/TeacherCustomTests';
@@ -158,7 +158,7 @@ const App = () => {
             <Route path="/TeacherDashboard" element={<TeacherDashboard />} />
             <Route path="/TeacherContent" element={<TeacherContent />} />
             <Route path="/TeacherSubTeachers" element={<TeacherSubTeachers />} />
-            <Route path="/TeacherAddQuestion" element={<TeacherAddQuestion />} />
+            {/* <Route path="/TeacherAddQuestion" element={<TeacherAddQuestion />} /> */} {/* 🆕 HATA DIYA */}
             <Route path="/TeacherPYQPapers" element={<TeacherPYQPapers />} />
             <Route
               path="/TeacherPYQPaperFill/:paperId/:subjectName"

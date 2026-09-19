@@ -158,6 +158,10 @@ const TeacherCustomTestResults = () => {
                       <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${wrongColor(q.wrongPercentage)}`}>{q.wrongPercentage}% galat</span>
                     </div>
                     <p className="text-sm text-gray-200 mb-1 leading-relaxed">{q.question}</p>
+                    {/* 🆕 Question photo (agar thi) */}
+                    {q.questionPhoto && (
+                      <img src={q.questionPhoto} alt="Question" className="mb-3 max-w-full rounded-lg border border-gray-800" />
+                    )}
                     {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
                     {q.askedIn && (
                       <span className="inline-block mb-4 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
@@ -191,6 +195,10 @@ const TeacherCustomTestResults = () => {
                       <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-3">
                         <p className="text-[10px] font-semibold tracking-wider text-purple-400 uppercase mb-1.5">Explanation</p>
                         <p className="text-xs text-gray-300 leading-relaxed">{q.answerExplain}</p>
+                        {/* 🆕 Explanation photo (agar thi) */}
+                        {q.answerExplainWithPhoto && (
+                          <img src={q.answerExplainWithPhoto} alt="Explanation" className="mt-2 max-w-full rounded-lg border border-gray-700" />
+                        )}
                       </div>
                     )}
                   </div>

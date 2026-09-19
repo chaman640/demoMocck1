@@ -225,12 +225,9 @@ const ManageExamNamesCard = () => {
 // combined subject naam se system sahi se kaam nahi karta — max 3
 // questions per topic hi ek mock mein aa sakte hain).
 // ─────────────────────────────────────────────
-const SUBJECT_SUGGESTIONS = [
-  "History, Geography, Economy & Polity",
-  "Reasoning, Maths & DI",
-  "Static GK, Current Affairs & Science",
-  "Hindi & English",
-];
+// 🆕 HATA DIYA — pehle ye ek hardcoded/fixed suggestion list thi. Ab
+// subject/topic Blueprint se dynamically aate hain (neeche AddQuestionCard
+// mein /admin/exam-structure/:examName se), isliye ye ab zaroori nahi.
 
 const EMPTY_QUESTION_FORM = {
   examName: "UPSSSC PET",
@@ -256,7 +253,42 @@ const AddQuestionCard = () => {
   const [message, setMessage] = useState("");
   const [countThisSession, setCountThisSession] = useState(0);
 
+  // 🆕 Exam ka poora subject→topic tree — taaki subject/topic ab TYPE
+  // nahi, blueprint mein jo already bana hai usi mein se CHUNA jaaye.
+  // Isse spelling/spacing mismatch (jo mock test ko khaali kar deta tha)
+  // hamesha ke liye khatam ho jaata hai.
+  const [structure, setStructure] = useState(null); // { subjects: [{subjectName, topics: [...]}] } | null
+  const [structureLoading, setStructureLoading] = useState(false);
+  const [useCustomTopic, setUseCustomTopic] = useState(false); // escape-hatch — bilkul naya topic
+
+  useEffect(() => {
+    if (!form.examName.trim()) {
+      setStructure(null);
+      return;
+    }
+    let cancelled = false;
+    setStructureLoading(true);
+    api
+      .get(`/admin/exam-structure/${encodeURIComponent(form.examName.trim())}`)
+      .then((res) => { if (!cancelled) setStructure(res.data.data); })
+      .catch(() => { if (!cancelled) setStructure(null); })
+      .finally(() => { if (!cancelled) setStructureLoading(false); });
+    return () => { cancelled = true; };
+  }, [form.examName]);
+
+  const subjectOptions = structure?.subjects || [];
+  const selectedSubject = subjectOptions.find((s) => s.subjectName === form.subjectName);
+  const topicOptions = selectedSubject?.topics || [];
+
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+
+  // 🆕 Subject badalte hi topic reset — pichle subject ka topic naye
+  // subject ke saath galti se na chala jaaye
+  const handleSubjectSelect = (e) => {
+    const value = e.target.value;
+    setUseCustomTopic(false);
+    setForm((prev) => ({ ...prev, subjectName: value, topicName: "" }));
+  };
 
   // 🆕 AI ko bhejne layak demo JSON + samjhaane wala prompt, ek saath copy
   const DEMO_QUESTIONS = [
@@ -394,14 +426,54 @@ const AddQuestionCard = () => {
 
       {mode === "single" ? (
         <form onSubmit={handleSingleSubmit} className="space-y-3">
-          <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name" className={inputClass} />
+          <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
 
-          <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject (jaise: Reasoning, Maths & DI)" list="subject-suggestions" className={inputClass} />
-          <datalist id="subject-suggestions">
-            {SUBJECT_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
-          </datalist>
+          {/* 🆕 Ab subject/topic TYPE nahi, blueprint se CHUNA jaata hai —
+              isse spelling/spacing mismatch (jo mock ko khaali kar deta
+              tha) hamesha ke liye khatam ho jaata hai */}
+          {form.examName.trim() && structureLoading && (
+            <p className="text-xs text-gray-500">Blueprint check ho raha hai...</p>
+          )}
 
-          <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic — CHHOTA/specific rakhein (jaise: Number System, Percentage)" className={inputClass} />
+          {form.examName.trim() && !structureLoading && subjectOptions.length === 0 ? (
+            <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
+              ⚠️ '{form.examName}' ke liye abhi koi Blueprint nahi mila. Pehle "📐 Blueprint Add Karein" se ek banayein, phir wahi subject/topic naam yahan dropdown mein milenge.
+            </div>
+          ) : subjectOptions.length > 0 ? (
+            <>
+              <select value={form.subjectName} onChange={handleSubjectSelect} className={inputClass}>
+                <option value="">Subject Chunein</option>
+                {subjectOptions.map((s) => <option key={s.subjectName} value={s.subjectName}>{s.subjectName}</option>)}
+              </select>
+
+              {form.subjectName && !useCustomTopic && (
+                <select
+                  value={form.topicName}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") { setUseCustomTopic(true); setForm((prev) => ({ ...prev, topicName: "" })); }
+                    else handleChange(e);
+                  }}
+                  name="topicName"
+                  className={inputClass}
+                >
+                  <option value="">Topic Chunein</option>
+                  {topicOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                  <option value="__custom__">+ Naya topic likhein...</option>
+                </select>
+              )}
+              {form.subjectName && useCustomTopic && (
+                <div className="flex gap-2">
+                  <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Naya topic naam (agla Blueprint update mein isi naam se add karein)" className={`${inputClass} flex-1`} />
+                  <button type="button" onClick={() => setUseCustomTopic(false)} className="px-3 rounded-xl bg-[#1F2937] border border-gray-700 text-xs text-gray-400">List</button>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject naam (exam type karte hi dropdown ban jayega)" className={inputClass} />
+              <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic naam" className={inputClass} />
+            </>
+          )}
 
           <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Question" className={inputClass} />
 
@@ -604,7 +676,7 @@ const AddBlueprintCard = () => {
             {subjects.map((s, sIdx) => (
               <div key={sIdx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2 items-center">
-                  <input value={s.subjectName} onChange={(e) => updateSubjectName(sIdx, e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${smallInputClass} flex-1`} />
+                  <input value={s.subjectName} onChange={(e) => updateSubjectName(sIdx, e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${tinyInputClass} flex-1 min-w-0`} />
                   <span className="text-xs text-[#A78BFA] font-semibold flex-shrink-0 px-2">{subjectTotal(s)} Q</span>
                   <button type="button" onClick={() => removeSubjectRow(sIdx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
                 </div>
@@ -612,8 +684,8 @@ const AddBlueprintCard = () => {
                 <div className="pl-3 border-l-2 border-gray-800 space-y-1.5">
                   {s.topics.map((t, tIdx) => (
                     <div key={tIdx} className="flex gap-2">
-                      <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1`} />
-                      <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16`} />
+                      <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1 min-w-0`} />
+                      <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16 flex-shrink-0`} />
                       <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
                     </div>
                   ))}
@@ -683,6 +755,25 @@ const AddUnseenPassageCard = () => {
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
+  // 🆕 Blueprint naam bhi ab dropdown se — free-typing mismatch se bachne ke liye
+  const [blueprintOptions, setBlueprintOptions] = useState([]);
+  const [structureLoading, setStructureLoading] = useState(false);
+
+  useEffect(() => {
+    if (!examName.trim()) {
+      setBlueprintOptions([]);
+      return;
+    }
+    let cancelled = false;
+    setStructureLoading(true);
+    api
+      .get(`/admin/exam-structure/${encodeURIComponent(examName.trim())}`)
+      .then((res) => { if (!cancelled) setBlueprintOptions(res.data.data?.blueprints || []); })
+      .catch(() => { if (!cancelled) setBlueprintOptions([]); })
+      .finally(() => { if (!cancelled) setStructureLoading(false); });
+    return () => { cancelled = true; };
+  }, [examName]);
+
   const updateQuestion = (idx, field, value) => setQuestions((prev) => prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
   const addQuestionRow = () => setQuestions((prev) => [...prev, { ...EMPTY_PASSAGE_Q }]);
   const removeQuestionRow = (idx) => setQuestions((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
@@ -744,7 +835,22 @@ const AddUnseenPassageCard = () => {
 
       <form onSubmit={handleSubmit} className="space-y-3">
         <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
-        <input value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} placeholder="Blueprint Name — jisme ye Unseen Passage bucket bana tha" className={inputClass} />
+        {/* 🆕 Blueprint dropdown se — free text nahi, taaki naam bilkul match ho */}
+        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprints load ho rahe hain...</p>}
+        {examName.trim() && !structureLoading && blueprintOptions.length === 0 ? (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
+            ⚠️ '{examName}' ke liye koi Blueprint nahi mila. Pehle Blueprint banayein.
+          </div>
+        ) : blueprintOptions.length > 0 ? (
+          <select value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} className={inputClass}>
+            <option value="">Blueprint Chunein</option>
+            {blueprintOptions.map((b) => (
+              <option key={b.blueprintName} value={b.blueprintName}>
+                {b.blueprintName} {b.hasUnseenPassages ? "" : "(⚠️ isme Unseen Passage bucket nahi hai)"}
+              </option>
+            ))}
+          </select>
+        ) : null}
 
         <select value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass}>
           <option value="Hindi">Hindi Passage</option>

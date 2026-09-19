@@ -42,6 +42,7 @@ export const getCustomTestAttemptDetail = async (req, res) => {
         return {
           questionId: q._id,
           question: q.question,
+          questionPhoto: q.questionPhoto || null, // 🆕
           options: {
             option1: q.option1,
             option2: q.option2,
@@ -52,6 +53,7 @@ export const getCustomTestAttemptDetail = async (req, res) => {
           userAnswer: aq.userAnswer,
           isCorrect: aq.isCorrect,
           answerExplain: q.answerExplain || null,
+          answerExplainWithPhoto: q.answerExplainWithPhoto || null, // 🆕
           askedIn: q.askedIn || null, // 🆕
           topicName: q.topicName,
           subjectName: q.subjectName,

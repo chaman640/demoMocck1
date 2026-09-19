@@ -102,7 +102,10 @@ import { logoutUser } from "../controllers/logoutUser.js";
 import { hideQuestion } from "../controllers/hideQuestion.js";
 
 import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQuestion.js";
-import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js";
+// import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js"; // 🆕 HATA DIYA — ab teacher Question Bank mein sawaal add nahi karta
+import { getCouponSubjects } from "../controllers/getCouponSubjects.js"; // 🆕
+import { getExamStructure } from "../controllers/getExamStructure.js"; // 🆕
+import { uploadSingleImage, handleImageUpload } from "../utils/cloudinaryUpload.js"; // 🆕
 import { createPreviousYearPaperShell } from "../controllers/createPreviousYearPaperShell.js";
 import { fillPreviousYearPaperSubject } from "../controllers/fillPreviousYearPaperSubject.js";
 import { createCustomTest } from "../controllers/createCustomTest.js";
@@ -320,16 +323,22 @@ router.post("/manage-coupon-access/revoke", teacherInfo, writeLimiter, revokeCou
 // subject ka naam haath se type karne ki wajah se spelling galtiyan hoti thi
 // (aur poore flow chup-chaap toot jate the). Ab frontend yahan se list mangwata hai.
 router.get("/teacher/subjects", teacherInfo, getTeacherSubjects);
+// 🆕 Sub-teacher invite karte waqt is coupon ke exam ke Blueprint subjects
+router.get("/teacher/coupon-subjects/:couponId", teacherInfo, getCouponSubjects);
+// 🆕 Admin ke Question/Unseen-Passage add-forms ke liye — exam ka poora subject→topic tree
+router.get("/admin/exam-structure/:examName", adminOnly, getExamStructure);
+
+// 🆕 Standalone image upload — Custom Test builder mein photo add karne
+// ke liye (poora test JSON se banta hai, isliye photo pehle alag se
+// upload karke URL leni padti hai)
+router.post("/teacher/upload-image", teacherInfo, writeLimiter, uploadSingleImage, handleImageUpload);
+router.post("/admin/upload-image", adminLimiter, adminOnly, uploadSingleImage, handleImageUpload);
 
 // ── Content ──
-router.post(
-  "/teacher/add-question",
-  teacherInfo,
-  writeLimiter,
-  processTeacherQuestionMiddleware,
-  sanitizeBody, // 👈 multer ke baad — multipart field "subjectName[$ne]" jaisi chaal rokta hai
-  addTeacherQuestion
-);
+// 🆕 HATA DIYA — ab teacher Question Bank (jisse Mock Test banta hai)
+// mein sawaal add NAHI kar sakta, sirf ADMIN kar sakta hai. Teacher apne
+// students ke liye Custom Test se hi sawaal daal sakta hai.
+// router.post("/teacher/add-question", teacherInfo, writeLimiter, processTeacherQuestionMiddleware, sanitizeBody, addTeacherQuestion);
 
 router.post("/teacher/previous-year-paper/create-shell", teacherInfo, writeLimiter, createPreviousYearPaperShell);
 router.post("/teacher/previous-year-paper/:paperId/fill-subject", teacherInfo, writeLimiter, fillPreviousYearPaperSubject);

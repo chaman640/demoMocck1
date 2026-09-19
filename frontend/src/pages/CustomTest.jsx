@@ -923,6 +923,10 @@ const QuestionDetailCard = ({ q }) => {
 
       <div className="mb-6">
         <p className="text-base sm:text-lg leading-relaxed">{q.question}</p>
+        {/* 🆕 Question photo (agar thi) */}
+        {q.questionPhoto && (
+          <img src={q.questionPhoto} alt="Question" className="mt-3 max-w-full rounded-lg border border-gray-800" />
+        )}
         {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
         {q.askedIn && (
           <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
@@ -970,6 +974,10 @@ const QuestionDetailCard = ({ q }) => {
             Explanation
           </p>
           <p className="text-sm text-gray-300 leading-relaxed">{q.answerExplain}</p>
+          {/* 🆕 Explanation photo (agar thi) */}
+          {q.answerExplainWithPhoto && (
+            <img src={q.answerExplainWithPhoto} alt="Explanation" className="mt-3 max-w-full rounded-lg border border-gray-700" />
+          )}
         </div>
       )}
     </div>

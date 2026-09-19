@@ -23,12 +23,14 @@ const EMPTY_META = { testName: "", durationMinutes: "", marksPerQuestion: 1, neg
 const EMPTY_Q_FORM = {
   topicName: "",
   question: "",
+  questionPhoto: "", // 🆕 Cloudinary URL (upload turant hota hai, yahan URL store hoti hai)
   option1: "",
   option2: "",
   option3: "",
   option4: "",
   correctOption: "",
   answerExplain: "",
+  answerExplainWithPhoto: "", // 🆕
   askedIn: "", // 🆕 optional — "UPSSSC PET 2019" jaisa
 };
 
@@ -49,6 +51,7 @@ const TeacherCustomTests = () => {
   const [newSubjectName, setNewSubjectName] = useState("");
   const [activeSubjectIdx, setActiveSubjectIdx] = useState(null); // kaunse subject mein question add ho raha hai
   const [qForm, setQForm] = useState(EMPTY_Q_FORM);
+  const [uploadingPhoto, setUploadingPhoto] = useState(null); // 🆕 "question" | "explain" | null
 
   const [builderError, setBuilderError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -129,6 +132,25 @@ const TeacherCustomTests = () => {
   // ── Question management (active subject ke andar) ──
   const handleQChange = (e) => {
     setQForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  // 🆕 Photo select karte hi turant upload — poora test JSON se banta hai
+  // (multipart nahi), isliye photo pehle alag se upload karke URL leni
+  // padti hai, phir wahi URL qForm mein store hoti hai
+  const handlePhotoUpload = async (field, file) => {
+    if (!file) return;
+    setUploadingPhoto(field === "questionPhoto" ? "question" : "explain");
+    setBuilderError("");
+    try {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await api.post("/teacher/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setQForm((prev) => ({ ...prev, [field]: res.data.url }));
+    } catch (err) {
+      setBuilderError(err.response?.data?.message || "Photo upload nahi ho paayi.");
+    } finally {
+      setUploadingPhoto(null);
+    }
   };
 
   const addQuestionToActiveSubject = () => {
@@ -494,6 +516,20 @@ const TeacherCustomTests = () => {
                         className={inputClass}
                       />
 
+                      {/* 🆕 Question ke saath photo */}
+                      <div>
+                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Question Photo (optional)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingPhoto === "question"}
+                          onChange={(e) => handlePhotoUpload("questionPhoto", e.target.files?.[0])}
+                          className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
+                        />
+                        {uploadingPhoto === "question" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
+                        {qForm.questionPhoto && uploadingPhoto !== "question" && <p className="text-[10px] text-green-400 mt-1">✅ Photo lag gayi</p>}
+                      </div>
+
                       <div className="space-y-2">
                         {[1, 2, 3, 4].map((n) => (
                           <div key={n} className="flex items-center gap-2">
@@ -528,6 +564,20 @@ const TeacherCustomTests = () => {
                         placeholder="Explanation (optional)"
                         className={inputClass}
                       />
+
+                      {/* 🆕 Explanation ke saath photo (jaise diagram/chart) */}
+                      <div>
+                        <label className="block text-[10px] text-gray-500 uppercase mb-1">Explanation Photo (optional)</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          disabled={uploadingPhoto === "explain"}
+                          onChange={(e) => handlePhotoUpload("answerExplainWithPhoto", e.target.files?.[0])}
+                          className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
+                        />
+                        {uploadingPhoto === "explain" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
+                        {qForm.answerExplainWithPhoto && uploadingPhoto !== "explain" && <p className="text-[10px] text-green-400 mt-1">✅ Photo lag gayi</p>}
+                      </div>
 
                       {/* 🆕 Ye sawaal pehle kis exam/saal mein aa chuka hai — student ko sawaal ke niche dikhega */}
                       <input
