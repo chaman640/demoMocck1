@@ -4,43 +4,42 @@ import UnseenPassage from "../models/UnseenPassage.js";
 import Blueprint from "../models/bluePrint.js";
 
 // POST /add-unseen-passage  (admin-only)
-// Body: { examName, blueprintName, language, passageText, questions: [...] }
+// Body: { examName, subjectName, topicName, language, passageText, questions: [...] }
 export const addUnseenPassage = async (req, res) => {
   try {
-    const { examName, blueprintName, language, passageText, questions } = req.body;
+    const { examName, subjectName, topicName, language, passageText, questions } = req.body;
 
-    if (!examName || !blueprintName || !language || !passageText || !Array.isArray(questions) || questions.length === 0) {
+    if (!examName || !subjectName || !topicName || !language || !passageText || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "examName, blueprintName, language, passageText aur kam se kam ek question zaroori hai.",
+        message: "examName, subjectName, topicName, language, passageText aur kam se kam ek question zaroori hai.",
       });
     }
     if (!["Hindi", "English"].includes(language)) {
       return res.status(400).json({ success: false, message: "language 'Hindi' ya 'English' hona chahiye." });
     }
 
-    // Blueprint exist karta hai aur usmein isi language ka unseen-passage
-    // bucket maujood hai, ye confirm kar lo — taaki galti se kisi aise
-    // blueprint pe passage na ban jaaye jise iski zaroorat hi nahi
-    const blueprint = await Blueprint.findOne({ examName, blueprintName });
-    if (!blueprint) {
-      return res.status(404).json({ success: false, message: "Ye blueprint nahi mila." });
-    }
-    const hasBucket = (blueprint.unseenPassages || []).some((p) => p.language === language);
-    if (!hasBucket) {
+    // 🆕 Confirm karo ki kisi Blueprint mein isi exam ke is subject ke
+    // andar ye topic wakai "Unseen Passage" ke roop mein bana hai —
+    // taaki galti se kisi normal topic pe passage-content na chadh jaaye
+    const matchingBlueprint = await Blueprint.findOne({
+      examName,
+      subjects: {
+        $elemMatch: {
+          subjectName,
+          topics: { $elemMatch: { topicName, isUnseenPassage: true, passageLanguage: language } },
+        },
+      },
+    });
+
+    if (!matchingBlueprint) {
       return res.status(400).json({
         success: false,
-        message: `'${blueprintName}' mein '${language}' Unseen Passage ka bucket hi nahi hai. Pehle blueprint mein ye add karein.`,
+        message: `Koi Blueprint nahi mila jisme '${examName}' → '${subjectName}' subject ke andar '${topicName}' (${language}) Unseen Passage topic bana ho. Pehle Blueprint mein ye topic banayein.`,
       });
     }
 
-    const created = await UnseenPassage.create({
-      examName,
-      blueprintName,
-      language,
-      passageText,
-      questions,
-    });
+    const created = await UnseenPassage.create({ examName, subjectName, topicName, language, passageText, questions });
 
     return res.status(201).json({ success: true, message: "Unseen Passage add ho gaya!", data: created });
   } catch (error) {
@@ -49,11 +48,11 @@ export const addUnseenPassage = async (req, res) => {
   }
 };
 
-// GET /unseen-passages/:examName/:blueprintName  (admin-only)
+// GET /unseen-passages/:examName/:subjectName/:topicName  (admin-only)
 export const listUnseenPassages = async (req, res) => {
   try {
-    const { examName, blueprintName } = req.params;
-    const passages = await UnseenPassage.find({ examName, blueprintName }).sort({ createdAt: -1 });
+    const { examName, subjectName, topicName } = req.params;
+    const passages = await UnseenPassage.find({ examName, subjectName, topicName }).sort({ createdAt: -1 });
     return res.status(200).json({
       success: true,
       data: passages.map((p) => ({

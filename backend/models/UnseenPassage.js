@@ -1,11 +1,16 @@
 // models/UnseenPassage.js
 //
-// 🆕 NAYA — Ek "Unseen Passage" document mein EK passage aur uske SAARE
-// jude hue sawaal ek saath rehte hain. Jab mock generate hota hai aur
-// blueprint mein "Unseen Passage (Hindi): 5 questions" jaisi entry hoti
-// hai, system is collection se EK poora passage (uske saare sawaal
-// samet) uठा leta hai — taaki student ko sabhi sawaal usi ek passage ke
-// saath, ek block mein milein, alag-alag passage se bikhre hue nahi.
+// 🆕 v2 — Ab examName + subjectName + topicName se link hota hai (bilkul
+// regular Question pool jaisa), blueprintName se nahi. Isse ek passage
+// Full Mock aur Mini Mock dono mein use ho sakta hai, jab tak dono ke
+// blueprint mein wahi subjectName+topicName ho ("Unseen Passage (Hindi)"
+// jaisa) — bilkul jaise regular questions kaam karte hain.
+//
+// Ek document mein EK passage aur uske SAARE jude hue sawaal ek saath
+// rehte hain. Jab mock generate hota hai aur kisi subject ke andar
+// "Unseen Passage (Hindi)" naam ka topic hota hai, system is collection
+// se EK poora passage (uske saare sawaal samet) uठा leta hai — taaki
+// student ko sabhi sawaal usi ek passage ke saath, ek block mein milein.
 import mongoose from "mongoose";
 import { rowQuestionConnection } from "../config/rowQuestion.js";
 
@@ -25,10 +30,10 @@ const passageQuestionSchema = new mongoose.Schema(
 const unseenPassageSchema = new mongoose.Schema(
   {
     examName: { type: String, required: true, trim: true },
-    // Kis blueprint ke liye hai — taaki mock-generation sirf usi
-    // blueprint ke passages mein se chune, kisi doosre exam/blueprint
-    // ka passage galti se na aa jaaye
-    blueprintName: { type: String, required: true, trim: true },
+    // 🆕 Blueprint ke subject/topic ke EXACT naam se match — jaise
+    // subjectName="Hindi & English", topicName="Unseen Passage (Hindi)"
+    subjectName: { type: String, required: true, trim: true },
+    topicName: { type: String, required: true, trim: true },
     language: { type: String, enum: ["Hindi", "English"], required: true },
     passageText: { type: String, required: true },
     questions: {

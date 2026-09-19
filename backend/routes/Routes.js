@@ -173,7 +173,7 @@ router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredicto
 router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
 // 🆕 Unseen Passage — admin-only
 router.post("/add-unseen-passage", adminLimiter, adminOnly, addUnseenPassage);
-router.get("/unseen-passages/:examName/:blueprintName", adminOnly, listUnseenPassages);
+router.get("/unseen-passages/:examName/:subjectName/:topicName", adminOnly, listUnseenPassages);
 router.delete("/unseen-passages/:id", adminLimiter, adminOnly, deleteUnseenPassage);
 router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
 router.post("/add-current-affair-quiz", adminLimiter, adminOnly, addCurrentAffairQuiz);

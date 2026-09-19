@@ -11,7 +11,6 @@ export const addBluePrint = async (req, res) => {
             negativeMarking,
             durationMinutes,
             subjects,
-            unseenPassages, // 🆕 — pehle ye field controller mein hi nahi tha, isliye chup-chaap ignore ho jaata tha
             mockType
         } = req.body;
 
@@ -32,10 +31,11 @@ export const addBluePrint = async (req, res) => {
         }
 
         // 3. Naya Blueprint Document banayein
-        // 🆕 Yahan se hierarchy (totalQuestions = subjects + unseenPassages ka
-        // sum, aur har subject.questionCount = uske topics ka sum) khud Model
-        // ke pre("validate") hook mein check hoti hai — agar numbers match
-        // nahi karte to .save() khud hi saaf error de dega.
+        // 🆕 Yahan se hierarchy (totalQuestions = subjects ka sum, aur har
+        // subject.questionCount = uske topics ka sum — Unseen Passage bhi
+        // ek normal topic hi hai) khud Model ke pre("validate") hook mein
+        // check hoti hai — agar numbers match nahi karte to .save() khud hi
+        // saaf error de dega.
         const newBlueprint = new Blueprint({
             blueprintName,
             examName,
@@ -44,7 +44,6 @@ export const addBluePrint = async (req, res) => {
             negativeMarking: negativeMarking ?? 0,
             durationMinutes: durationMinutes ?? 0,
             subjects,
-            unseenPassages: unseenPassages ?? [], // 🆕
             mockType: mockType ?? "Full"
         });
 

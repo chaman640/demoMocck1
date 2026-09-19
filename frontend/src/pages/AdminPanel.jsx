@@ -278,7 +278,12 @@ const AddQuestionCard = () => {
 
   const subjectOptions = structure?.subjects || [];
   const selectedSubject = subjectOptions.find((s) => s.subjectName === form.subjectName);
-  const topicOptions = selectedSubject?.topics || [];
+  // 🆕 BUG FIX: "Unseen Passage" topics yahan se hata diye — agar in par
+  // koi normal sawaal daal diya jaaye, to wo hamesha ke liye invisible ho
+  // jaata (mock-generator is topic ke liye Question pool dekhta hi nahi,
+  // seedha UnseenPassage collection dekhta hai). Aise sawaal add karne ke
+  // liye "📖 Unseen Passage Add Karein" card use karein.
+  const topicOptions = (selectedSubject?.topics || []).filter((t) => !t.isUnseenPassage);
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -457,7 +462,7 @@ const AddQuestionCard = () => {
                   className={inputClass}
                 >
                   <option value="">Topic Chunein</option>
-                  {topicOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                  {topicOptions.map((t) => <option key={t.topicName} value={t.topicName}>{t.topicName}</option>)}
                   <option value="__custom__">+ Naya topic likhein...</option>
                 </select>
               )}
@@ -544,7 +549,7 @@ const AddQuestionCard = () => {
 // Ab jo yahan likhoge, mock mein WAHI utna hi milega — koi hidden limit
 // nahi. Unseen Passage ke liye alag section hai.
 // ─────────────────────────────────────────────
-const EMPTY_TOPIC_ROW = { topicName: "", questionCount: "" };
+const EMPTY_TOPIC_ROW = { topicName: "", questionCount: "", isUnseenPassage: false, passageLanguage: "Hindi" };
 const EMPTY_SUBJECT_ROW = () => ({ subjectName: "", topics: [{ ...EMPTY_TOPIC_ROW }] });
 
 const AddBlueprintCard = () => {
@@ -555,14 +560,19 @@ const AddBlueprintCard = () => {
   const [negativeMarking, setNegativeMarking] = useState("0.25");
   const [durationMinutes, setDurationMinutes] = useState("60");
   const [subjects, setSubjects] = useState([EMPTY_SUBJECT_ROW()]);
-  const [unseenPassages, setUnseenPassages] = useState([]); // 🆕 [{language, questionCount}]
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
-  const subjectTotal = (s) => s.topics.reduce((sum, t) => sum + (Number(t.questionCount) || 0), 0);
-  const subjectsGrandTotal = subjects.reduce((sum, s) => sum + subjectTotal(s), 0);
-  const passagesGrandTotal = unseenPassages.reduce((sum, p) => sum + (Number(p.questionCount) || 0), 0);
-  const totalQuestions = subjectsGrandTotal + passagesGrandTotal;
+  // 🆕 BUG FIX: Pehle "total" (display ke liye) SAARE topics se calculate
+  // hota tha, lekin submit karte waqt sirf VALID topics (jinme naam AUR
+  // count dono bhare hon) bhejte the — agar koi adhoora row ho (jaise
+  // count bhara ho par naam khaali), to dikhne wala total aur asal mein
+  // submit hone wala total ALAG ho jaata tha, aur backend "numbers match
+  // nahi karte" wala confusing error deta tha. Ab dono jagah EK hi
+  // "valid topics" list use hoti hai, taaki jo dikhe wahi submit ho.
+  const getValidTopics = (s) => s.topics.filter((t) => t.topicName.trim() && Number(t.questionCount) > 0);
+  const subjectTotal = (s) => getValidTopics(s).reduce((sum, t) => sum + Number(t.questionCount), 0);
+  const totalQuestions = subjects.reduce((sum, s) => sum + subjectTotal(s), 0);
   const totalMarks = totalQuestions * (Number(marksPerQuestion) || 0);
 
   const updateSubjectName = (idx, value) => setSubjects((prev) => prev.map((s, i) => (i === idx ? { ...s, subjectName: value } : s)));
@@ -575,12 +585,36 @@ const AddBlueprintCard = () => {
   const removeTopicRow = (sIdx, tIdx) =>
     setSubjects((prev) => prev.map((s, i) => (i === sIdx ? { ...s, topics: s.topics.length > 1 ? s.topics.filter((_, ti) => ti !== tIdx) : s.topics } : s)));
 
-  const addPassageBucket = (language) => {
-    if (unseenPassages.some((p) => p.language === language)) return;
-    setUnseenPassages((prev) => [...prev, { language, questionCount: "" }]);
+  // 🆕 Topic ko "Unseen Passage" type mein toggle karna — topicName
+  // khud-ba-khud "Unseen Passage (Hindi/English)" ban jaata hai taaki
+  // baad mein Unseen Passage content isi naam se link ho sake
+  const toggleUnseenPassage = (sIdx, tIdx) => {
+    setSubjects((prev) =>
+      prev.map((s, i) => {
+        if (i !== sIdx) return s;
+        return {
+          ...s,
+          topics: s.topics.map((t, ti) => {
+            if (ti !== tIdx) return t;
+            const nowPassage = !t.isUnseenPassage;
+            return {
+              ...t,
+              isUnseenPassage: nowPassage,
+              topicName: nowPassage ? `Unseen Passage (${t.passageLanguage || "Hindi"})` : "",
+            };
+          }),
+        };
+      })
+    );
   };
-  const updatePassageCount = (language, value) => setUnseenPassages((prev) => prev.map((p) => (p.language === language ? { ...p, questionCount: value } : p)));
-  const removePassageBucket = (language) => setUnseenPassages((prev) => prev.filter((p) => p.language !== language));
+  const updatePassageLanguage = (sIdx, tIdx, language) =>
+    setSubjects((prev) =>
+      prev.map((s, i) =>
+        i === sIdx
+          ? { ...s, topics: s.topics.map((t, ti) => (ti === tIdx ? { ...t, passageLanguage: language, topicName: `Unseen Passage (${language})` } : t)) }
+          : s
+      )
+    );
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -596,7 +630,12 @@ const AddBlueprintCard = () => {
       .map((s) => ({
         subjectName: s.subjectName.trim(),
         questionCount: subjectTotal(s),
-        topics: s.topics.filter((t) => t.topicName.trim() && Number(t.questionCount) > 0).map((t) => ({ topicName: t.topicName.trim(), questionCount: Number(t.questionCount) })),
+        topics: getValidTopics(s).map((t) => ({
+          topicName: t.topicName.trim(),
+          questionCount: Number(t.questionCount),
+          isUnseenPassage: !!t.isUnseenPassage,
+          passageLanguage: t.isUnseenPassage ? t.passageLanguage : null,
+        })),
       }))
       .filter((s) => s.topics.length > 0);
 
@@ -604,8 +643,6 @@ const AddBlueprintCard = () => {
       setMessage("❌ Kam se kam ek subject, ek topic aur uska question count dalein.");
       return;
     }
-
-    const cleanPassages = unseenPassages.filter((p) => Number(p.questionCount) > 0).map((p) => ({ language: p.language, questionCount: Number(p.questionCount) }));
 
     setStatus("submitting");
     try {
@@ -618,12 +655,10 @@ const AddBlueprintCard = () => {
         durationMinutes: Number(durationMinutes) || 0,
         totalQuestions,
         subjects: cleanSubjects,
-        unseenPassages: cleanPassages,
       });
       setMessage(`✅ '${blueprintName.trim()}' blueprint ban gaya! (${totalQuestions} questions, ${totalMarks} marks)`);
       setBlueprintName("");
       setSubjects([EMPTY_SUBJECT_ROW()]);
-      setUnseenPassages([]);
     } catch (err) {
       setMessage(err.response?.data?.message || "Error aaya.");
     } finally {
@@ -632,13 +667,12 @@ const AddBlueprintCard = () => {
   };
 
   const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
-  const smallInputClass = "px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
   const tinyInputClass = "px-2.5 py-1.5 text-xs bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
 
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
       <h3 className="font-semibold text-base mb-1">📐 Blueprint Add Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Har topic ka apna exact question count dalein — mock mein bilkul utna hi milega, koi hidden limit nahi.</p>
+      <p className="text-xs text-gray-500 mb-4">Har topic ka apna exact question count dalein — mock mein bilkul utna hi milega, koi hidden limit nahi. Unseen Passage bhi ab ek normal topic ki tarah, subject ke andar hi add hota hai.</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -681,12 +715,29 @@ const AddBlueprintCard = () => {
                   <button type="button" onClick={() => removeSubjectRow(sIdx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
                 </div>
 
-                <div className="pl-3 border-l-2 border-gray-800 space-y-1.5">
+                <div className="pl-3 border-l-2 border-gray-800 space-y-2">
                   {s.topics.map((t, tIdx) => (
-                    <div key={tIdx} className="flex gap-2">
-                      <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1 min-w-0`} />
-                      <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16 flex-shrink-0`} />
-                      <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
+                    <div key={tIdx} className={`rounded-lg p-2 space-y-1.5 ${t.isUnseenPassage ? "bg-[#7C3AED]/10 border border-[#7C3AED]/30" : ""}`}>
+                      {t.isUnseenPassage ? (
+                        <div className="flex gap-2 items-center">
+                          <select value={t.passageLanguage} onChange={(e) => updatePassageLanguage(sIdx, tIdx, e.target.value)} className={`${tinyInputClass} flex-1`}>
+                            <option value="Hindi">Unseen Passage — Hindi</option>
+                            <option value="English">Unseen Passage — English</option>
+                          </select>
+                          <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16 flex-shrink-0`} />
+                          <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1 min-w-0`} />
+                          <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16 flex-shrink-0`} />
+                          <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
+                        </div>
+                      )}
+                      <label className="flex items-center gap-1.5 text-[10px] text-gray-500 pl-1">
+                        <input type="checkbox" checked={t.isUnseenPassage} onChange={() => toggleUnseenPassage(sIdx, tIdx)} className="accent-[#7C3AED]" />
+                        Ye ek Unseen Passage topic hai (poora passage + uske sawaal ek saath aayenge)
+                      </label>
                     </div>
                   ))}
                   <button type="button" onClick={() => addTopicRow(sIdx)} className="text-[11px] text-[#A78BFA] hover:underline">+ Topic Jodein</button>
@@ -697,33 +748,6 @@ const AddBlueprintCard = () => {
           <button type="button" onClick={addSubjectRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
             + Aur Subject Jodein
           </button>
-        </div>
-
-        {/* 🆕 Unseen Passage bucket */}
-        <div>
-          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-4 mb-2">Unseen Passage (optional)</p>
-          <div className="space-y-2">
-            {unseenPassages.map((p) => (
-              <div key={p.language} className="flex gap-2 items-center bg-[#0A0D14] border border-gray-800 rounded-xl p-3">
-                <span className="text-sm text-gray-300 flex-1">{p.language} Passage</span>
-                <input type="number" min="1" value={p.questionCount} onChange={(e) => updatePassageCount(p.language, e.target.value)} placeholder="Q count" className={`${smallInputClass} w-24`} />
-                <button type="button" onClick={() => removePassageBucket(p.language)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-2 mt-2">
-            {!unseenPassages.some((p) => p.language === "Hindi") && (
-              <button type="button" onClick={() => addPassageBucket("Hindi")} className="flex-1 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
-                + Hindi Passage
-              </button>
-            )}
-            {!unseenPassages.some((p) => p.language === "English") && (
-              <button type="button" onClick={() => addPassageBucket("English")} className="flex-1 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
-                + English Passage
-              </button>
-            )}
-          </div>
-          <p className="text-[11px] text-gray-500 mt-1.5">Asli passage (text + sawaal) yahan se nahi — "📖 Unseen Passage Add Karein" card se banega, isi blueprint ko refer karke.</p>
         </div>
 
         <div className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 flex items-center justify-between text-sm">
@@ -748,31 +772,38 @@ const EMPTY_PASSAGE_Q = { question: "", option1: "", option2: "", option3: "", o
 
 const AddUnseenPassageCard = () => {
   const [examName, setExamName] = useState("");
-  const [blueprintName, setBlueprintName] = useState("");
-  const [language, setLanguage] = useState("Hindi");
+  const [subjectName, setSubjectName] = useState("");
+  const [topicName, setTopicName] = useState("");
   const [passageText, setPassageText] = useState("");
   const [questions, setQuestions] = useState([{ ...EMPTY_PASSAGE_Q }]);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
-  // 🆕 Blueprint naam bhi ab dropdown se — free-typing mismatch se bachne ke liye
-  const [blueprintOptions, setBlueprintOptions] = useState([]);
+  // 🆕 Subject/Topic dropdown se — is exam ke Blueprints mein jo bhi
+  // "Unseen Passage" type topics bane hain, sirf wahi yahan dikhenge
+  const [structure, setStructure] = useState(null);
   const [structureLoading, setStructureLoading] = useState(false);
 
   useEffect(() => {
     if (!examName.trim()) {
-      setBlueprintOptions([]);
+      setStructure(null);
       return;
     }
     let cancelled = false;
     setStructureLoading(true);
     api
       .get(`/admin/exam-structure/${encodeURIComponent(examName.trim())}`)
-      .then((res) => { if (!cancelled) setBlueprintOptions(res.data.data?.blueprints || []); })
-      .catch(() => { if (!cancelled) setBlueprintOptions([]); })
+      .then((res) => { if (!cancelled) setStructure(res.data.data); })
+      .catch(() => { if (!cancelled) setStructure(null); })
       .finally(() => { if (!cancelled) setStructureLoading(false); });
     return () => { cancelled = true; };
   }, [examName]);
+
+  // Sirf wo subjects jinke andar kam se kam ek Unseen Passage topic hai
+  const subjectsWithPassage = (structure?.subjects || []).filter((s) => s.topics.some((t) => t.isUnseenPassage));
+  const selectedSubject = subjectsWithPassage.find((s) => s.subjectName === subjectName);
+  const passageTopics = selectedSubject?.topics.filter((t) => t.isUnseenPassage) || [];
+  const selectedTopic = passageTopics.find((t) => t.topicName === topicName);
 
   const updateQuestion = (idx, field, value) => setQuestions((prev) => prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
   const addQuestionRow = () => setQuestions((prev) => [...prev, { ...EMPTY_PASSAGE_Q }]);
@@ -782,8 +813,8 @@ const AddUnseenPassageCard = () => {
     e.preventDefault();
     setMessage("");
 
-    if (!examName.trim() || !blueprintName.trim() || !passageText.trim()) {
-      setMessage("❌ Exam Name, Blueprint Name aur Passage text zaroori hain.");
+    if (!examName.trim() || !subjectName || !topicName || !passageText.trim()) {
+      setMessage("❌ Exam Name, Subject, Topic aur Passage text zaroori hain.");
       return;
     }
     const validQuestions = questions.filter((q) => q.question.trim() && q.option1 && q.option2 && q.option3 && q.option4 && q.correctOption);
@@ -796,8 +827,9 @@ const AddUnseenPassageCard = () => {
     try {
       await api.post("/add-unseen-passage", {
         examName: examName.trim(),
-        blueprintName: blueprintName.trim(),
-        language,
+        subjectName,
+        topicName,
+        language: selectedTopic?.passageLanguage || "Hindi",
         passageText: passageText.trim(),
         questions: validQuestions.map((q) => ({
           question: q.question.trim(),
@@ -825,7 +857,7 @@ const AddUnseenPassageCard = () => {
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
       <h3 className="font-semibold text-base mb-1">📖 Unseen Passage Add Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Ek passage + uske saare sawaal ek saath. Jo Blueprint isko refer karega, uske Unseen Passage bucket mein yahi poora set-of-questions ek block mein aayega.</p>
+      <p className="text-xs text-gray-500 mb-4">Ek passage + uske saare sawaal ek saath — jis subject/topic ko yahan chunoge, mock mein wahi sawaal usi subject ke andar, ek block mein saath-saath aayenge.</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -834,28 +866,28 @@ const AddUnseenPassageCard = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
-        {/* 🆕 Blueprint dropdown se — free text nahi, taaki naam bilkul match ho */}
-        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprints load ho rahe hain...</p>}
-        {examName.trim() && !structureLoading && blueprintOptions.length === 0 ? (
-          <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
-            ⚠️ '{examName}' ke liye koi Blueprint nahi mila. Pehle Blueprint banayein.
-          </div>
-        ) : blueprintOptions.length > 0 ? (
-          <select value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} className={inputClass}>
-            <option value="">Blueprint Chunein</option>
-            {blueprintOptions.map((b) => (
-              <option key={b.blueprintName} value={b.blueprintName}>
-                {b.blueprintName} {b.hasUnseenPassages ? "" : "(⚠️ isme Unseen Passage bucket nahi hai)"}
-              </option>
-            ))}
-          </select>
-        ) : null}
+        <input value={examName} onChange={(e) => { setExamName(e.target.value); setSubjectName(""); setTopicName(""); }} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
 
-        <select value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass}>
-          <option value="Hindi">Hindi Passage</option>
-          <option value="English">English Passage</option>
-        </select>
+        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprint check ho raha hai...</p>}
+        {examName.trim() && !structureLoading && subjectsWithPassage.length === 0 ? (
+          <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
+            ⚠️ '{examName}' ke liye koi Unseen Passage topic nahi mila. Pehle "📐 Blueprint Add Karein" mein kisi subject ke andar ek topic ko "Unseen Passage" mark karein.
+          </div>
+        ) : subjectsWithPassage.length > 0 ? (
+          <>
+            <select value={subjectName} onChange={(e) => { setSubjectName(e.target.value); setTopicName(""); }} className={inputClass}>
+              <option value="">Subject Chunein</option>
+              {subjectsWithPassage.map((s) => <option key={s.subjectName} value={s.subjectName}>{s.subjectName}</option>)}
+            </select>
+
+            {subjectName && (
+              <select value={topicName} onChange={(e) => setTopicName(e.target.value)} className={inputClass}>
+                <option value="">Passage Topic Chunein</option>
+                {passageTopics.map((t) => <option key={t.topicName} value={t.topicName}>{t.topicName}</option>)}
+              </select>
+            )}
+          </>
+        ) : null}
 
         <textarea value={passageText} onChange={(e) => setPassageText(e.target.value)} rows={6} placeholder="Poora passage yahan paste karein..." className={inputClass} />
 

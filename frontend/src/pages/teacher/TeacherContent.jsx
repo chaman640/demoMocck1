@@ -24,13 +24,14 @@ const TeacherContent = () => {
             <button
               key={o.path}
               onClick={() => navigate(o.path)}
-              className="w-full flex items-center gap-4 bg-[#111827] border border-gray-800 rounded-2xl p-4 hover:border-gray-600 transition-colors text-left"
+              className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/60 rounded-2xl p-5 flex items-center gap-4 transition-colors"
             >
               <span className="text-2xl flex-shrink-0">{o.icon}</span>
               <div className="min-w-0">
                 <p className="font-semibold text-sm">{o.title}</p>
-                <p className="text-xs text-gray-500">{o.desc}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{o.desc}</p>
               </div>
+              <span className="ml-auto text-[#A78BFA] flex-shrink-0">→</span>
             </button>
           ))}
         </div>

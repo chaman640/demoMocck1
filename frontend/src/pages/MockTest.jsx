@@ -789,12 +789,13 @@ const TestScreen = ({
             Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
           </p>
 
-          {/* 🆕 Unseen Passage — is subject/tab ke saare sawaal isi passage
-              se jude hain, isliye ek baar upar dikha diya jaata hai */}
-          {subject.passageText && (
+          {/* 🆕 Unseen Passage — ab per-question hai (poore subject/tab
+              par nahi), taaki sirf passage-wale sawaalon ke upar hi dikhe,
+              usi subject ke baaki normal sawaalon ke upar nahi */}
+          {currentQuestion.passageText && (
             <div className="bg-[#0A0D14] border border-gray-700 rounded-xl p-4 mb-5 max-h-64 overflow-y-auto">
               <p className="text-[10px] font-semibold tracking-wider text-[#A78BFA] uppercase mb-2">Passage</p>
-              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{subject.passageText}</p>
+              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{currentQuestion.passageText}</p>
             </div>
           )}
 

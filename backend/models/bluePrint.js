@@ -1,30 +1,28 @@
 // models/Blueprint.js
 //
-// 🆕 REDESIGN
+// 🆕 REDESIGN v3 — Unseen Passage ab subject ke ANDAR ek topic ki tarah
+// hai, alag top-level bucket nahi. Jaise: "Hindi & English" subject mein
+// topics ho sakte hain — "General Hindi"(10), "General English"(10), aur
+// "Unseen Passage (Hindi)"(5) — teeno isi EK subject/tab ke andar. Isse
+// student ko sawaal usi subject ke flow mein milte hain (jaise 16-20),
+// alag tab mein nahi.
 //
-// PEHLE: har subject ke andar "importantTopics" (sirf naam ki list) hota
-// tha, aur mock-generation apne aap decide karta tha kis topic se kitne
-// questions lene hain (weak-topic-priority ke through) — max 3 per topic
-// ki hardcoded limit ke saath. Isse do dikkatein thi:
-//   1. Agar subject ko 30 questions chahiye lekin sirf 4 topics hain,
-//      to 4×3=12 hi max mil sakte the — kabhi 30 nahi bante.
-//   2. Unseen Passage jaise sawaal (jahan 5 sawaal EK passage se aane
-//      chahiye) ka koi tareeka nahi tha — har sawaal alag-alag passage
-//      se aa jaata tha.
-//
-// AB: har topic ka apna EXACT questionCount hota hai — teacher/admin
-// khud tay karte hain "is topic se itne sawaal chahiye", koi hardcoded
-// limit nahi. Aur "Unseen Passage" ek alag, khud ka bucket hai jo poore
-// passage (sabhi sawaal ek saath) ko as-a-whole include karta hai.
+// v2 mein ye ek alag top-level "unseenPassages" array tha — usse hata
+// diya gaya hai, ab topic-level flag (isUnseenPassage + passageLanguage)
+// se kaam chalta hai.
 import mongoose from "mongoose";
 import { rowQuestionConnection } from "../config/rowQuestion.js";
 
 const topicSchema = new mongoose.Schema(
   {
     topicName: { type: String, required: true, trim: true },
-    // 🆕 Is topic se EXACTLY kitne questions lene hain (pehle sirf naam
-    // hota tha, count nahi)
     questionCount: { type: Number, required: true, min: 1 },
+    // 🆕 Agar ye topic Unseen Passage hai, to sawaal Question pool se
+    // nahi, UnseenPassage collection se (ek poore passage ke roop mein)
+    // aayenge — aur mock mein ye sab hamesha isi subject ke andar,
+    // ek saath (contiguous) rahenge, shuffle nahi honge.
+    isUnseenPassage: { type: Boolean, default: false },
+    passageLanguage: { type: String, enum: ["Hindi", "English", null], default: null },
   },
   { _id: false }
 );
@@ -41,19 +39,6 @@ const subjectSchema = new mongoose.Schema(
         message: "Har subject mein kam se kam ek topic hona chahiye",
       },
     },
-  },
-  { _id: false }
-);
-
-// 🆕 NAYA — Unseen Passage bucket. Hindi aur English dono ke liye alag
-// entry ho sakti hai. "questionCount" batata hai is language mein kitne
-// passage-based questions chahiye (asli sawaal UnseenPassage collection
-// se aayenge, poore ek passage ke — is model mein sirf "kitne chahiye"
-// bataya jaata hai).
-const unseenPassageBucketSchema = new mongoose.Schema(
-  {
-    language: { type: String, enum: ["Hindi", "English"], required: true },
-    questionCount: { type: Number, required: true, min: 1 },
   },
   { _id: false }
 );
@@ -95,12 +80,6 @@ const blueprintSchema = new mongoose.Schema(
         message: "Kam se kam ek subject hona chahiye",
       },
     },
-    // 🆕 Optional — jin exams/blueprints mein Unseen Passage nahi hai,
-    // wahan ye khaali chhod sakte hain
-    unseenPassages: {
-      type: [unseenPassageBucketSchema],
-      default: [],
-    },
     mockType: {
       type: String,
       enum: ["Mini", "Full"],
@@ -110,9 +89,10 @@ const blueprintSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// 🆕 Hierarchy check — save hone se pehle khud verify karta hai ki
-// numbers sahi se jud rahe hain, taaki galat blueprint kabhi save hi na ho:
-//   totalQuestions = sum(subjects.questionCount) + sum(unseenPassages.questionCount)
+// 🆕 Hierarchy check — ab simple ho gaya hai kyunki Unseen Passage bhi
+// ek normal topic hi hai (uska questionCount bhi topics ke sum mein
+// khud-ba-khud shaamil ho jaata hai):
+//   totalQuestions = sum(subjects.questionCount)
 //   har subject.questionCount = sum(uske topics.questionCount)
 blueprintSchema.pre("validate", function (next) {
   for (const subject of this.subjects || []) {
@@ -124,17 +104,17 @@ blueprintSchema.pre("validate", function (next) {
         )
       );
     }
+    for (const topic of subject.topics || []) {
+      if (topic.isUnseenPassage && !topic.passageLanguage) {
+        return next(new Error(`Topic '${topic.topicName}' Unseen Passage hai lekin uski language (Hindi/English) nahi batayi gayi.`));
+      }
+    }
   }
 
   const subjectsSum = (this.subjects || []).reduce((sum, s) => sum + s.questionCount, 0);
-  const passagesSum = (this.unseenPassages || []).reduce((sum, p) => sum + p.questionCount, 0);
-  const grandTotal = subjectsSum + passagesSum;
-
-  if (grandTotal !== this.totalQuestions) {
+  if (subjectsSum !== this.totalQuestions) {
     return next(
-      new Error(
-        `totalQuestions (${this.totalQuestions}) subjects (${subjectsSum}) + unseen passages (${passagesSum}) = ${grandTotal} se match nahi karta.`
-      )
+      new Error(`totalQuestions (${this.totalQuestions}) subjects ke total (${subjectsSum}) se match nahi karta.`)
     );
   }
 
