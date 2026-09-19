@@ -47,6 +47,9 @@ const TeacherAddQuestion = () => {
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sessionAdded, setSessionAdded] = useState([]);
+  const [mode, setMode] = useState("single"); // 🆕 "single" | "bulk"
+  const [bulkJson, setBulkJson] = useState("");
+  const [bulkMessage, setBulkMessage] = useState("");
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -148,6 +151,70 @@ const TeacherAddQuestion = () => {
     }
   };
 
+  // 🆕 AI ko bhejne layak demo JSON + samjhaane wala prompt, ek saath copy
+  const DEMO_BULK_QUESTIONS = [
+    {
+      subjectName: form.subjectName || "Reasoning",
+      topicName: "Blood Relations",
+      question: "यहाँ सवाल लिखें?",
+      option1: "पहला विकल्प",
+      option2: "दूसरा विकल्प",
+      option3: "तीसरा विकल्प",
+      option4: "चौथा विकल्प",
+      correctOption: 1,
+      answerExplain: "यहाँ व्याख्या लिखें",
+    },
+  ];
+  const AI_PROMPT_HINT =
+    "Neeche diye JSON format mein mujhe [SUBJECT/TOPIC BADLEIN] ke [KITNE CHAHIYE VO NUMBER] MCQ questions Hindi mein do. Sirf ek JSON array return karo, koi extra text mat likhna. correctOption hamesha 1,2,3,4 mein se ek number ho (1 ka matlab option1 sahi hai).";
+
+  const copyBulkDemoForAI = async () => {
+    const text = `${AI_PROMPT_HINT}\n\n${JSON.stringify(DEMO_BULK_QUESTIONS, null, 2)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setBulkMessage("📋 Demo JSON + prompt copy ho gaya — kisi AI chatbot mein paste karke bhej dein.");
+    } catch {
+      setBulkMessage("❌ Copy nahi ho paaya.");
+    }
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    setBulkMessage("");
+
+    if (!teacher?.activeCoupon) {
+      setBulkMessage("❌ Pehle apna active batch select karein!");
+      return;
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(bulkJson);
+    } catch {
+      setBulkMessage("❌ JSON format galat hai — check karein.");
+      return;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      setBulkMessage("❌ JSON ek array hona chahiye, kam se kam 1 question ke saath.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await api.post("/teacher/add-question", { couponId: teacher.activeCoupon, questions: parsed });
+      setBulkMessage(`✅ ${parsed.length} questions add ho gaye!`);
+      setSessionAdded((prev) => [
+        ...parsed.map((q) => ({ question: q.question, subjectName: q.subjectName, topicName: q.topicName })),
+        ...prev,
+      ]);
+      setBulkJson("");
+    } catch (err) {
+      setBulkMessage(err.response?.data?.message || "Questions save nahi ho paaye.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (phase === "loading") return <PageSkeleton />;
 
   if (phase === "error") {
@@ -177,11 +244,46 @@ const TeacherAddQuestion = () => {
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
 
+        {teacher?.activeCoupon && (
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setMode("single")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "single" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+              Ek-Ek Karke (form)
+            </button>
+            <button type="button" onClick={() => setMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+              Bulk JSON (AI se likhwa ke)
+            </button>
+          </div>
+        )}
+
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
             <p className="text-sm text-gray-400">
               Sawaal add karne se pehle upar se ek active batch select karein.
             </p>
+          </div>
+        ) : mode === "bulk" ? (
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
+            {bulkMessage && (
+              <div className={`mb-4 p-3 rounded-xl text-sm text-center ${bulkMessage.startsWith("✅") || bulkMessage.startsWith("📋") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {bulkMessage}
+              </div>
+            )}
+            <form onSubmit={handleBulkSubmit} className="space-y-3">
+              <button type="button" onClick={copyBulkDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
+                📋 Demo JSON + AI Prompt Copy Karein
+              </button>
+              <p className="text-[11px] text-gray-500">Upar wala button dabao → copy hua text kisi AI chatbot mein paste karo → jo JSON array mile use neeche paste karke submit karo. Photo bulk mode mein add nahi hoti — photo wale sawaal "Ek-Ek Karke" mode se add karein.</p>
+              <textarea
+                value={bulkJson}
+                onChange={(e) => setBulkJson(e.target.value)}
+                rows={12}
+                placeholder="Yahan AI se mila JSON array paste karein..."
+                className={`${inputClass} font-mono text-xs`}
+              />
+              <button type="submit" disabled={submitting || !bulkJson.trim()} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50">
+                {submitting ? "Save ho raha hai..." : "Sabhi Sawaal Save Karein"}
+              </button>
+            </form>
           </div>
         ) : (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5">

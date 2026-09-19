@@ -52,6 +52,9 @@ const TeacherCustomTests = () => {
 
   const [builderError, setBuilderError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [builderMode, setBuilderMode] = useState("form"); // 🆕 "form" | "bulk"
+  const [bulkTestJson, setBulkTestJson] = useState("");
+  const [bulkMessage, setBulkMessage] = useState("");
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -206,6 +209,81 @@ const TeacherCustomTests = () => {
     }
   };
 
+  // 🆕 AI ko bhejne layak demo JSON — poora test ek saath (meta + subjects + questions)
+  const DEMO_TEST_JSON = {
+    testName: "Reasoning Practice Set 1",
+    durationMinutes: 30,
+    marksPerQuestion: 1,
+    negativeMarking: 0.25,
+    subjects: [
+      {
+        subjectName: "Reasoning",
+        questions: [
+          {
+            question: "यहाँ सवाल लिखें?",
+            option1: "पहला विकल्प",
+            option2: "दूसरा विकल्प",
+            option3: "तीसरा विकल्प",
+            option4: "चौथा विकल्प",
+            correctOption: 1,
+            answerExplain: "यहाँ व्याख्या लिखें",
+            topicName: "Blood Relations",
+          },
+        ],
+      },
+    ],
+  };
+  const AI_TEST_PROMPT_HINT =
+    "Neeche diye JSON format mein mujhe [SUBJECT NAAM BADLEIN] subject ka ek poora practice test do — [KITNE QUESTIONS CHAHIYE] MCQ questions Hindi mein, [KITNA DURATION] minute ka test. Sirf ek JSON object return karo, koi extra text mat likhna. correctOption hamesha 1,2,3,4 mein se ek number ho.";
+
+  const copyTestDemoForAI = async () => {
+    const text = `${AI_TEST_PROMPT_HINT}\n\n${JSON.stringify(DEMO_TEST_JSON, null, 2)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setBulkMessage("📋 Demo JSON + prompt copy ho gaya — kisi AI chatbot mein paste karke bhej dein.");
+    } catch {
+      setBulkMessage("❌ Copy nahi ho paaya.");
+    }
+  };
+
+  const handleBulkCreateTest = async (e) => {
+    e.preventDefault();
+    setBulkMessage("");
+
+    let parsed;
+    try {
+      parsed = JSON.parse(bulkTestJson);
+    } catch {
+      setBulkMessage("❌ JSON format galat hai — check karein.");
+      return;
+    }
+    if (!parsed.testName || !parsed.durationMinutes || !Array.isArray(parsed.subjects) || parsed.subjects.length === 0) {
+      setBulkMessage("❌ testName, durationMinutes aur subjects (kam se kam 1) zaroori hain.");
+      return;
+    }
+
+    setCreating(true);
+    try {
+      await api.post("/teacher/custom-test/create", {
+        couponId: teacher.activeCoupon,
+        testName: parsed.testName,
+        durationMinutes: Number(parsed.durationMinutes),
+        marksPerQuestion: Number(parsed.marksPerQuestion) || 1,
+        negativeMarking: Number(parsed.negativeMarking) || 0,
+        subjects: parsed.subjects,
+      });
+      setBulkMessage("✅ Test ban gaya!");
+      setBulkTestJson("");
+      resetBuilder();
+      setShowBuilder(false);
+      await load();
+    } catch (err) {
+      setBulkMessage(err.response?.data?.message || "Test nahi ban paaya.");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (phase === "loading") return <PageSkeleton />;
 
   if (phase === "error") {
@@ -260,6 +338,39 @@ const TeacherCustomTests = () => {
                   </div>
                 )}
 
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setBuilderMode("form")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${builderMode === "form" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+                    Form Se Banayein
+                  </button>
+                  <button type="button" onClick={() => setBuilderMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${builderMode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+                    Bulk JSON (AI se likhwa ke)
+                  </button>
+                </div>
+
+                {builderMode === "bulk" ? (
+                  <div className="space-y-3">
+                    {bulkMessage && (
+                      <div className={`p-3 rounded-xl text-sm text-center ${bulkMessage.startsWith("✅") || bulkMessage.startsWith("📋") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                        {bulkMessage}
+                      </div>
+                    )}
+                    <button type="button" onClick={copyTestDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
+                      📋 Demo JSON + AI Prompt Copy Karein
+                    </button>
+                    <p className="text-[11px] text-gray-500">Upar wala button dabao → AI chatbot mein paste karo → poora test JSON mile to neeche paste karke banayein.</p>
+                    <textarea
+                      value={bulkTestJson}
+                      onChange={(e) => setBulkTestJson(e.target.value)}
+                      rows={14}
+                      placeholder="Yahan AI se mila poora test JSON paste karein..."
+                      className={`${inputClass} font-mono`}
+                    />
+                    <button type="button" onClick={handleBulkCreateTest} disabled={creating || !bulkTestJson.trim()} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+                      {creating ? "Ban raha hai..." : "Test Banayein"}
+                    </button>
+                  </div>
+                ) : (
+                  <>
                 {/* Test meta */}
                 <div>
                   <h3 className="text-sm font-semibold text-gray-300 mb-3">Test Details</h3>
@@ -463,6 +574,8 @@ const TeacherCustomTests = () => {
                 >
                   {creating ? "Ban raha hai..." : `Test Banayein (${totalQuestionsInBuilder} sawaal)`}
                 </button>
+                  </>
+                )}
               </div>
             )}
 

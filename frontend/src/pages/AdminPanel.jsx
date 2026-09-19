@@ -61,7 +61,7 @@ const CreateMainTeacherCard = () => {
 // Inke fields models se match karte hain; agar Postman se pehle
 // use kiya hai to wahi JSON yahan paste kar sakte ho.
 // ─────────────────────────────────────────────
-const JsonActionCard = ({ title, description, endpoint, placeholder }) => {
+const JsonActionCard = ({ title, description, endpoint, placeholder, aiHint }) => {
   const [raw, setRaw] = useState(placeholder);
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
@@ -85,15 +85,31 @@ const JsonActionCard = ({ title, description, endpoint, placeholder }) => {
     }
   };
 
+  // 🆕 Demo JSON + samjhaane wala prompt ek saath copy — kisi AI chatbot ko dene ke liye
+  const copyDemoForAI = async () => {
+    const text = `${aiHint}\n\n${placeholder}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage("📋 Demo JSON + prompt copy ho gaya — AI chatbot mein paste kar dein.");
+    } catch {
+      setMessage("❌ Copy nahi ho paaya.");
+    }
+  };
+
   return (
     <details className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
       <summary className="px-5 py-4 cursor-pointer font-semibold text-sm">{title}</summary>
       <div className="px-5 pb-5">
         <p className="text-xs text-gray-500 mb-3">{description}</p>
         {message && (
-          <div className={`mb-3 p-2.5 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          <div className={`mb-3 p-2.5 rounded-lg text-xs text-center ${message.startsWith("✅") || message.startsWith("📋") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
             {message}
           </div>
+        )}
+        {aiHint && (
+          <button type="button" onClick={copyDemoForAI} className="w-full mb-3 py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10">
+            📋 Demo JSON + AI Prompt Copy Karein
+          </button>
         )}
         <form onSubmit={handleSubmit}>
           <textarea
@@ -110,6 +126,7 @@ const JsonActionCard = ({ title, description, endpoint, placeholder }) => {
     </details>
   );
 };
+
 
 // ─────────────────────────────────────────────
 // 🆕 Manage Exam Names — ab admin khud naya exam add/remove kar sakta hai,
@@ -230,14 +247,47 @@ const EMPTY_QUESTION_FORM = {
 };
 
 const AddQuestionCard = () => {
+  const [mode, setMode] = useState("single"); // "single" | "bulk"
   const [form, setForm] = useState(EMPTY_QUESTION_FORM);
+  const [questionPhoto, setQuestionPhoto] = useState(null);
+  const [answerPhoto, setAnswerPhoto] = useState(null);
+  const [bulkJson, setBulkJson] = useState("");
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
   const [countThisSession, setCountThisSession] = useState(0);
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  // 🆕 AI ko bhejne layak demo JSON + samjhaane wala prompt, ek saath copy
+  const DEMO_QUESTIONS = [
+    {
+      examName: "UPSSSC PET",
+      subjectName: "History, Geography, Economy & Polity",
+      topicName: "Ancient India",
+      question: "यहाँ सवाल लिखें?",
+      option1: "पहला विकल्प",
+      option2: "दूसरा विकल्प",
+      option3: "तीसरा विकल्प",
+      option4: "चौथा विकल्प",
+      correctOption: 1,
+      answerExplain: "यहाँ व्याख्या लिखें (kyu ये सही उत्तर है)",
+      askedIn: "UPSSSC PET 2019 (SIRF tab bharein jab question kisi REAL pichhle exam mein aaya ho, warna is line ko poora hata dein)",
+    },
+  ];
+  const AI_PROMPT_HINT =
+    "Neeche diye JSON format mein mujhe [SUBJECT/TOPIC BADLEIN] ke [KITNE CHAHIYE VO NUMBER LIKHEIN] MCQ questions Hindi mein do. Sirf ek JSON array return karo, koi extra text/explanation mत likhna. correctOption hamesha 1,2,3,4 mein se ek number ho (1 ka matlab option1 sahi hai). 'askedIn' field SIRF tab bharo jab tumhe pakka pata ho ki ye sawaal kisi real pichhle exam mein aaya tha — warna 'askedIn' field poori tarah hata do, khaali mat chhodo.";
+
+  const copyDemoForAI = async () => {
+    const text = `${AI_PROMPT_HINT}\n\n${JSON.stringify(DEMO_QUESTIONS, null, 2)}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      setMessage("📋 Demo JSON + prompt copy ho gaya — ab kisi AI chatbot mein paste karke bhej dein.");
+    } catch {
+      setMessage("❌ Copy nahi ho paaya, browser permission check karein.");
+    }
+  };
+
+  const handleSingleSubmit = async (e) => {
     e.preventDefault();
     setMessage("");
 
@@ -264,11 +314,15 @@ const AddQuestionCard = () => {
       fd.append("correctOption", form.correctOption);
       fd.append("answerExplain", form.answerExplain.trim());
       if (form.askedIn.trim()) fd.append("askedIn", form.askedIn.trim());
+      if (questionPhoto) fd.append("questionPhoto", questionPhoto);
+      if (answerPhoto) fd.append("answerExplainWithPhoto", answerPhoto);
 
       await api.post("/add-question", fd, { headers: { "Content-Type": "multipart/form-data" } });
 
       setMessage("✅ Question add ho gaya!");
       setCountThisSession((c) => c + 1);
+      setQuestionPhoto(null);
+      setAnswerPhoto(null);
       // 🆕 Subject/Exam/Topic yaad rakhta hai — agla question isi topic ka
       // daalna ho to baar-baar type nahi karna padega
       setForm((prev) => ({
@@ -284,7 +338,36 @@ const AddQuestionCard = () => {
     }
   };
 
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+    let parsed;
+    try {
+      parsed = JSON.parse(bulkJson);
+    } catch {
+      setMessage("❌ JSON format galat hai — check karein.");
+      return;
+    }
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      setMessage("❌ JSON ek array hona chahiye, kam se kam 1 question ke saath.");
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      await api.post("/add-question", parsed);
+      setMessage(`✅ ${parsed.length} questions add ho gaye!`);
+      setCountThisSession((c) => c + parsed.length);
+      setBulkJson("");
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Error aaya.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
   const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
+  const fileInputClass = "w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs";
 
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
@@ -294,47 +377,89 @@ const AddQuestionCard = () => {
       </div>
       <p className="text-xs text-gray-500 mb-4">Subject/Topic mein CHHOTA, SPECIFIC naam dalein (jaise "Number System", "Percentage") — bada combined naam (jaise "Elementary Arithmetic") dalne se mock test mein sirf 3 hi kabhi use honge, chahe kitne bhi daal do.</p>
 
+      <div className="flex gap-2 mb-4">
+        <button type="button" onClick={() => setMode("single")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "single" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+          Ek-Ek Karke (form)
+        </button>
+        <button type="button" onClick={() => setMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
+          Bulk JSON (AI se likhwa ke)
+        </button>
+      </div>
+
       {message && (
-        <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+        <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") || message.startsWith("📋") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
           {message}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name" className={inputClass} />
+      {mode === "single" ? (
+        <form onSubmit={handleSingleSubmit} className="space-y-3">
+          <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name" className={inputClass} />
 
-        <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject (jaise: Reasoning, Maths & DI)" list="subject-suggestions" className={inputClass} />
-        <datalist id="subject-suggestions">
-          {SUBJECT_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
-        </datalist>
+          <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject (jaise: Reasoning, Maths & DI)" list="subject-suggestions" className={inputClass} />
+          <datalist id="subject-suggestions">
+            {SUBJECT_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
+          </datalist>
 
-        <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic — CHHOTA/specific rakhein (jaise: Number System, Percentage)" className={inputClass} />
+          <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic — CHHOTA/specific rakhein (jaise: Number System, Percentage)" className={inputClass} />
 
-        <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Question" className={inputClass} />
+          <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Question" className={inputClass} />
 
-        <div className="grid grid-cols-2 gap-3">
-          <input name="option1" value={form.option1} onChange={handleChange} placeholder="Option 1" className={inputClass} />
-          <input name="option2" value={form.option2} onChange={handleChange} placeholder="Option 2" className={inputClass} />
-          <input name="option3" value={form.option3} onChange={handleChange} placeholder="Option 3" className={inputClass} />
-          <input name="option4" value={form.option4} onChange={handleChange} placeholder="Option 4" className={inputClass} />
-        </div>
+          {/* 🆕 Question ke saath photo */}
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase mb-1">Question Photo (optional)</label>
+            <input type="file" accept="image/*" onChange={(e) => setQuestionPhoto(e.target.files?.[0] || null)} className={fileInputClass} />
+          </div>
 
-        <select name="correctOption" value={form.correctOption} onChange={handleChange} className={inputClass}>
-          <option value="">Sahi Answer Chunein</option>
-          <option value="1">Option 1</option>
-          <option value="2">Option 2</option>
-          <option value="3">Option 3</option>
-          <option value="4">Option 4</option>
-        </select>
+          <div className="grid grid-cols-2 gap-3">
+            <input name="option1" value={form.option1} onChange={handleChange} placeholder="Option 1" className={inputClass} />
+            <input name="option2" value={form.option2} onChange={handleChange} placeholder="Option 2" className={inputClass} />
+            <input name="option3" value={form.option3} onChange={handleChange} placeholder="Option 3" className={inputClass} />
+            <input name="option4" value={form.option4} onChange={handleChange} placeholder="Option 4" className={inputClass} />
+          </div>
 
-        <textarea name="answerExplain" value={form.answerExplain} onChange={handleChange} rows={2} placeholder="Explanation (optional)" className={inputClass} />
+          <select name="correctOption" value={form.correctOption} onChange={handleChange} className={inputClass}>
+            <option value="">Sahi Answer Chunein</option>
+            <option value="1">Option 1</option>
+            <option value="2">Option 2</option>
+            <option value="3">Option 3</option>
+            <option value="4">Option 4</option>
+          </select>
 
-        <input name="askedIn" value={form.askedIn} onChange={handleChange} placeholder='Pehle kab pucha gaya? jaise "UPSSSC PET 2019" (optional — sirf real ho to bharein)' className={inputClass} />
+          <textarea name="answerExplain" value={form.answerExplain} onChange={handleChange} rows={2} placeholder="Explanation (optional)" className={inputClass} />
 
-        <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-          {status === "submitting" ? "Add ho raha hai..." : "Question Add Karein"}
-        </button>
-      </form>
+          {/* 🆕 Explanation ke saath photo (jaise diagram/chart wali explanation) */}
+          <div>
+            <label className="block text-[10px] text-gray-500 uppercase mb-1">Explanation Photo (optional)</label>
+            <input type="file" accept="image/*" onChange={(e) => setAnswerPhoto(e.target.files?.[0] || null)} className={fileInputClass} />
+          </div>
+
+          <input name="askedIn" value={form.askedIn} onChange={handleChange} placeholder='Pehle kab pucha gaya? jaise "UPSSSC PET 2019" (optional — sirf real ho to bharein)' className={inputClass} />
+
+          <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+            {status === "submitting" ? "Add ho raha hai..." : "Question Add Karein"}
+          </button>
+        </form>
+      ) : (
+        <form onSubmit={handleBulkSubmit} className="space-y-3">
+          <button type="button" onClick={copyDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
+            📋 Demo JSON + AI Prompt Copy Karein
+          </button>
+          <p className="text-[11px] text-gray-500">Upar wala button dabao → copy hua text kisi AI chatbot (ChatGPT/Claude/Gemini) mein paste karo → jo JSON array wapas mile, use neeche paste karke submit karo. Photo bulk mode mein add nahi ho sakti — photo wale questions "Ek-Ek Karke" mode se add karein.</p>
+
+          <textarea
+            value={bulkJson}
+            onChange={(e) => setBulkJson(e.target.value)}
+            rows={12}
+            placeholder="Yahan AI se mila JSON array paste karein..."
+            className={`${inputClass} font-mono text-xs`}
+          />
+
+          <button type="submit" disabled={status === "submitting" || !bulkJson.trim()} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+            {status === "submitting" ? "Add ho raha hai..." : "Sabhi Questions Add Karein"}
+          </button>
+        </form>
+      )}
     </div>
   );
 };
@@ -535,27 +660,31 @@ const AdminPanel = () => {
             description="examName, year, dataPoints ([{score, rank}]), totalCandidates, totalVacancies, isActive"
             endpoint="/add-rank-predictor-data"
             placeholder={JSON.stringify({ examName: "UPSC", year: 2026, dataPoints: [{ score: 150, rank: 500 }], totalCandidates: 500000, totalVacancies: 1000, isActive: true }, null, 2)}
+            aiHint="Neeche diye JSON format mein mujhe [EXAM NAAM BADLEIN] ke liye realistic score-vs-rank dataPoints do (kam se kam 8-10 points, high score se low score tak). Sirf ek JSON object return karo, koi extra text nahi."
           />
 
           <JsonActionCard
             title="📄 Previous Year Test (Global) Add Karein"
             description="examName, testName, year, description, subjects ([{subjectName, questions: [...]}]), marksPerQuestion, negativeMarking, durationMinutes"
             endpoint="/add-previous-year-test"
-            placeholder={JSON.stringify({ examName: "UPSC", testName: "UPSC Prelims 2025", year: 2025, description: "", subjects: [], marksPerQuestion: 2, negativeMarking: 0.5, durationMinutes: 120 }, null, 2)}
+            placeholder={JSON.stringify({ examName: "UPSC", testName: "UPSC Prelims 2025", year: 2025, description: "", subjects: [{ subjectName: "History", questions: [{ question: "यहाँ सवाल", option1: "विकल्प 1", option2: "विकल्प 2", option3: "विकल्प 3", option4: "विकल्प 4", correctOption: 1, answerExplain: "व्याख्या", topicName: "Ancient India" }] }], marksPerQuestion: 2, negativeMarking: 0.5, durationMinutes: 120 }, null, 2)}
+            aiHint="Neeche diye JSON format mein mujhe [EXAM NAAM] ke [SAAL] ke previous year paper jaisa poora test do — [SUBJECT NAAM BADLEIN] subject ke [KITNE CHAHIYE] MCQ questions Hindi mein. correctOption 1-4 number ho. Sirf ek JSON object return karo, koi extra text nahi."
           />
 
           <JsonActionCard
             title="📰 Current Affair Add Karein"
             description="examName, date (YYYY-MM-DD), title, items ([{headline, content, category, source}])"
             endpoint="/add-current-affair"
-            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", title: "Daily Current Affairs", items: [] }, null, 2)}
+            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", title: "Daily Current Affairs", items: [{ headline: "यहाँ headline", content: "yahan poora detail", category: "National", source: "PIB" }] }, null, 2)}
+            aiHint="Neeche diye JSON format mein mujhe [TAREEKH] ke [EXAM NAAM] ke liye [KITNI CHAHIYE] real current affairs items do (asli, verified khabrein — banayi hui nahi). Sirf ek JSON object return karo, koi extra text nahi."
           />
 
           <JsonActionCard
             title="📝 Current Affair Quiz Add Karein"
             description="examName, date (YYYY-MM-DD), questions ([{question, option1..4, correctOption, answerExplain}])"
             endpoint="/add-current-affair-quiz"
-            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", questions: [] }, null, 2)}
+            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", questions: [{ question: "यहाँ सवाल", option1: "विकल्प 1", option2: "विकल्प 2", option3: "विकल्प 3", option4: "विकल्प 4", correctOption: 1, answerExplain: "व्याख्या" }] }, null, 2)}
+            aiHint="Neeche diye JSON format mein mujhe [TAREEKH] ke real current affairs par based [KITNE CHAHIYE] quiz questions do. correctOption 1-4 number ho. Sirf ek JSON object return karo, koi extra text nahi."
           />
         </div>
       </div>
