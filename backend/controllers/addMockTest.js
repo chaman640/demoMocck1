@@ -51,10 +51,25 @@ async function selectQuestionsForTopic({ examName, subjectName, topicName, quest
     correctOption: 1, topicName: 1, subjectName: 1, questionNumber: 1,
   };
 
-  const unusedPool = await Question.find(
-    { examName: { $in: [examName] }, subjectName, topicName, _id: { $nin: excludeIdsArray }, ...couponFilter },
-    projection
-  ).lean();
+  const primaryQuery = { examName: { $in: [examName] }, subjectName, topicName, _id: { $nin: excludeIdsArray }, ...couponFilter };
+  const unusedPool = await Question.find(primaryQuery, projection).lean();
+
+  // 🆕 DIAGNOSTIC LOGGING — agar exact query se 0 mile, to Render Logs mein
+  // poori detail print karo: kya query bheji, kitne mile. Isse "spelling
+  // match hai ya nahi" jaisa guesswork hamesha ke liye khatam ho jaata hai —
+  // Logs seedha bata denge.
+  if (unusedPool.length === 0) {
+    const anyForTopic = await Question.countDocuments({ subjectName, topicName });
+    const anyForExam = await Question.countDocuments({ examName: { $in: [examName] } });
+    console.log("🔍 [MOCK-DEBUG] Zero questions mile is query se:", JSON.stringify(primaryQuery));
+    console.log(`   → Sirf subjectName+topicName match (examName/coupon ignore karke) karne par: ${anyForTopic} mile`);
+    console.log(`   → Sirf examName "${examName}" match karne par (kahin bhi): ${anyForExam} mile`);
+    if (anyForTopic > 0 && anyForExam === 0) {
+      console.log(`   ⚠️ Matlab: subjectName/topicName sahi hain, lekin examName mismatch hai! Question ka examName array is exact string "${examName}" se match nahi kar raha.`);
+    } else if (anyForTopic === 0) {
+      console.log(`   ⚠️ Matlab: subjectName ("${subjectName}") ya topicName ("${topicName}") kahin bhi match nahi ho rahe — dono ko bilkul exact (space/bracket samet) compare karein.`);
+    }
+  }
 
   let selected = fisherYatesShuffle(unusedPool).slice(0, questionCount);
 
