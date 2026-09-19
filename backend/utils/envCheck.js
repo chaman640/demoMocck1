@@ -8,6 +8,13 @@
 // jab wo image wala question add karke "Cloudinary upload failed"
 // dekhta. Ab ye galti deploy hote hi console mein saaf dikhegi.
 //
+// 🆕 CHANGE — purana "FAST2SMS_API_KEY" check hata diya (ab SMS use
+// nahi hota) aur "BREVO_API_KEY" / "BREVO_SENDER_EMAIL" add kiya —
+// ye email OTP, admin magic-link, teacher invite — sabke liye zaroori
+// hain. Ab har deploy ke Render Logs mein turant pata chal jayega
+// agar ye missing hain, "Email service configure nahi hai" error
+// dekh kar guess nahi karna padega.
+//
 // Do tarah ke variables hain:
 //   • REQUIRED  — inke bina server production mein start hi nahi hoga
 //   • OPTIONAL  — inke bina server chalega, bas wo feature band rahega
@@ -23,10 +30,11 @@ const OPTIONAL = [
   ["CLOUDINARY_CLOUD_NAME", "image wale questions upload nahi honge"],
   ["CLOUDINARY_API_KEY", "image wale questions upload nahi honge"],
   ["CLOUDINARY_API_SECRET", "image wale questions upload nahi honge"],
-  ["FAST2SMS_API_KEY", "signup/forgot-password ka OTP SMS nahi jayega"],
+  ["BREVO_API_KEY", "🚨 OTP / admin login link / teacher invite — KOI BHI EMAIL NAHI JAYEGA"],
+  ["BREVO_SENDER_EMAIL", "🚨 OTP / admin login link / teacher invite — KOI BHI EMAIL NAHI JAYEGA"],
   ["ADMIN_SECRET", "admin seeding/scripts (x-admin-secret header) band rahenge"],
   ["ADMIN_EMAIL", "browser se admin panel access band rahega"],
-  ["FRONTEND_URL", "CORS mein sirf hardcoded origins allowed rahenge"],
+  ["FRONTEND_URL", "CORS mein sirf hardcoded origins allowed rahenge, email links mein galat domain jaa sakta hai"],
 ];
 
 export const checkEnv = () => {
@@ -45,6 +53,10 @@ export const checkEnv = () => {
     console.warn("\n⚠️  Ye env variables set nahi hain (server chalega, feature band rahega):");
     for (const [key, why] of missingOptional) console.warn(`   • ${key.padEnd(24)} → ${why}`);
     console.warn("");
+  } else {
+    // 🆕 Positive confirmation bhi print karo — taaki "sab sahi hai" bhi
+    // saaf dikhe, sirf missing hone par hi warning na aaye
+    console.log("✅ Saari optional env variables (Cloudinary, Brevo, Admin, Frontend URL) set hain.\n");
   }
 
   if (missingRequired.length) {
