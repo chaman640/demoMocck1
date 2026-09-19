@@ -931,6 +931,105 @@ const AddUnseenPassageCard = () => {
   );
 };
 
+// ─────────────────────────────────────────────
+// 🆕 Blueprint Coverage Check — "100 questions chahiye the, sirf 35-40
+// aaye" jaisi confusion khatam karne ke liye. Batata hai har topic mein
+// kitne chahiye vs kitne DB mein maujood hain — laal(kam)/hara(theek)
+// se turant pata chal jaata hai kaunsa topic adhoora hai.
+// ─────────────────────────────────────────────
+const BlueprintCoverageCard = () => {
+  const [examName, setExamName] = useState("");
+  const [blueprintName, setBlueprintName] = useState("");
+  const [blueprintOptions, setBlueprintOptions] = useState([]);
+  const [structureLoading, setStructureLoading] = useState(false);
+  const [report, setReport] = useState(null);
+  const [checking, setChecking] = useState(false);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    if (!examName.trim()) { setBlueprintOptions([]); return; }
+    let cancelled = false;
+    setStructureLoading(true);
+    api
+      .get(`/admin/exam-structure/${encodeURIComponent(examName.trim())}`)
+      .then((res) => { if (!cancelled) setBlueprintOptions(res.data.data?.blueprints || []); })
+      .catch(() => { if (!cancelled) setBlueprintOptions([]); })
+      .finally(() => { if (!cancelled) setStructureLoading(false); });
+    return () => { cancelled = true; };
+  }, [examName]);
+
+  const handleCheck = async () => {
+    if (!examName.trim() || !blueprintName) {
+      setMessage("❌ Exam aur Blueprint dono chunein.");
+      return;
+    }
+    setChecking(true);
+    setMessage("");
+    setReport(null);
+    try {
+      const res = await api.get(`/admin/blueprint-coverage/${encodeURIComponent(examName.trim())}/${encodeURIComponent(blueprintName)}`);
+      setReport(res.data.data);
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Coverage check nahi ho paaya.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
+      <h3 className="font-semibold text-base mb-1">🔍 Blueprint Coverage Check</h3>
+      <p className="text-xs text-gray-500 mb-4">Mock generate karne se PEHLE check karo — har topic mein kitne question chahiye, kitne maujood hain.</p>
+
+      {message && <div className="mb-4 p-3 rounded-lg text-xs text-center bg-red-500/10 text-red-400">{message}</div>}
+
+      <div className="space-y-3 mb-4">
+        <input value={examName} onChange={(e) => { setExamName(e.target.value); setBlueprintName(""); setReport(null); }} placeholder="Exam Name" className={inputClass} />
+        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprints load ho rahe hain...</p>}
+        {examName.trim() && !structureLoading && blueprintOptions.length > 0 && (
+          <select value={blueprintName} onChange={(e) => { setBlueprintName(e.target.value); setReport(null); }} className={inputClass}>
+            <option value="">Blueprint Chunein</option>
+            {blueprintOptions.map((b) => <option key={b.blueprintName} value={b.blueprintName}>{b.blueprintName}</option>)}
+          </select>
+        )}
+        <button onClick={handleCheck} disabled={checking || !blueprintName} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+          {checking ? "Check ho raha hai..." : "Coverage Check Karein"}
+        </button>
+      </div>
+
+      {report && (
+        <div className="space-y-3">
+          <div className={`p-3 rounded-xl text-sm font-medium text-center ${report.anyShort ? "bg-amber-500/10 text-amber-400 border border-amber-500/25" : "bg-green-500/10 text-green-400 border border-green-500/25"}`}>
+            {report.anyShort
+              ? `⚠️ Abhi mock generate karoge to sirf ~${report.totalAvailable} / ${report.totalNeeded} questions milenge`
+              : `✅ Sab theek hai — poore ${report.totalNeeded} questions available hain`}
+          </div>
+
+          {report.subjects.map((s) => (
+            <div key={s.subjectName} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3">
+              <p className="text-xs font-semibold text-gray-300 mb-2">{s.subjectName} <span className="text-gray-500">({s.needed} chahiye)</span></p>
+              <div className="space-y-1.5">
+                {s.topics.map((t) => (
+                  <div key={t.topicName} className="flex items-center justify-between text-xs">
+                    <span className={t.short ? "text-red-400" : "text-gray-400"}>
+                      {t.short ? "❌" : "✅"} {t.topicName} {t.isUnseenPassage && "📖"}
+                    </span>
+                    <span className={t.short ? "text-red-400 font-semibold" : "text-gray-500"}>
+                      {t.available} / {t.needed}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const AdminPanel = () => {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("checking"); // checking | ready
@@ -977,6 +1076,8 @@ const AdminPanel = () => {
         <ManageExamNamesCard />
 
         <AddBlueprintCard />
+
+        <BlueprintCoverageCard />
 
         <AddUnseenPassageCard />
 

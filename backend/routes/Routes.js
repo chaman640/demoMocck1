@@ -105,6 +105,7 @@ import { processTeacherQuestionMiddleware } from "../middlewares/processTeacherQ
 // import { addTeacherQuestion } from "../controllers/addTeacherQuestion.js"; // 🆕 HATA DIYA — ab teacher Question Bank mein sawaal add nahi karta
 import { getCouponSubjects } from "../controllers/getCouponSubjects.js"; // 🆕
 import { getExamStructure } from "../controllers/getExamStructure.js"; // 🆕
+import { getBlueprintCoverage } from "../controllers/getBlueprintCoverage.js"; // 🆕
 import { uploadSingleImage, handleImageUpload } from "../utils/cloudinaryUpload.js"; // 🆕
 import { createPreviousYearPaperShell } from "../controllers/createPreviousYearPaperShell.js";
 import { fillPreviousYearPaperSubject } from "../controllers/fillPreviousYearPaperSubject.js";
@@ -327,6 +328,8 @@ router.get("/teacher/subjects", teacherInfo, getTeacherSubjects);
 router.get("/teacher/coupon-subjects/:couponId", teacherInfo, getCouponSubjects);
 // 🆕 Admin ke Question/Unseen-Passage add-forms ke liye — exam ka poora subject→topic tree
 router.get("/admin/exam-structure/:examName", adminOnly, getExamStructure);
+// 🆕 Blueprint Coverage Check — kitne chahiye vs kitne available hain
+router.get("/admin/blueprint-coverage/:examName/:blueprintName", adminOnly, getBlueprintCoverage);
 
 // 🆕 Standalone image upload — Custom Test builder mein photo add karne
 // ke liye (poora test JSON se banta hai, isliye photo pehle alag se
