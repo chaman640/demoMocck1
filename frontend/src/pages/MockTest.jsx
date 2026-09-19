@@ -727,6 +727,13 @@ const TestScreen = ({
   const selected = answers[currentQuestion._id];
   const timeLow = remainingSeconds <= 300;
 
+  // 🆕 Sabse aakhri question hai ya nahi (sabse aakhri subject ka sabse
+  // aakhri sawaal) — agar haan, to "Save & Next" ki jagah "Save & Submit"
+  // dikhega aur click karte hi seedha submit-confirm khulega
+  const isLastQuestion =
+    activeSubjectIdx === mockData.subjects.length - 1 &&
+    activeQIdx === subject.questions.length - 1;
+
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
       {/* Top bar */}
@@ -791,7 +798,16 @@ const TestScreen = ({
             </div>
           )}
 
-          <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
+          <div className="mb-6">
+            <p className="text-base sm:text-lg leading-relaxed">{currentQuestion.question}</p>
+            {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) —
+                ab live attempt ke dauraan bhi dikhega, review mein hi nahi */}
+            {currentQuestion.askedIn && (
+              <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
+                📌 {currentQuestion.askedIn}
+              </span>
+            )}
+          </div>
 
           <div className="space-y-3 mb-8">
             {[1, 2, 3, 4].map((n) => {
@@ -842,10 +858,10 @@ const TestScreen = ({
               Mark for Review &amp; Next
             </button>
             <button
-              onClick={onNext}
+              onClick={isLastQuestion ? onSubmitClick : onNext}
               className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
             >
-              Save &amp; Next
+              {isLastQuestion ? "Save & Submit" : "Save & Next"}
             </button>
           </div>
         </div>

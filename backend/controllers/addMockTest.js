@@ -49,6 +49,7 @@ async function selectQuestionsForTopic({ examName, subjectName, topicName, quest
   const projection = {
     _id: 1, question: 1, option1: 1, option2: 1, option3: 1, option4: 1,
     correctOption: 1, topicName: 1, subjectName: 1, questionNumber: 1,
+    askedIn: 1, // 🆕 — pehle isse bhejte hi nahi the, isliye live mock mein kabhi dikhta nahi tha
   };
 
   const primaryQuery = { examName: { $in: [examName] }, subjectName, topicName, _id: { $nin: excludeIdsArray }, ...couponFilter };
