@@ -465,12 +465,15 @@ const AddQuestionCard = () => {
 };
 
 // ─────────────────────────────────────────────
-// 🆕 Add Blueprint — mock test ka dhaancha banata hai (kitne subjects,
-// har subject mein kitne questions, marks, negative marking, time).
-// Subjects ko row-by-row add karte hain — total questions apne aap
-// jud kar dikhta hai taaki galti se number mismatch na ho.
+// 🆕 Add Blueprint (REDESIGNED) — ab har topic ka apna EXACT question
+// count hota hai (pehle sirf topic naam likhte the, count nahi — isliye
+// system khud decide karta tha aur bade subjects (30+ questions) kabhi
+// poore nahi bharte the, max 3 per topic ki hidden limit ki wajah se).
+// Ab jo yahan likhoge, mock mein WAHI utna hi milega — koi hidden limit
+// nahi. Unseen Passage ke liye alag section hai.
 // ─────────────────────────────────────────────
-const EMPTY_SUBJECT_ROW = { subjectName: "", questionCount: "", importantTopics: "" };
+const EMPTY_TOPIC_ROW = { topicName: "", questionCount: "" };
+const EMPTY_SUBJECT_ROW = () => ({ subjectName: "", topics: [{ ...EMPTY_TOPIC_ROW }] });
 
 const AddBlueprintCard = () => {
   const [examName, setExamName] = useState("");
@@ -479,18 +482,33 @@ const AddBlueprintCard = () => {
   const [marksPerQuestion, setMarksPerQuestion] = useState("1");
   const [negativeMarking, setNegativeMarking] = useState("0.25");
   const [durationMinutes, setDurationMinutes] = useState("60");
-  const [subjects, setSubjects] = useState([{ ...EMPTY_SUBJECT_ROW }]);
+  const [subjects, setSubjects] = useState([EMPTY_SUBJECT_ROW()]);
+  const [unseenPassages, setUnseenPassages] = useState([]); // 🆕 [{language, questionCount}]
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
 
-  const totalQuestions = subjects.reduce((sum, s) => sum + (Number(s.questionCount) || 0), 0);
+  const subjectTotal = (s) => s.topics.reduce((sum, t) => sum + (Number(t.questionCount) || 0), 0);
+  const subjectsGrandTotal = subjects.reduce((sum, s) => sum + subjectTotal(s), 0);
+  const passagesGrandTotal = unseenPassages.reduce((sum, p) => sum + (Number(p.questionCount) || 0), 0);
+  const totalQuestions = subjectsGrandTotal + passagesGrandTotal;
   const totalMarks = totalQuestions * (Number(marksPerQuestion) || 0);
 
-  const updateSubject = (idx, field, value) => {
-    setSubjects((prev) => prev.map((s, i) => (i === idx ? { ...s, [field]: value } : s)));
-  };
-  const addSubjectRow = () => setSubjects((prev) => [...prev, { ...EMPTY_SUBJECT_ROW }]);
+  const updateSubjectName = (idx, value) => setSubjects((prev) => prev.map((s, i) => (i === idx ? { ...s, subjectName: value } : s)));
+  const addSubjectRow = () => setSubjects((prev) => [...prev, EMPTY_SUBJECT_ROW()]);
   const removeSubjectRow = (idx) => setSubjects((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+
+  const updateTopic = (sIdx, tIdx, field, value) =>
+    setSubjects((prev) => prev.map((s, i) => (i === sIdx ? { ...s, topics: s.topics.map((t, ti) => (ti === tIdx ? { ...t, [field]: value } : t)) } : s)));
+  const addTopicRow = (sIdx) => setSubjects((prev) => prev.map((s, i) => (i === sIdx ? { ...s, topics: [...s.topics, { ...EMPTY_TOPIC_ROW }] } : s)));
+  const removeTopicRow = (sIdx, tIdx) =>
+    setSubjects((prev) => prev.map((s, i) => (i === sIdx ? { ...s, topics: s.topics.length > 1 ? s.topics.filter((_, ti) => ti !== tIdx) : s.topics } : s)));
+
+  const addPassageBucket = (language) => {
+    if (unseenPassages.some((p) => p.language === language)) return;
+    setUnseenPassages((prev) => [...prev, { language, questionCount: "" }]);
+  };
+  const updatePassageCount = (language, value) => setUnseenPassages((prev) => prev.map((p) => (p.language === language ? { ...p, questionCount: value } : p)));
+  const removePassageBucket = (language) => setUnseenPassages((prev) => prev.filter((p) => p.language !== language));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -500,11 +518,22 @@ const AddBlueprintCard = () => {
       setMessage("❌ Exam Name aur Blueprint Name zaroori hain.");
       return;
     }
-    const validSubjects = subjects.filter((s) => s.subjectName.trim() && Number(s.questionCount) > 0);
-    if (validSubjects.length === 0) {
-      setMessage("❌ Kam se kam ek subject (naam + question count ke saath) dalein.");
+
+    const cleanSubjects = subjects
+      .filter((s) => s.subjectName.trim())
+      .map((s) => ({
+        subjectName: s.subjectName.trim(),
+        questionCount: subjectTotal(s),
+        topics: s.topics.filter((t) => t.topicName.trim() && Number(t.questionCount) > 0).map((t) => ({ topicName: t.topicName.trim(), questionCount: Number(t.questionCount) })),
+      }))
+      .filter((s) => s.topics.length > 0);
+
+    if (cleanSubjects.length === 0) {
+      setMessage("❌ Kam se kam ek subject, ek topic aur uska question count dalein.");
       return;
     }
+
+    const cleanPassages = unseenPassages.filter((p) => Number(p.questionCount) > 0).map((p) => ({ language: p.language, questionCount: Number(p.questionCount) }));
 
     setStatus("submitting");
     try {
@@ -516,15 +545,13 @@ const AddBlueprintCard = () => {
         negativeMarking: Number(negativeMarking) || 0,
         durationMinutes: Number(durationMinutes) || 0,
         totalQuestions,
-        subjects: validSubjects.map((s) => ({
-          subjectName: s.subjectName.trim(),
-          questionCount: Number(s.questionCount),
-          importantTopics: s.importantTopics.split(",").map((t) => t.trim()).filter(Boolean),
-        })),
+        subjects: cleanSubjects,
+        unseenPassages: cleanPassages,
       });
       setMessage(`✅ '${blueprintName.trim()}' blueprint ban gaya! (${totalQuestions} questions, ${totalMarks} marks)`);
       setBlueprintName("");
-      setSubjects([{ ...EMPTY_SUBJECT_ROW }]);
+      setSubjects([EMPTY_SUBJECT_ROW()]);
+      setUnseenPassages([]);
     } catch (err) {
       setMessage(err.response?.data?.message || "Error aaya.");
     } finally {
@@ -534,11 +561,12 @@ const AddBlueprintCard = () => {
 
   const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
   const smallInputClass = "px-3 py-2 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
+  const tinyInputClass = "px-2.5 py-1.5 text-xs bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
 
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
       <h3 className="font-semibold text-base mb-1">📐 Blueprint Add Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Ye mock test ka dhaancha hai — kitne questions, kaunse subject mein kitne, kitna time. Ek exam ke liye "Full Mock" aur alag-alag "Mini Mock" bhi bana sakte hain.</p>
+      <p className="text-xs text-gray-500 mb-4">Har topic ka apna exact question count dalein — mock mein bilkul utna hi milega, koi hidden limit nahi.</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -569,23 +597,61 @@ const AddBlueprintCard = () => {
           </div>
         </div>
 
+        {/* ── Subjects → Topics (nested) ── */}
         <div>
-          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-4 mb-2">Subjects</p>
-          <div className="space-y-2">
-            {subjects.map((s, idx) => (
-              <div key={idx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
-                <div className="flex gap-2">
-                  <input value={s.subjectName} onChange={(e) => updateSubject(idx, "subjectName", e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${smallInputClass} flex-1`} />
-                  <input type="number" min="1" value={s.questionCount} onChange={(e) => updateSubject(idx, "questionCount", e.target.value)} placeholder="Q count" className={`${smallInputClass} w-24`} />
-                  <button type="button" onClick={() => removeSubjectRow(idx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
+          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-4 mb-2">Subjects &amp; Topics</p>
+          <div className="space-y-3">
+            {subjects.map((s, sIdx) => (
+              <div key={sIdx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
+                <div className="flex gap-2 items-center">
+                  <input value={s.subjectName} onChange={(e) => updateSubjectName(sIdx, e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${smallInputClass} flex-1`} />
+                  <span className="text-xs text-[#A78BFA] font-semibold flex-shrink-0 px-2">{subjectTotal(s)} Q</span>
+                  <button type="button" onClick={() => removeSubjectRow(sIdx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
                 </div>
-                <input value={s.importantTopics} onChange={(e) => updateSubject(idx, "importantTopics", e.target.value)} placeholder="Is subject ke topics, comma se alag (jaise: Reasoning, Elementary Arithmetic, Graph Analysis)" className={`${smallInputClass} w-full`} />
+
+                <div className="pl-3 border-l-2 border-gray-800 space-y-1.5">
+                  {s.topics.map((t, tIdx) => (
+                    <div key={tIdx} className="flex gap-2">
+                      <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1`} />
+                      <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16`} />
+                      <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={() => addTopicRow(sIdx)} className="text-[11px] text-[#A78BFA] hover:underline">+ Topic Jodein</button>
+                </div>
               </div>
             ))}
           </div>
           <button type="button" onClick={addSubjectRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
             + Aur Subject Jodein
           </button>
+        </div>
+
+        {/* 🆕 Unseen Passage bucket */}
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-4 mb-2">Unseen Passage (optional)</p>
+          <div className="space-y-2">
+            {unseenPassages.map((p) => (
+              <div key={p.language} className="flex gap-2 items-center bg-[#0A0D14] border border-gray-800 rounded-xl p-3">
+                <span className="text-sm text-gray-300 flex-1">{p.language} Passage</span>
+                <input type="number" min="1" value={p.questionCount} onChange={(e) => updatePassageCount(p.language, e.target.value)} placeholder="Q count" className={`${smallInputClass} w-24`} />
+                <button type="button" onClick={() => removePassageBucket(p.language)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-2">
+            {!unseenPassages.some((p) => p.language === "Hindi") && (
+              <button type="button" onClick={() => addPassageBucket("Hindi")} className="flex-1 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
+                + Hindi Passage
+              </button>
+            )}
+            {!unseenPassages.some((p) => p.language === "English") && (
+              <button type="button" onClick={() => addPassageBucket("English")} className="flex-1 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
+                + English Passage
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1.5">Asli passage (text + sawaal) yahan se nahi — "📖 Unseen Passage Add Karein" card se banega, isi blueprint ko refer karke.</p>
         </div>
 
         <div className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 flex items-center justify-between text-sm">
@@ -595,6 +661,132 @@ const AddBlueprintCard = () => {
 
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
           {status === "submitting" ? "Bana rahe hain..." : "Blueprint Banayein"}
+        </button>
+      </form>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// 🆕 Add Unseen Passage — ek passage + uske saare sawaal ek saath.
+// Blueprint mein jo "Unseen Passage" bucket banaya tha, usi ke liye
+// content yahan se aata hai.
+// ─────────────────────────────────────────────
+const EMPTY_PASSAGE_Q = { question: "", option1: "", option2: "", option3: "", option4: "", correctOption: "", answerExplain: "" };
+
+const AddUnseenPassageCard = () => {
+  const [examName, setExamName] = useState("");
+  const [blueprintName, setBlueprintName] = useState("");
+  const [language, setLanguage] = useState("Hindi");
+  const [passageText, setPassageText] = useState("");
+  const [questions, setQuestions] = useState([{ ...EMPTY_PASSAGE_Q }]);
+  const [status, setStatus] = useState("idle");
+  const [message, setMessage] = useState("");
+
+  const updateQuestion = (idx, field, value) => setQuestions((prev) => prev.map((q, i) => (i === idx ? { ...q, [field]: value } : q)));
+  const addQuestionRow = () => setQuestions((prev) => [...prev, { ...EMPTY_PASSAGE_Q }]);
+  const removeQuestionRow = (idx) => setQuestions((prev) => (prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev));
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setMessage("");
+
+    if (!examName.trim() || !blueprintName.trim() || !passageText.trim()) {
+      setMessage("❌ Exam Name, Blueprint Name aur Passage text zaroori hain.");
+      return;
+    }
+    const validQuestions = questions.filter((q) => q.question.trim() && q.option1 && q.option2 && q.option3 && q.option4 && q.correctOption);
+    if (validQuestions.length === 0) {
+      setMessage("❌ Kam se kam ek poora sawaal (options + sahi answer ke saath) dalein.");
+      return;
+    }
+
+    setStatus("submitting");
+    try {
+      await api.post("/add-unseen-passage", {
+        examName: examName.trim(),
+        blueprintName: blueprintName.trim(),
+        language,
+        passageText: passageText.trim(),
+        questions: validQuestions.map((q) => ({
+          question: q.question.trim(),
+          option1: q.option1.trim(),
+          option2: q.option2.trim(),
+          option3: q.option3.trim(),
+          option4: q.option4.trim(),
+          correctOption: Number(q.correctOption),
+          answerExplain: q.answerExplain.trim(),
+        })),
+      });
+      setMessage(`✅ Passage add ho gaya! (${validQuestions.length} questions)`);
+      setPassageText("");
+      setQuestions([{ ...EMPTY_PASSAGE_Q }]);
+    } catch (err) {
+      setMessage(err.response?.data?.message || "Error aaya.");
+    } finally {
+      setStatus("idle");
+    }
+  };
+
+  const inputClass = "w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600";
+  const tinyInputClass = "px-3 py-2 text-xs bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white placeholder-gray-600";
+
+  return (
+    <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
+      <h3 className="font-semibold text-base mb-1">📖 Unseen Passage Add Karein</h3>
+      <p className="text-xs text-gray-500 mb-4">Ek passage + uske saare sawaal ek saath. Jo Blueprint isko refer karega, uske Unseen Passage bucket mein yahi poora set-of-questions ek block mein aayega.</p>
+
+      {message && (
+        <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+          {message}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
+        <input value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} placeholder="Blueprint Name — jisme ye Unseen Passage bucket bana tha" className={inputClass} />
+
+        <select value={language} onChange={(e) => setLanguage(e.target.value)} className={inputClass}>
+          <option value="Hindi">Hindi Passage</option>
+          <option value="English">English Passage</option>
+        </select>
+
+        <textarea value={passageText} onChange={(e) => setPassageText(e.target.value)} rows={6} placeholder="Poora passage yahan paste karein..." className={inputClass} />
+
+        <div>
+          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-3 mb-2">Is Passage Ke Sawaal</p>
+          <div className="space-y-3">
+            {questions.map((q, idx) => (
+              <div key={idx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] text-gray-500">Question {idx + 1}</span>
+                  <button type="button" onClick={() => removeQuestionRow(idx)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
+                </div>
+                <textarea value={q.question} onChange={(e) => updateQuestion(idx, "question", e.target.value)} rows={2} placeholder="Sawaal" className={`${tinyInputClass} w-full`} />
+                <div className="grid grid-cols-2 gap-2">
+                  <input value={q.option1} onChange={(e) => updateQuestion(idx, "option1", e.target.value)} placeholder="Option 1" className={tinyInputClass} />
+                  <input value={q.option2} onChange={(e) => updateQuestion(idx, "option2", e.target.value)} placeholder="Option 2" className={tinyInputClass} />
+                  <input value={q.option3} onChange={(e) => updateQuestion(idx, "option3", e.target.value)} placeholder="Option 3" className={tinyInputClass} />
+                  <input value={q.option4} onChange={(e) => updateQuestion(idx, "option4", e.target.value)} placeholder="Option 4" className={tinyInputClass} />
+                </div>
+                <select value={q.correctOption} onChange={(e) => updateQuestion(idx, "correctOption", e.target.value)} className={`${tinyInputClass} w-full`}>
+                  <option value="">Sahi Answer Chunein</option>
+                  <option value="1">Option 1</option>
+                  <option value="2">Option 2</option>
+                  <option value="3">Option 3</option>
+                  <option value="4">Option 4</option>
+                </select>
+                <textarea value={q.answerExplain} onChange={(e) => updateQuestion(idx, "answerExplain", e.target.value)} rows={2} placeholder="Explanation (optional)" className={`${tinyInputClass} w-full`} />
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={addQuestionRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
+            + Aur Sawaal Jodein
+          </button>
+        </div>
+
+        <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
+          {status === "submitting" ? "Add ho raha hai..." : "Passage Add Karein"}
         </button>
       </form>
     </div>
@@ -647,6 +839,8 @@ const AdminPanel = () => {
         <ManageExamNamesCard />
 
         <AddBlueprintCard />
+
+        <AddUnseenPassageCard />
 
         <AddQuestionCard />
 

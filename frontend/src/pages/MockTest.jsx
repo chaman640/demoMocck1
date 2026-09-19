@@ -781,6 +781,16 @@ const TestScreen = ({
           <p className="text-xs text-gray-500 mb-3">
             Question {activeQIdx + 1} of {subject.questions.length} &middot; {subject.subjectName}
           </p>
+
+          {/* 🆕 Unseen Passage — is subject/tab ke saare sawaal isi passage
+              se jude hain, isliye ek baar upar dikha diya jaata hai */}
+          {subject.passageText && (
+            <div className="bg-[#0A0D14] border border-gray-700 rounded-xl p-4 mb-5 max-h-64 overflow-y-auto">
+              <p className="text-[10px] font-semibold tracking-wider text-[#A78BFA] uppercase mb-2">Passage</p>
+              <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-line">{subject.passageText}</p>
+            </div>
+          )}
+
           <p className="text-base sm:text-lg mb-6 leading-relaxed">{currentQuestion.question}</p>
 
           <div className="space-y-3 mb-8">

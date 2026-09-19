@@ -7,6 +7,7 @@ import { addQuestion } from "../controllers/addQuestion.js";
 import { addUser } from "../controllers/addUser.js";
 import { addPerformence } from "../controllers/addPerformence.js";
 import { addBluePrint } from "../controllers/addBlluePrient.js";
+import { addUnseenPassage, listUnseenPassages, deleteUnseenPassage } from "../controllers/manageUnseenPassage.js"; // 🆕
 import { addMocktest } from "../controllers/addMockTest.js";
 import { loginUser } from "../controllers/authentication.js";
 import { updateUserInfo } from "../controllers/updateSutf.js";
@@ -167,6 +168,10 @@ router.post("/add-question", adminLimiter, adminOnly, processQuestionMiddleware,
 router.post("/add-bluePrint", adminLimiter, adminOnly, addBluePrint);
 router.post("/add-rank-predictor-data", adminLimiter, adminOnly, addRankPredictorData);
 router.post("/add-previous-year-test", adminLimiter, adminOnly, addPreviousYearTest);
+// 🆕 Unseen Passage — admin-only
+router.post("/add-unseen-passage", adminLimiter, adminOnly, addUnseenPassage);
+router.get("/unseen-passages/:examName/:blueprintName", adminOnly, listUnseenPassages);
+router.delete("/unseen-passages/:id", adminLimiter, adminOnly, deleteUnseenPassage);
 router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
 router.post("/add-current-affair-quiz", adminLimiter, adminOnly, addCurrentAffairQuiz);
 
