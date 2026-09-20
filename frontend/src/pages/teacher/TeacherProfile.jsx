@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
+import LanguageSwitcher from "../../components/LanguageSwitcher"; // 🆕
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -110,6 +111,13 @@ const TeacherProfile = () => {
           <span className={`inline-block mt-2 px-3 py-1 rounded-full text-[11px] font-medium ${teacher.role === "main" ? "bg-[#7C3AED]/20 text-[#A78BFA]" : "bg-gray-700/40 text-gray-300"}`}>
             {teacher.role === "main" ? "Main Teacher" : "Sub-Teacher"}
           </span>
+        </div>
+
+        {/* 🆕 Language Switcher */}
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 space-y-3">
+          <p className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">Language</p>
+          <LanguageSwitcher />
+          <p className="text-[11px] text-gray-600">Filhaal Landing Page aur Bottom Nav is language mein badalte hain — baaki pages jald hi add honge.</p>
         </div>
 
         {/* ── Contact info ── */}

@@ -1,5 +1,6 @@
 import React from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useLanguage } from "../context/LanguageContext"; // 🆕
 
 // 🆕 REORGANIZE — "Team" aur "Students" bottom nav se hata diye (5 items
 // se zyada mobile pe cramped ho jaata hai). Wo dono ab apni sambandhit
@@ -10,11 +11,11 @@ import { useNavigate, useLocation } from "react-router-dom";
 // "Content" ke andar chhupa hua tha, ek extra click lagta tha).
 // "Profile" naya add hua.
 const NAV_ITEMS = [
-  { key: "dashboard", label: "Home", path: "/TeacherDashboard" },
-  { key: "coupons", label: "Batches", path: "/TeacherCoupons" },
-  { key: "analysis", label: "Analysis", path: "/TeacherClassAnalysis" },
-  { key: "content", label: "Content", path: "/TeacherContent" },
-  { key: "profile", label: "Profile", path: "/TeacherProfile" },
+  { key: "dashboard", labelKey: "nav_teacher_home", path: "/TeacherDashboard" },
+  { key: "coupons", labelKey: "nav_batches", path: "/TeacherCoupons" },
+  { key: "analysis", labelKey: "nav_analysis", path: "/TeacherClassAnalysis" },
+  { key: "content", labelKey: "nav_content", path: "/TeacherContent" },
+  { key: "profile", labelKey: "nav_profile", path: "/TeacherProfile" },
 ];
 
 const isActivePath = (pathname, key) => {
@@ -60,6 +61,7 @@ const ICONS = {
 const TeacherBottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage(); // 🆕
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0A0D14]/95 backdrop-blur-lg border-t border-gray-800 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,0px)]">
@@ -72,7 +74,7 @@ const TeacherBottomNav = () => {
             className={`flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl transition-colors ${active ? "text-[#A78BFA]" : "text-gray-500 hover:text-gray-300"}`}
           >
             {ICONS[item.key]}
-            <span className="text-[10px] font-medium">{item.label}</span>
+            <span className="text-[10px] font-medium">{t(item.labelKey)}</span>
           </button>
         );
       })}

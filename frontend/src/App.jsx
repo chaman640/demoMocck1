@@ -1,6 +1,7 @@
 // App.jsx
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { LanguageProvider } from './context/LanguageContext'; // 🆕
 import MockTest from './pages/MockTest';
 import UserAllAnalysis from './pages/UserAllAnalysis';
 import UserSubjectAnallysis from './pages/UserSubjectAnallysis';
@@ -112,17 +113,18 @@ const NotFound = () => {
 
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <HashRouter>
-        <div>
-          <Routes>
-            {/* ── Student ── */}
-            <Route path="/" element={<Landing />} /> {/* 🆕 pehle HomePage tha — ab public landing page */}
-            <Route path="/HomePage" element={<HomePage />} />
-            <Route path="/MockTest" element={<MockTest />} />
-            <Route path="/UserAllAnalysis" element={<UserAllAnalysis />} />
-            <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis />} />
-            <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis />} />
+    <LanguageProvider>
+      <QueryClientProvider client={queryClient}>
+        <HashRouter>
+          <div>
+            <Routes>
+              {/* ── Student ── */}
+              <Route path="/" element={<Landing />} /> {/* 🆕 pehle HomePage tha — ab public landing page */}
+              <Route path="/HomePage" element={<HomePage />} />
+              <Route path="/MockTest" element={<MockTest />} />
+              <Route path="/UserAllAnalysis" element={<UserAllAnalysis />} />
+              <Route path="/UserSubjectAnallysis" element={<UserSubjectAnallysis />} />
+              <Route path="/UserTopicAnalysis" element={<UserTopicAnalysis />} />
             <Route path="/AnalysisPage" element={<UserAllAnalysis />} />
             <Route path="/ProfilePage" element={<ProfilePage />} />
 
@@ -190,7 +192,8 @@ const App = () => {
           </Routes>
         </div>
       </HashRouter>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </LanguageProvider>
   );
 };
 
