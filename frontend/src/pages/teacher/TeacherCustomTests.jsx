@@ -55,6 +55,8 @@ const TeacherCustomTests = () => {
 
   const [builderError, setBuilderError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [deletingTestId, setDeletingTestId] = useState(null); // 🆕
+  const [confirmDeleteTestId, setConfirmDeleteTestId] = useState(null); // 🆕
   const [builderMode, setBuilderMode] = useState("form"); // 🆕 "form" | "bulk"
   const [bulkTestJson, setBulkTestJson] = useState("");
   const [bulkMessage, setBulkMessage] = useState("");
@@ -228,6 +230,24 @@ const TeacherCustomTests = () => {
       setBuilderError(err.response?.data?.message || "Test nahi ban paaya.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  // 🆕 Test delete — 2-step confirm (permanent hai)
+  const handleDeleteTest = async (testId) => {
+    if (confirmDeleteTestId !== testId) {
+      setConfirmDeleteTestId(testId);
+      return;
+    }
+    setDeletingTestId(testId);
+    try {
+      await api.delete(`/teacher/custom-test/${testId}`);
+      setConfirmDeleteTestId(null);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Test delete nahi ho paaya.");
+    } finally {
+      setDeletingTestId(null);
     }
   };
 
@@ -652,6 +672,23 @@ const TeacherCustomTests = () => {
                       className="w-full py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10"
                     >
                       📊 Results Dekhein
+                    </button>
+
+                    {/* 🆕 Delete — 2-step confirm */}
+                    <button
+                      onClick={() => handleDeleteTest(t.testId)}
+                      disabled={deletingTestId === t.testId}
+                      className={`w-full mt-2 py-2 rounded-lg text-xs font-medium disabled:opacity-50 ${
+                        confirmDeleteTestId === t.testId
+                          ? "bg-red-500/20 border border-red-500/50 text-red-400"
+                          : "bg-[#1F2937] border border-gray-700 text-gray-500 hover:border-red-500/40 hover:text-red-400"
+                      }`}
+                    >
+                      {deletingTestId === t.testId
+                        ? "Delete ho raha hai..."
+                        : confirmDeleteTestId === t.testId
+                        ? "⚠️ Pakka? Dobara dabao"
+                        : "🗑️ Test Delete Karein"}
                     </button>
                   </div>
                 ))}

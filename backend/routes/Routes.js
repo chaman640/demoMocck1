@@ -76,6 +76,7 @@ import { adminCreateMainTeacher } from "../controllers/adminCreateMainTeacher.js
 import { listExamNamesAdmin, addExamName, deleteExamName } from "../controllers/manageExamNames.js"; // 🆕
 
 import { createCoupon } from "../controllers/createCoupon.js";
+import { deleteCoupon } from "../controllers/deleteCoupon.js"; // 🆕
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
 import { addAllowedStudent, listAllowedStudents, deleteAllowedStudent } from "../controllers/manageAllowedStudents.js"; // 🆕
 
@@ -110,6 +111,7 @@ import { uploadSingleImage, handleImageUpload } from "../utils/cloudinaryUpload.
 import { createPreviousYearPaperShell } from "../controllers/createPreviousYearPaperShell.js";
 import { fillPreviousYearPaperSubject } from "../controllers/fillPreviousYearPaperSubject.js";
 import { createCustomTest } from "../controllers/createCustomTest.js";
+import { deleteCustomTest } from "../controllers/deleteCustomTest.js"; // 🆕
 
 import { getAllCustomTests } from "../controllers/getAllCustomTests.js";
 import { getCustomTest } from "../controllers/getCustomTest.js";
@@ -306,6 +308,7 @@ router.get("/teacher/dashboard", teacherInfo, getTeacherDashboard);
 
 // ── Coupons / group ──
 router.post("/create-coupon", teacherInfo, writeLimiter, createCoupon);
+router.delete("/delete-coupon/:couponId", teacherInfo, writeLimiter, deleteCoupon); // 🆕
 router.get("/my-coupons", teacherInfo, getMyCoupons);
 // 🆕 Batch ke liye pre-approved students manage karna (sirf Main Teacher)
 router.post("/teacher/batch-students", teacherInfo, writeLimiter, addAllowedStudent);
@@ -350,6 +353,7 @@ router.get("/teacher/previous-year-paper/list", teacherInfo, getTeacherPYQPapers
 router.get("/teacher/previous-year-paper/:paperId", teacherInfo, getTeacherPYQPaperById);
 
 router.post("/teacher/custom-test/create", teacherInfo, writeLimiter, createCustomTest);
+router.delete("/teacher/custom-test/:testId", teacherInfo, writeLimiter, deleteCustomTest); // 🆕
 router.get("/teacher/custom-test/list", teacherInfo, getTeacherCustomTests);
 // 🆕 Ek specific Custom Test ka leaderboard + question-wise analysis
 router.get("/teacher/custom-test/:testId/results", teacherInfo, getCustomTestLeaderboard);

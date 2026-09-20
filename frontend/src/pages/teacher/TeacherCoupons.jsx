@@ -33,6 +33,8 @@ const TeacherCoupons = () => {
 
   const [switchingId, setSwitchingId] = useState(null);
   const [copiedCode, setCopiedCode] = useState(null);
+  const [deletingId, setDeletingId] = useState(null); // 🆕
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 🆕 — 2-step confirm
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -99,6 +101,25 @@ const TeacherCoupons = () => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 1500);
+  };
+
+  // 🆕 Batch delete — permanent hai, isliye pehle click sirf confirm-mode
+  // dikhata hai, dusra click par asal delete hota hai
+  const handleDelete = async (couponId) => {
+    if (confirmDeleteId !== couponId) {
+      setConfirmDeleteId(couponId);
+      return;
+    }
+    setDeletingId(couponId);
+    try {
+      await api.delete(`/delete-coupon/${couponId}`);
+      setConfirmDeleteId(null);
+      await load();
+    } catch (err) {
+      alert(err.response?.data?.message || "Batch delete nahi ho paaya.");
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (phase === "loading") return <CouponsSkeleton />;
@@ -254,6 +275,27 @@ const TeacherCoupons = () => {
                       className="w-full mt-2 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-sm font-medium"
                     >
                       👥 Students Manage Karein
+                    </button>
+                  )}
+
+                  {/* 🆕 Sirf Main Teacher — batch delete (2-step confirm, kyunki
+                      permanent hai — custom tests aur batch-exclusive questions
+                      bhi saath mein chale jaate hain) */}
+                  {isMain && (
+                    <button
+                      onClick={() => handleDelete(c._id)}
+                      disabled={deletingId === c._id}
+                      className={`w-full mt-2 py-2 rounded-lg text-sm font-medium disabled:opacity-50 ${
+                        confirmDeleteId === c._id
+                          ? "bg-red-500/20 border border-red-500/50 text-red-400"
+                          : "bg-[#1F2937] border border-gray-700 text-gray-500 hover:border-red-500/40 hover:text-red-400"
+                      }`}
+                    >
+                      {deletingId === c._id
+                        ? "Delete ho raha hai..."
+                        : confirmDeleteId === c._id
+                        ? "⚠️ Pakka? Dobara dabao — Custom Tests aur is batch ke questions bhi delete ho jaayenge"
+                        : "🗑️ Batch Delete Karein"}
                     </button>
                   )}
                 </div>
