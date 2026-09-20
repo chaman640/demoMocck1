@@ -59,7 +59,7 @@ const Login = () => {
       if (response.data.success) {
         setToastMsg("Login Successful! Redirecting...");
         setTimeout(() => {
-          navigate('/');
+          navigate('/HomePage'); {/* 🆕 FIX — pehle '/' tha, jo pehle HomePage tha; ab '/' Landing page hai, isliye seedha /HomePage bhejna zaroori */}
         }, 1500);
       }
     } catch (err) {

@@ -19,7 +19,7 @@ const LanguageContext = createContext(null);
 
 const STORAGE_KEY = "batchmock_language";
 const VALID_LANGUAGES = ["hindi", "english", "hinglish"];
-const DEFAULT_LANGUAGE = "hinglish"; // 🆕 website ki asli/purani "voice" — backward-compatible default
+const DEFAULT_LANGUAGE = "english"; // 🆕 CHANGE — poori site (Landing ke alawa) English mein hi rehti hai
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguageState] = useState(() => {

@@ -28,10 +28,8 @@ const Landing = () => {
           <span className="text-lg font-bold tracking-tight">BatchMock.in</span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* 🆕 Language switcher — public page se hi language chun sakte hain */}
-          <div className="hidden sm:block w-44">
-            <LanguageSwitcher />
-          </div>
+          {/* 🆕 Language button — sirf yahan, poori site mein aur kahin nahi */}
+          <LanguageSwitcher />
           <button
             onClick={() => navigate("/TeacherLogin")}
             className="hidden sm:block px-4 py-2 text-sm font-medium text-gray-300 hover:text-white transition-colors whitespace-nowrap"
@@ -46,11 +44,6 @@ const Landing = () => {
           </button>
         </div>
       </header>
-
-      {/* 🆕 Mobile ke liye language switcher, header ke neeche */}
-      <div className="sm:hidden px-4 pb-2">
-        <LanguageSwitcher />
-      </div>
 
       {/* ── Hero ── */}
       <section className="max-w-6xl mx-auto px-4 sm:px-8 pt-10 sm:pt-16 pb-16 sm:pb-24 grid lg:grid-cols-2 gap-10 items-center">
