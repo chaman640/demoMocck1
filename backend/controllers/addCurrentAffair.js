@@ -1,6 +1,10 @@
 import CurrentAffair from "../models/CurrentAffair.js";
 import { getTodayIST } from "../utils/dateHelpers.js";
 
+// 🆕 Ye Admin ka route hai — hamesha GLOBAL (coupon: null) current affair
+// banata/update karta hai, poore exam ke liye. Batch-specific wale ab
+// Teacher apne "Content" page se, alag controller (addTeacherCurrentAffair)
+// se add karta hai.
 export const addCurrentAffair = async (req, res) => {
   try {
     const { examName, date, title, items } = req.body;
@@ -29,11 +33,13 @@ export const addCurrentAffair = async (req, res) => {
       });
     }
 
-    // upsert — agar isi din ka entry pehle se hai to update ho jayega,
-    // taaki content edit karne ke liye dobara POST karne par duplicate-key error na aaye
+    // upsert — agar isi din ka GLOBAL entry pehle se hai to update ho
+    // jayega, taaki content edit karne ke liye dobara POST karne par
+    // duplicate-key error na aaye. "coupon: null" explicitly diya hai
+    // taaki galti se kisi batch-specific entry se match/overwrite na ho.
     const saved = await CurrentAffair.findOneAndUpdate(
-      { examName, date: finalDate },
-      { $set: { examName, date: finalDate, title, items } },
+      { examName, date: finalDate, coupon: null },
+      { $set: { examName, date: finalDate, title, items, coupon: null } },
       { new: true, upsert: true, runValidators: true }
     );
 

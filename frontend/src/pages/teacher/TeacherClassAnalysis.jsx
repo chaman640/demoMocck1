@@ -297,10 +297,22 @@ const TeacherClassAnalysis = () => {
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-1">Class Analysis</h1>
-          <p className="text-gray-400 text-sm">Mock Test, Previous Year Papers aur Custom Tests — sabhi mila ke, kaunse topics mein poori class ko sabse zyada dikkat hai</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold mb-1">Class Analysis</h1>
+            <p className="text-gray-400 text-sm">Mock Test, Previous Year Papers aur Custom Tests — sabhi mila ke, kaunse topics mein poori class ko sabse zyada dikkat hai</p>
+          </div>
         </div>
+
+        {/* 🆕 Ek student ka individual analysis dekhna ho to yahan se search karein */}
+        <button
+          onClick={() => navigate("/TeacherStudentSearch")}
+          className="w-full flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
+        >
+          <span className="text-lg">🔍</span>
+          <span className="text-sm font-medium flex-1">Kisi Ek Student Ka Analysis Dekhein</span>
+          <span className="text-gray-600">→</span>
+        </button>
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
 

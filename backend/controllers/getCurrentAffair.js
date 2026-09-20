@@ -1,46 +1,75 @@
 import CurrentAffair from "../models/CurrentAffair.js";
 import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
 import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+import User from "../models/User.js";
 import { getTodayIST } from "../utils/dateHelpers.js";
 
 // GET /current-affair/:examName  ya  /current-affair/:examName/:date
 // date na diya ho to aaj (IST) dhundta hai; agar aaj ka publish nahi hua
 // to sabse latest available date de deta hai — taaki khali screen na dikhe
+//
+// 🆕 CHANGE — ab Admin ka GLOBAL entry (coupon: null) aur student ke apne
+// batch ka TEACHER-added entry (coupon: activeCoupon) — dono ke items ek
+// saath jodkar dikhaye jaate hain. Agar student kisi batch mein nahi hai,
+// sirf global hi dikhta hai (jaisa pehle tha).
 export const getCurrentAffair = async (req, res) => {
   try {
     const { examName } = req.params;
     const requestedDate = req.params.date;
     const userId = req.user._id;
 
-    let affair;
+    const user = await User.findById(userId).select("activeCoupon");
 
-    if (requestedDate) {
-      affair = await CurrentAffair.findOne({ examName, date: requestedDate });
+    let dateToUse = requestedDate;
+    let globalAffair = null;
+
+    if (dateToUse) {
+      globalAffair = await CurrentAffair.findOne({ examName, date: dateToUse, coupon: null });
     } else {
       const today = getTodayIST();
-      affair = await CurrentAffair.findOne({ examName, date: today });
-      if (!affair) {
-        affair = await CurrentAffair.findOne({ examName }).sort({ date: -1 });
+      globalAffair = await CurrentAffair.findOne({ examName, date: today, coupon: null });
+      if (globalAffair) {
+        dateToUse = today;
+      } else {
+        globalAffair = await CurrentAffair.findOne({ examName, coupon: null }).sort({ date: -1 });
+        dateToUse = globalAffair?.date;
       }
     }
 
-    if (!affair) {
+    // 🆕 Isi date ka batch-specific (teacher-added) entry bhi dhoondo —
+    // sirf tab jab student kisi batch mein ho
+    let batchAffair = null;
+    if (user?.activeCoupon && dateToUse) {
+      batchAffair = await CurrentAffair.findOne({ examName, date: dateToUse, coupon: user.activeCoupon });
+    }
+
+    if (!globalAffair && !batchAffair) {
       return res.status(200).json({ success: true, available: false, data: null });
     }
 
+    // Dono ke items jodo — batch wale pehle (teacher ne khaas apne
+    // students ke liye daala hai, isliye zyada relevant), phir global
+    const combinedItems = [
+      ...(batchAffair?.items || []),
+      ...(globalAffair?.items || []),
+    ];
+
+    const finalDate = globalAffair?.date || batchAffair?.date;
+
     const [quiz, attempt] = await Promise.all([
-      CurrentAffairQuiz.findOne({ examName, date: affair.date }).select("_id questions"),
-      CurrentAffairAttempt.findOne({ userId, examName, date: affair.date }),
+      CurrentAffairQuiz.findOne({ examName, date: finalDate }).select("_id questions"),
+      CurrentAffairAttempt.findOne({ userId, examName, date: finalDate }),
     ]);
 
     return res.status(200).json({
       success: true,
       available: true,
       data: {
-        examName: affair.examName,
-        date: affair.date,
-        title: affair.title,
-        items: affair.items,
+        examName,
+        date: finalDate,
+        title: globalAffair?.title || batchAffair?.title,
+        items: combinedItems,
+        hasBatchContent: !!batchAffair, // 🆕 frontend chahe to "aapke batch se" badge dikha sakta hai
         quizAvailable: !!quiz,
         totalQuizQuestions: quiz ? quiz.questions.length : 0,
         alreadyAttempted: !!attempt,
@@ -64,12 +93,14 @@ export const getCurrentAffair = async (req, res) => {
 };
 
 // GET /current-affair/:examName/dates — history list ke liye
+// (Ye sirf GLOBAL dates dikhata hai — batch-wise history filhaal
+// scope se bahar hai, taaki simple rahe)
 export const getCurrentAffairDates = async (req, res) => {
   try {
     const { examName } = req.params;
     const userId = req.user._id;
 
-    const affairs = await CurrentAffair.find({ examName })
+    const affairs = await CurrentAffair.find({ examName, coupon: null })
       .select("date title items")
       .sort({ date: -1 })
       .limit(60);

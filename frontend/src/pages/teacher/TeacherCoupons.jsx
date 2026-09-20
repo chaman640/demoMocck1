@@ -157,11 +157,24 @@ const TeacherCoupons = () => {
             </button>
           )}
         </div>
-        <p className="text-gray-400 text-sm mb-6">
+        <p className="text-gray-400 text-sm mb-4">
           {isMain
             ? "Har batch ek unique coupon code se students ko join hone dega"
             : "Ye batches aapko Main Teacher ne assign ki hain"}
         </p>
+
+        {/* 🆕 Team link — bottom nav se hata ke yahan de diya, kyunki
+            sub-teacher access hamesha kisi batch se hi juda hota hai */}
+        {isMain && (
+          <button
+            onClick={() => navigate("/TeacherSubTeachers")}
+            className="w-full mb-6 flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
+          >
+            <span className="text-lg">👥</span>
+            <span className="text-sm font-medium flex-1">Team (Sub-Teachers) Manage Karein</span>
+            <span className="text-gray-600">→</span>
+          </button>
+        )}
 
         {isMain && showForm && (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 mb-6">

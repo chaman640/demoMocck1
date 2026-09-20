@@ -8,6 +8,7 @@ import UserTopicAnalysis from './pages/UserTopicAnalysis';
 import Login from './pages/Login';
 import Singup from './pages/Singup';
 import HomePage from './pages/HomePage';
+import Landing from './pages/Landing'; // 🆕
 import ProfilePage from './pages/ProfilePage';
 import Challenge from './pages/Challenge';
 import ChallengeReview from './pages/ChallengeReview';
@@ -28,6 +29,8 @@ import TeacherSignup from './pages/teacher/TeacherSignup';
 import AcceptInvite from './pages/teacher/AcceptInvite';
 import TeacherDashboard from './pages/teacher/TeacherDashboard';
 import TeacherContent from './pages/teacher/TeacherContent';
+import TeacherProfile from './pages/teacher/TeacherProfile'; // 🆕
+import TeacherCurrentAffairs from './pages/teacher/TeacherCurrentAffairs'; // 🆕
 import TeacherSubTeachers from './pages/teacher/TeacherSubTeachers';
 // import TeacherAddQuestion from './pages/teacher/TeacherAddQuestion'; // 🆕 HATA DIYA — ab sirf Admin Question Bank mein sawaal add karta hai
 import TeacherPYQPapers from './pages/teacher/TeacherPYQPapers';
@@ -114,7 +117,7 @@ const App = () => {
         <div>
           <Routes>
             {/* ── Student ── */}
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<Landing />} /> {/* 🆕 pehle HomePage tha — ab public landing page */}
             <Route path="/HomePage" element={<HomePage />} />
             <Route path="/MockTest" element={<MockTest />} />
             <Route path="/UserAllAnalysis" element={<UserAllAnalysis />} />
@@ -157,6 +160,8 @@ const App = () => {
             <Route path="/AcceptInvite/:token" element={<AcceptInvite />} />
             <Route path="/TeacherDashboard" element={<TeacherDashboard />} />
             <Route path="/TeacherContent" element={<TeacherContent />} />
+            <Route path="/TeacherProfile" element={<TeacherProfile />} /> {/* 🆕 */}
+            <Route path="/TeacherCurrentAffairs" element={<TeacherCurrentAffairs />} /> {/* 🆕 */}
             <Route path="/TeacherSubTeachers" element={<TeacherSubTeachers />} />
             {/* <Route path="/TeacherAddQuestion" element={<TeacherAddQuestion />} /> */} {/* 🆕 HATA DIYA */}
             <Route path="/TeacherPYQPapers" element={<TeacherPYQPapers />} />

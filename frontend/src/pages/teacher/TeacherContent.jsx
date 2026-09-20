@@ -8,7 +8,9 @@ const options = [
   // apne students ke liye "Custom Tests" se hi sawaal daal sakta hai.
   { title: "Previous Year Papers", desc: "Paper-shell banayein ya apna subject fill karein", path: "/TeacherPYQPapers", icon: "📚" },
   { title: "Custom Tests", desc: "Weekly/chapter-wise test banayein", path: "/TeacherCustomTests", icon: "📝" },
-  { title: "Class Analysis", desc: "Poori class ka topic-wise weak-area breakdown", path: "/TeacherClassAnalysis", icon: "📊" },
+  // 🆕 NAYA — apne batch ke liye current affairs
+  { title: "Batch Current Affairs", desc: "Apne batch ke students ke liye daily updates daalein", path: "/TeacherCurrentAffairs", icon: "📰" },
+  // 🆕 HATA DIYA — "Class Analysis" ab bottom nav mein seedha "Analysis" hai
 ];
 
 const TeacherContent = () => {

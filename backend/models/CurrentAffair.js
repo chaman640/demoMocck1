@@ -27,12 +27,22 @@ const currentAffairSchema = new mongoose.Schema(
     },
     title: { type: String, trim: true },
     items: [currentAffairItemSchema],
+    // 🆕 NAYA — null = Admin ne global (poore exam ke liye) daala hai.
+    // Value set ho to matlab kisi Teacher ne apne specific batch ke liye
+    // daala hai — sirf usi batch ke students ko ye extra items dikhenge
+    // (global wale ke saath jud ke).
+    coupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
+    addedByTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", default: null },
   },
   { timestamps: true }
 );
 
-// Ek exam ke liye ek din mein sirf ek hi entry ho
-currentAffairSchema.index({ examName: 1, date: 1 }, { unique: true });
+// 🆕 CHANGE — pehle sirf examName+date par unique tha, isliye ek din mein
+// EK hi entry ban sakti thi (chahe global ho ya kisi batch ki). Ab
+// "coupon" bhi shaamil hai — isliye ek hi din, ek hi exam ke liye,
+// Admin ka EK global entry + har batch ka apna EK entry — sab ek saath
+// reh sakte hain.
+currentAffairSchema.index({ examName: 1, date: 1, coupon: 1 }, { unique: true });
 
 const CurrentAffair = rowQuestionConnection.model("CurrentAffair", currentAffairSchema);
 export default CurrentAffair;

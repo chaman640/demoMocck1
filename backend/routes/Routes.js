@@ -34,6 +34,7 @@ import { getPreviousYearAttemptDetail } from "../controllers/getPreviousYearAtte
 
 // Current Affairs
 import { addCurrentAffair } from "../controllers/addCurrentAffair.js";
+import { addTeacherCurrentAffair, getTeacherCurrentAffair } from "../controllers/addTeacherCurrentAffair.js"; // 🆕
 import { addCurrentAffairQuiz } from "../controllers/addCurrentAffairQuiz.js";
 import { getCurrentAffair, getCurrentAffairDates } from "../controllers/getCurrentAffair.js";
 import { getCurrentAffairQuiz } from "../controllers/getCurrentAffairQuiz.js";
@@ -179,6 +180,10 @@ router.post("/add-unseen-passage", adminLimiter, adminOnly, addUnseenPassage);
 router.get("/unseen-passages/:examName/:subjectName/:topicName", adminOnly, listUnseenPassages);
 router.delete("/unseen-passages/:id", adminLimiter, adminOnly, deleteUnseenPassage);
 router.post("/add-current-affair", adminLimiter, adminOnly, addCurrentAffair);
+// 🆕 Teacher apne batch ke liye — Admin ke global se ALAG/EXTRA
+router.post("/teacher/current-affair", teacherInfo, writeLimiter, addTeacherCurrentAffair);
+router.get("/teacher/current-affair/:date", teacherInfo, getTeacherCurrentAffair);
+router.get("/teacher/current-affair", teacherInfo, getTeacherCurrentAffair);
 router.post("/add-current-affair-quiz", adminLimiter, adminOnly, addCurrentAffairQuiz);
 
 // ═════════════════════════════════════════════
