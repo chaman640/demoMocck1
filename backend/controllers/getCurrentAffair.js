@@ -18,7 +18,7 @@ export const getCurrentAffair = async (req, res) => {
     const requestedDate = req.params.date;
     const userId = req.user._id;
 
-    const user = await User.findById(userId).select("activeCoupon");
+    const user = await User.findById(userId).select("activeCoupon exam");
 
     let dateToUse = requestedDate;
     let globalAffair = null;
@@ -41,6 +41,21 @@ export const getCurrentAffair = async (req, res) => {
     let batchAffair = null;
     if (user?.activeCoupon && dateToUse) {
       batchAffair = await CurrentAffair.findOne({ examName, date: dateToUse, coupon: user.activeCoupon });
+    }
+
+    // 🆕 DIAGNOSTIC LOGGING — agar kuch bhi nahi mila, Render Logs mein
+    // exact wajah print karo (examName mismatch sabse common cause hai —
+    // bilkul waisa hi jaisa Question Bank mein "UPSSSC" vs "UPSSSC PET"
+    // wala tha).
+    if (!globalAffair && !batchAffair) {
+      const anyForThisExamAnyDate = await CurrentAffair.countDocuments({ examName });
+      const allExamNamesInDB = await CurrentAffair.distinct("examName");
+      console.log(`🔍 [CURRENT-AFFAIR-DEBUG] Student ka exam field: "${user?.exam}" — request kiya examName: "${examName}"`);
+      console.log(`   → Is exact examName ke liye DB mein kahin bhi (kisi bhi date ka) entry: ${anyForThisExamAnyDate}`);
+      console.log(`   → DB mein current-affairs jin examName ke liye maujood hain: ${JSON.stringify(allExamNamesInDB)}`);
+      if (anyForThisExamAnyDate === 0 && allExamNamesInDB.length > 0) {
+        console.log(`   ⚠️ examName mismatch ho sakta hai! Upar wali list mein se koi "${examName}" se milta-julta (lekin exact match nahi) naam dhoondein.`);
+      }
     }
 
     if (!globalAffair && !batchAffair) {
