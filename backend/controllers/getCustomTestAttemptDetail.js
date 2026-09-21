@@ -1,8 +1,7 @@
-// controllers/getCustomTestAttemptDetail.js
-// Submit ke baad review screen isi se poora breakdown fetch karti hai
 import mongoose from "mongoose";
 import CustomTest from "../models/CustomTest.js";
 import CustomTestAttempt from "../models/CustomTestAttempt.js";
+import { getBatchAverageTimePerEmbeddedQuestion } from "../utils/classAnalytics.js";
 
 export const getCustomTestAttemptDetail = async (req, res) => {
   try {
@@ -33,16 +32,21 @@ export const getCustomTestAttemptDetail = async (req, res) => {
       }
     }
 
+    const questionIds = attempt.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean);
+    const batchTimeMap = await getBatchAverageTimePerEmbeddedQuestion(CustomTestAttempt, test._id, questionIds);
+
     const questionBreakdown = attempt.attemptedQuestions
       .map((aq) => {
         const qId = aq.questionId ? aq.questionId.toString() : null;
         const q = qId ? questionMap[qId] : null;
         if (!q) return null;
 
+        const batchTime = qId ? batchTimeMap[qId] : null;
+
         return {
           questionId: q._id,
           question: q.question,
-          questionPhoto: q.questionPhoto || null, // 🆕
+          questionPhoto: q.questionPhoto || null,
           options: {
             option1: q.option1,
             option2: q.option2,
@@ -53,11 +57,13 @@ export const getCustomTestAttemptDetail = async (req, res) => {
           userAnswer: aq.userAnswer,
           isCorrect: aq.isCorrect,
           answerExplain: q.answerExplain || null,
-          answerExplainWithPhoto: q.answerExplainWithPhoto || null, // 🆕
-          askedIn: q.askedIn || null, // 🆕
+          answerExplainWithPhoto: q.answerExplainWithPhoto || null,
+          askedIn: q.askedIn || null,
           topicName: q.topicName,
           subjectName: q.subjectName,
           timeTakenInSeconds: aq.timeTakenInSeconds,
+          batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+          batchTimeSampleSize: batchTime?.sampleSize ?? 0,
         };
       })
       .filter(Boolean);

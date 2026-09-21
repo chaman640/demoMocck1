@@ -1,35 +1,10 @@
-// backend/pages/user/analysicUser.js
-//
-// 🆕 REDESIGN — Student Analysis Page ko "mistake-finding" tool banaya
-//
-// Neeche jo naye fields add hue hain, sab is soch se add hue hain:
-// "Sirf number dikhana kaafi nahi — student ko pata chalna chahiye
-//  KAHAN galti ho rahi hai aur USE THIK KARNE KA seedha raasta milna chahiye."
-//
-// Naye additions (sabko 🆕 se mark kiya hai):
-//   1. Lifetime average (sirf last-3 ka average pehle bahut misleading tha)
-//   2. Trend — pichle 3 vs uske pehle wale 3 mocks — improve ho rahe ho ya nahi
-//   3. topWeakTopics — pehle ye sirf ek subject ke andar milta tha, ab
-//      seedhe overview page par hi saare subjects mein se sabse kamzor
-//      topics dikh jaate hain, aur click karte hi seedha unke galat
-//      sawaal khul jaate hain
-//   4. Negative marking se kitne marks kate — pehle ye kabhi dikhta hi nahi tha
-//
-// Baaki (getSubjectAnalysis, getTopicAnalysis, getUserMockTests) jaisa tha
-// waisa hi hai — wo already sahi kaam kar rahe the.
-
 import mongoose from "mongoose";
 import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
 import HiddenQuestion from "../../models/HiddenQuestion.js";
+import { getBatchAverageTimeForTopic, getBatchAverageTimePerQuestion } from "../../utils/classAnalytics.js";
 
-// ─────────────────────────────────────────────
-// Helper: ek set of tests ka % average nikalta hai (blueprint ke against),
-// taaki Full Mock (100 marks) aur Mini Mock (20 marks) sahi se mix ho sakein.
-// Same logic pehle sirf last-3 ke liye tha, ab lifetime + trend dono ke
-// liye reuse ho raha hai.
-// ─────────────────────────────────────────────
 function averagePercent(tests, blueprintByName) {
   const percentages = [];
   for (const test of tests) {
@@ -49,23 +24,15 @@ function scoreFromPercent(percent, primaryBlueprint) {
   return { score: Math.round((percent / 100) * outOf), outOf };
 }
 
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 1
-// Overview: average score (recent + lifetime), trend, subject list,
-// lifetime weak topics, negative-marking impact
-// Route: GET /analysis/overview/:userId/:examName
-// ─────────────────────────────────────────────
 export const getAllAnalysis1stPage = async (req, res) => {
   try {
     let { userId, examName } = req.params;
 
-    // 🔒 SECURITY FIX: userId ab URL se NAHI, login session se aata hai.
     if (!req.user || !req.user._id) {
       return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
     }
     userId = req.user._id;
 
-    // 1. Sare mocks fetch karo
     const allTests = await Performance.find({ userId, examName }).sort({ createdAt: -1 });
 
     if (!allTests || allTests.length === 0) {
@@ -77,7 +44,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
     }
 
     const last3Tests = allTests.slice(0, 3);
-    const previous3Tests = allTests.slice(3, 6); // 🆕 trend compare karne ke liye
+    const previous3Tests = allTests.slice(3, 6);
 
     const examBlueprints = await Blueprint.find({ examName }).select(
       "blueprintName totalQuestions marksPerQuestion negativeMarking mockType"
@@ -91,7 +58,6 @@ export const getAllAnalysis1stPage = async (req, res) => {
     const primaryBlueprint =
       examBlueprints.find((b) => b.mockType === "Full") || examBlueprints[0] || null;
 
-    // ── Recent (last 3) average — jaisa pehle tha ──
     const recentPercent = averagePercent(last3Tests, blueprintByName);
     let averageScore, averageScoreOutOf;
     if (recentPercent != null && primaryBlueprint) {
@@ -102,13 +68,10 @@ export const getAllAnalysis1stPage = async (req, res) => {
       averageScoreOutOf = null;
     }
 
-    // ── 🆕 Lifetime average — poore history ka, sirf last-3 ka nahi ──
     const lifetimePercent = averagePercent(allTests, blueprintByName);
     const { score: lifetimeAverageScore, outOf: lifetimeAverageScoreOutOf } =
       scoreFromPercent(lifetimePercent, primaryBlueprint);
 
-    // ── 🆕 Trend — abhi ke last-3 vs unke pehle wale 3 mocks ──
-    // "improving" / "declining" / "same" / null (jab pehle 3 mocks hi nahi hain)
     let trend = null;
     if (previous3Tests.length > 0) {
       const previousPercent = averagePercent(previous3Tests, blueprintByName);
@@ -121,29 +84,18 @@ export const getAllAnalysis1stPage = async (req, res) => {
       }
     }
 
-    // ── Graph Data — LIFETIME ke saare mocks (score-over-time chart ke liye) ──
     const graphData = allTests
-      .map((test) => ({
-        performanceId: test._id,
-        score: test.totalScore,
-        date: test.createdAt,
-        blueprintName: test.blueprintName,
-      }))
+      .map((test) => ({ performanceId: test._id, score: test.totalScore, date: test.createdAt, blueprintName: test.blueprintName }))
       .reverse();
 
-    // ── Subject-wise accuracy + time — last 3 mocks se (jaisa pehle tha) ──
     const subjectMap = {};
     last3Tests.forEach((test) => {
-      if (test.subjectAnalysis && test.subjectAnalysis.length > 0) {
-        test.subjectAnalysis.forEach((sub) => {
-          if (!subjectMap[sub.subjectName]) {
-            subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
-          }
-          subjectMap[sub.subjectName].totalAcc += sub.accuracy;
-          subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
-          subjectMap[sub.subjectName].count += 1;
-        });
-      }
+      (test.subjectAnalysis || []).forEach((sub) => {
+        if (!subjectMap[sub.subjectName]) subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
+        subjectMap[sub.subjectName].totalAcc += sub.accuracy;
+        subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
+        subjectMap[sub.subjectName].count += 1;
+      });
     });
 
     const subjectAnalysis = Object.keys(subjectMap).map((name) => ({
@@ -152,7 +104,6 @@ export const getAllAnalysis1stPage = async (req, res) => {
       averageTimePerQuestion: Number((subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)),
     }));
 
-    // ── 🆕 Lifetime totals — sabhi mocks ke correct/wrong/unattempted jod ke ──
     let totalCorrectLifetime = 0;
     let totalWrongLifetime = 0;
     let totalUnattemptedLifetime = 0;
@@ -170,10 +121,6 @@ export const getAllAnalysis1stPage = async (req, res) => {
     }
     marksLostToNegativeLifetime = Number(marksLostToNegativeLifetime.toFixed(2));
 
-    // ── 🆕 Top Weak Topics — LIFETIME, saare subjects mile-jule ──
-    // Isse student ko seedhe overview page par hi pata chal jaata hai ki
-    // "sabse zyada galtiyan kis topic mein ho rahi hain", chahe wo kisi
-    // bhi subject ka ho — pehle ye sirf ek subject ke andar jaake milta tha.
     const allQuestionIds = allTests.flatMap((test) =>
       test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean)
     );
@@ -196,16 +143,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
 
         const key = `${meta.subjectName}::${meta.topicName}`;
         if (!topicGroups[key]) {
-          topicGroups[key] = {
-            subjectName: meta.subjectName,
-            topicName: meta.topicName,
-            correct: 0,
-            wrong: 0,
-            unattempted: 0,
-            total: 0,
-            totalTime: 0,
-            timedCount: 0,
-          };
+          topicGroups[key] = { subjectName: meta.subjectName, topicName: meta.topicName, correct: 0, wrong: 0, unattempted: 0, total: 0, totalTime: 0, timedCount: 0 };
         }
 
         const g = topicGroups[key];
@@ -233,7 +171,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
           totalAttempted: t.total,
           wrongCount: t.wrong,
           averageTimePerQuestion: avgTime,
-          weaknessScore: t.wrong * 2 + avgTime / 30, // sorting ke liye, frontend ko nahi chahiye
+          weaknessScore: t.wrong * 2 + avgTime / 30,
           reason:
             t.wrong > 0 && avgTime > 30
               ? "Galat bhi kar rahe ho aur time bhi zyada lag raha hai"
@@ -244,15 +182,13 @@ export const getAllAnalysis1stPage = async (req, res) => {
       })
       .sort((a, b) => b.weaknessScore - a.weaknessScore)
       .slice(0, 6)
-      .map(({ weaknessScore, ...rest }) => rest); // internal sort key hata do
+      .map(({ weaknessScore, ...rest }) => rest);
 
     return res.status(200).json({
       success: true,
       data: {
-        // Recent
         averageScore,
         averageScoreOutOf,
-        // 🆕 Lifetime
         lifetimeAverageScore,
         lifetimeAverageScoreOutOf,
         totalTestsGiven: allTests.length,
@@ -260,9 +196,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
         totalWrongLifetime,
         totalUnattemptedLifetime,
         marksLostToNegativeLifetime,
-        // 🆕 Trend
         trend,
-        // Charts / lists
         graphData,
         subjectAnalysis,
         topWeakTopics,
@@ -273,13 +207,6 @@ export const getAllAnalysis1stPage = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// PAGE 1 — FUNCTION 2
-// Graph click → ek specific mock ka pura breakdown
-// (overview summary + sawaal-by-sawaal: sahi/galat/explanation)
-// 🆕 Ab negative-marking impact bhi included hai
-// Route: GET /analysis/mock-detail/:performanceId
-// ─────────────────────────────────────────────
 export const getPerformanceAnalysis = async (req, res) => {
   try {
     const { performanceId } = req.params;
@@ -288,7 +215,6 @@ export const getPerformanceAnalysis = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid Performance ID" });
     }
 
-    // 🔒 SECURITY FIX: sirf apna hi performance doc padha ja sakta hai.
     const performance = await Performance.findOne({
       _id: performanceId,
       userId: req.user?._id,
@@ -326,16 +252,20 @@ export const getPerformanceAnalysis = async (req, res) => {
     const averageTimePerQuestion =
       totalQuestions === 0 ? 0 : Number((totalTimeTaken / totalQuestions).toFixed(2));
 
-    // 🆕 Negative marking breakdown — student ko dikhna chahiye guessing
-    // ne kitna nuksaan kiya
     const marksLostToNegative = Number((wrong * (blueprint.negativeMarking || 0)).toFixed(2));
     const maxPossibleScore = totalQuestions * blueprint.marksPerQuestion;
-    const scoreIfLeftBlankInsteadOfWrong = Number(
-      (correct * blueprint.marksPerQuestion).toFixed(2)
-    ); // agar galat guess na karte to itna hota
+    const scoreIfLeftBlankInsteadOfWrong = Number((correct * blueprint.marksPerQuestion).toFixed(2));
+
+    const questionIds = performance.attemptedQuestions
+      .map((aq) => (aq.questionId ? aq.questionId._id?.toString() || aq.questionId.toString() : null))
+      .filter(Boolean);
+
+    const batchTimeMap = await getBatchAverageTimePerQuestion(performance.examName, questionIds);
 
     const questionBreakdown = performance.attemptedQuestions.map((aq) => {
       const q = aq.questionId;
+      const qId = q ? (q._id ? q._id.toString() : q.toString()) : null;
+      const batchTime = qId ? batchTimeMap[qId] : null;
       return {
         questionId: q ? q._id : aq.questionId,
         question: q ? q.question : null,
@@ -347,10 +277,12 @@ export const getPerformanceAnalysis = async (req, res) => {
         isCorrect: aq.isCorrect,
         answerExplain: q ? q.answerExplain : null,
         answerExplainWithPhoto: q ? q.answerExplainWithPhoto : null,
-        askedIn: q ? q.askedIn : null, // 🆕
+        askedIn: q ? q.askedIn : null,
         topicName: q ? q.topicName : null,
         subjectName: q ? q.subjectName : null,
         timeTakenInSeconds: aq.timeTakenInSeconds,
+        batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+        batchTimeSampleSize: batchTime?.sampleSize ?? 0,
       };
     });
 
@@ -367,7 +299,6 @@ export const getPerformanceAnalysis = async (req, res) => {
         accuracy,
         totalTimeTaken,
         averageTimePerQuestion,
-        // 🆕
         marksPerQuestion: blueprint.marksPerQuestion,
         negativeMarking: blueprint.negativeMarking,
         marksLostToNegative,
@@ -381,10 +312,6 @@ export const getPerformanceAnalysis = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// PAGE 2: Subject-wise Analysis (koi change nahi — already sahi tha)
-// Route: GET /analysis/subject/:userId/:examName/:subjectName
-// ─────────────────────────────────────────────
 export const getSubjectAnalysis = async (req, res) => {
   try {
     let { userId, examName, subjectName } = req.params;
@@ -517,11 +444,6 @@ export const getSubjectAnalysis = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// PAGE 3: Topic-wise Analysis (koi change nahi — already sahi tha,
-// lifetime galat sawaal, explanation ke saath, already deta tha)
-// Route: GET /analysis/topic/:userId/:examName/:subjectName/:topicName
-// ─────────────────────────────────────────────
 export const getTopicAnalysis = async (req, res) => {
   try {
     let { userId, examName, subjectName, topicName } = req.params;
@@ -594,7 +516,7 @@ export const getTopicAnalysis = async (req, res) => {
           userAnswer: aq.userAnswer,
           answerExplain: qDoc.answerExplain,
           answerExplainWithPhoto: qDoc.answerExplainWithPhoto ?? null,
-          askedIn: qDoc.askedIn ?? null, // 🆕
+          askedIn: qDoc.askedIn ?? null,
           timeTakenInSeconds: aq.timeTakenInSeconds,
         };
 
@@ -614,15 +536,36 @@ export const getTopicAnalysis = async (req, res) => {
     const efficiency = totalAttempted === 0 ? 0 : Number(((totalCorrect / totalAttempted) * 100).toFixed(2));
     const averageTimePerQuestion = timedCount === 0 ? 0 : Number((totalTime / timedCount).toFixed(2));
 
+    const batchTopicTime = await getBatchAverageTimeForTopic(examName, subjectName, topicName);
+
+    const distinctQuestionIds = Object.keys(questionMap);
+    const batchTimeMap = await getBatchAverageTimePerQuestion(examName, distinctQuestionIds);
+
+    const attachBatchTime = (entry) => ({
+      ...entry,
+      batchAverageTimeSeconds: batchTimeMap[entry.questionId.toString()]?.averageTimeSeconds ?? null,
+      batchTimeSampleSize: batchTimeMap[entry.questionId.toString()]?.sampleSize ?? 0,
+    });
+
     return res.status(200).json({
       success: true,
       data: {
         topicName,
         subjectName,
-        summary: { efficiency, averageTimePerQuestion, totalAttempted, totalCorrect, totalWrong, totalUnattempted, totalMocksConsidered: allTests.length },
-        goodAt: goodAtQuestions,
-        wrong: wrongQuestions,
-        unattempted: unattemptedQuestions,
+        summary: {
+          efficiency,
+          averageTimePerQuestion,
+          totalAttempted,
+          totalCorrect,
+          totalWrong,
+          totalUnattempted,
+          totalMocksConsidered: allTests.length,
+          batchAverageTimeSeconds: batchTopicTime.averageTimeSeconds,
+          batchTimeSampleSize: batchTopicTime.sampleSize,
+        },
+        goodAt: goodAtQuestions.map(attachBatchTime),
+        wrong: wrongQuestions.map(attachBatchTime),
+        unattempted: unattemptedQuestions.map(attachBatchTime),
       },
     });
   } catch (error) {
@@ -634,10 +577,6 @@ export const getTopicAnalysis = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// Mock test list — user ke sare mocks (koi change nahi)
-// Route: GET /analysis/mock-list/:userId/:examName
-// ─────────────────────────────────────────────
 export const getUserMockTests = async (req, res) => {
   try {
     const { examName } = req.params;

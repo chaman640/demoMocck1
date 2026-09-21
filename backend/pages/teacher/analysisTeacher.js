@@ -1,27 +1,16 @@
-// backend/pages/teacher/analysisTeacher.js
-//
-// 🆕 REDESIGN — teacher ab student ka sirf "last 3 mocks ka average" nahi,
-// poora lifetime picture dekh sakta hai: trend (improve/decline), cross-subject
-// weak topics (ek click mein), aur Mock/PYQ/Custom Test teenon ka comparison —
-// taaki pata chale student kis TYPE ke test mein sabse zyada struggle karta hai.
-//
-// Teacher-facing analysis — Main/Sub Teacher apne active-coupon ke
-// students ka overview/subject/topic analysis dekh sakte hain.
-// STRICT PRIVACY: target student ka activeCoupon teacher ke
-// activeCoupon se match karna zaroori hai, warna 403 — kisi doosre
-// teacher/batch ke student ka data kabhi access nahi hoga.
 import mongoose from "mongoose";
 import User from "../../models/User.js";
 import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
 import HiddenQuestion from "../../models/HiddenQuestion.js";
-import { getTestTypeComparison } from "../../utils/classAnalytics.js"; // 🆕 reuse
+import PreviousYearAttempt from "../../models/PreviousYearAttempt.js";
+import PreviousYearTest from "../../models/PreviousYearTest.js";
+import CustomTestAttempt from "../../models/CustomTestAttempt.js";
+import CustomTest from "../../models/CustomTest.js";
+import { getTestTypeComparison, getAllowedSubjectsForTeacher, getBatchAverageTimePerQuestion, getBatchAverageTimePerEmbeddedQuestion } from "../../utils/classAnalytics.js";
+import { sameSubject } from "../../utils/subjectName.js";
 
-// ─────────────────────────────────────────────
-// Reusable helper — teacher ke activeCoupon ke against student verify
-// karta hai. Har teacher-analysis route isko sabse pehle call karega.
-// ─────────────────────────────────────────────
 const verifyStudentAccess = async (teacher, studentId) => {
   if (!mongoose.Types.ObjectId.isValid(studentId)) {
     return { allowed: false, status: 400, message: "Invalid Student ID." };
@@ -42,7 +31,14 @@ const verifyStudentAccess = async (teacher, studentId) => {
   return { allowed: true, student };
 };
 
-// 🆕 Same helper jo student-side analysicUser.js mein hai — % based average
+const assertSubjectAllowed = async (teacher, subjectName) => {
+  const allowedSubjects = await getAllowedSubjectsForTeacher(teacher);
+  if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, subjectName))) {
+    return { allowed: false, allowedSubjects };
+  }
+  return { allowed: true, allowedSubjects };
+};
+
 function averagePercent(tests, blueprintByName) {
   const percentages = [];
   for (const test of tests) {
@@ -62,11 +58,6 @@ function scoreFromPercent(percent, primaryBlueprint) {
   return { score: Math.round((percent / 100) * outOf), outOf };
 }
 
-// ─────────────────────────────────────────────
-// TEACHER — Overview: lifetime average, trend, subject list, cross-subject
-// weak topics, test-type comparison (Mock/PYQ/Custom Test)
-// Route: GET /teacher/analysis/overview/:studentId/:examName
-// ─────────────────────────────────────────────
 export const getStudentOverview = async (req, res) => {
   try {
     const { studentId, examName } = req.params;
@@ -76,23 +67,49 @@ export const getStudentOverview = async (req, res) => {
       return res.status(check.status).json({ success: false, message: check.message });
     }
 
-    const allTests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 });
+    const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
 
-    // 🆕 Test-type comparison chalti hai chahe mock diya ho ya nahi —
-    // ho sakta hai student sirf Custom Test/PYQ deta ho, mock kabhi nahi
     const testTypeComparison = await getTestTypeComparison([new mongoose.Types.ObjectId(studentId)], examName);
+
+    const [pyqHistoryRaw, customTestHistoryRaw] = await Promise.all([
+      PreviousYearAttempt.find({ userId: studentId, examName })
+        .select("_id testId testName year totalScore createdAt")
+        .sort({ createdAt: -1 }),
+      CustomTestAttempt.find({ userId: studentId, examName })
+        .select("_id testId testName totalScore createdAt")
+        .sort({ createdAt: -1 }),
+    ]);
+
+    const pyqHistory = pyqHistoryRaw.map((a) => ({
+      attemptId: a._id,
+      testId: a.testId,
+      testName: a.testName,
+      year: a.year,
+      score: a.totalScore,
+      date: a.createdAt,
+    }));
+
+    const customTestHistory = customTestHistoryRaw.map((a) => ({
+      attemptId: a._id,
+      testId: a.testId,
+      testName: a.testName,
+      score: a.totalScore,
+      date: a.createdAt,
+    }));
+
+    const allTests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 });
 
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
         message: "Is student ne abhi tak koi mock nahi diya hai.",
         studentName: check.student.name,
-        data: { mockDataAvailable: false, testTypeComparison },
+        data: { mockDataAvailable: false, testTypeComparison, pyqHistory, customTestHistory },
       });
     }
 
     const last3Tests = allTests.slice(0, 3);
-    const previous3Tests = allTests.slice(3, 6); // 🆕 trend ke liye
+    const previous3Tests = allTests.slice(3, 6);
 
     const examBlueprints = await Blueprint.find({ examName }).select(
       "blueprintName totalQuestions marksPerQuestion negativeMarking mockType"
@@ -112,12 +129,10 @@ export const getStudentOverview = async (req, res) => {
       averageScoreOutOf = null;
     }
 
-    // 🆕 Lifetime average
     const lifetimePercent = averagePercent(allTests, blueprintByName);
     const { score: lifetimeAverageScore, outOf: lifetimeAverageScoreOutOf } =
       scoreFromPercent(lifetimePercent, primaryBlueprint);
 
-    // 🆕 Trend
     let trend = null;
     if (previous3Tests.length > 0) {
       const previousPercent = averagePercent(previous3Tests, blueprintByName);
@@ -137,6 +152,7 @@ export const getStudentOverview = async (req, res) => {
     const subjectMap = {};
     last3Tests.forEach((test) => {
       (test.subjectAnalysis || []).forEach((sub) => {
+        if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, sub.subjectName))) return;
         if (!subjectMap[sub.subjectName]) subjectMap[sub.subjectName] = { totalAcc: 0, totalTime: 0, count: 0 };
         subjectMap[sub.subjectName].totalAcc += sub.accuracy;
         subjectMap[sub.subjectName].totalTime += sub.averageTimePerQuestion ?? 0;
@@ -150,7 +166,6 @@ export const getStudentOverview = async (req, res) => {
       averageTimePerQuestion: Number((subjectMap[name].totalTime / subjectMap[name].count).toFixed(2)),
     }));
 
-    // 🆕 Lifetime totals + negative marking impact
     let totalCorrectLifetime = 0, totalWrongLifetime = 0, totalUnattemptedLifetime = 0, marksLostToNegativeLifetime = 0;
     for (const test of allTests) {
       totalCorrectLifetime += test.correctCount || 0;
@@ -161,9 +176,6 @@ export const getStudentOverview = async (req, res) => {
     }
     marksLostToNegativeLifetime = Number(marksLostToNegativeLifetime.toFixed(2));
 
-    // 🆕 Cross-subject weak topics — lifetime, sirf mock-pool questions se
-    // (PYQ/Custom Test ke embedded questions class-analysis mein already
-    // cover ho rahe hain; yahan is student ki mock-based weak-topic list hai)
     const allQuestionIds = allTests.flatMap((test) => test.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean));
     const questionDocs = await RowQuestion.find({ _id: { $in: allQuestionIds } }).select("_id topicName subjectName");
     const questionMetaMap = {};
@@ -175,6 +187,8 @@ export const getStudentOverview = async (req, res) => {
         if (!aq.questionId) continue;
         const meta = questionMetaMap[aq.questionId.toString()];
         if (!meta || !meta.topicName) continue;
+        if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, meta.subjectName))) continue;
+
         const key = `${meta.subjectName}::${meta.topicName}`;
         if (!topicGroups[key]) {
           topicGroups[key] = { subjectName: meta.subjectName, topicName: meta.topicName, correct: 0, wrong: 0, total: 0, totalTime: 0, timedCount: 0 };
@@ -229,7 +243,9 @@ export const getStudentOverview = async (req, res) => {
         graphData,
         subjectAnalysis,
         topWeakTopics,
-        testTypeComparison, // 🆕
+        testTypeComparison,
+        pyqHistory,
+        customTestHistory,
       },
     });
   } catch (error) {
@@ -238,10 +254,6 @@ export const getStudentOverview = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// TEACHER — Ek specific mock ka pura breakdown (🆕 negative marking added)
-// Route: GET /teacher/analysis/mock-detail/:studentId/:performanceId
-// ─────────────────────────────────────────────
 export const getStudentMockDetail = async (req, res) => {
   try {
     const { studentId, performanceId } = req.params;
@@ -275,26 +287,39 @@ export const getStudentMockDetail = async (req, res) => {
     const averageTimePerQuestion = totalQuestions === 0 ? 0 : Number((totalTimeTaken / totalQuestions).toFixed(2));
     const accuracy = totalQuestions === 0 ? 0 : Number(((performance.correctCount / totalQuestions) * 100).toFixed(2));
 
-    // 🆕 Negative marking breakdown
     const marksLostToNegative = Number((performance.wrongCount * (blueprint.negativeMarking || 0)).toFixed(2));
     const scoreIfLeftBlankInsteadOfWrong = Number((performance.correctCount * blueprint.marksPerQuestion).toFixed(2));
 
-    const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId;
-      return {
-        questionId: q ? q._id : aq.questionId,
-        question: q ? q.question : null,
-        options: q ? { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 } : null,
-        correctOption: q ? q.correctOption : null,
-        userAnswer: aq.userAnswer,
-        isCorrect: aq.isCorrect,
-        answerExplain: q ? q.answerExplain : null,
-        askedIn: q ? q.askedIn : null, // 🆕
-        topicName: q ? q.topicName : null,
-        subjectName: q ? q.subjectName : null,
-        timeTakenInSeconds: aq.timeTakenInSeconds,
-      };
-    });
+    const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
+
+    const questionIds = performance.attemptedQuestions
+      .map((aq) => (aq.questionId ? aq.questionId._id?.toString() || aq.questionId.toString() : null))
+      .filter(Boolean);
+    const batchTimeMap = await getBatchAverageTimePerQuestion(performance.examName, questionIds);
+
+    const questionBreakdown = performance.attemptedQuestions
+      .map((aq) => {
+        const q = aq.questionId;
+        if (Array.isArray(allowedSubjects) && q && !allowedSubjects.some((a) => sameSubject(a, q.subjectName))) return null;
+        const qId = q ? (q._id ? q._id.toString() : q.toString()) : null;
+        const batchTime = qId ? batchTimeMap[qId] : null;
+        return {
+          questionId: q ? q._id : aq.questionId,
+          question: q ? q.question : null,
+          options: q ? { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 } : null,
+          correctOption: q ? q.correctOption : null,
+          userAnswer: aq.userAnswer,
+          isCorrect: aq.isCorrect,
+          answerExplain: q ? q.answerExplain : null,
+          askedIn: q ? q.askedIn : null,
+          topicName: q ? q.topicName : null,
+          subjectName: q ? q.subjectName : null,
+          timeTakenInSeconds: aq.timeTakenInSeconds,
+          batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+          batchTimeSampleSize: batchTime?.sampleSize ?? 0,
+        };
+      })
+      .filter(Boolean);
 
     return res.status(200).json({
       success: true,
@@ -310,7 +335,6 @@ export const getStudentMockDetail = async (req, res) => {
         accuracy,
         totalTimeTaken,
         averageTimePerQuestion,
-        // 🆕
         negativeMarking: blueprint.negativeMarking,
         marksLostToNegative,
         scoreIfLeftBlankInsteadOfWrong,
@@ -323,10 +347,170 @@ export const getStudentMockDetail = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// TEACHER — Subject-wise Analysis (koi change nahi — already sahi tha)
-// Route: GET /teacher/analysis/subject/:studentId/:examName/:subjectName
-// ─────────────────────────────────────────────
+export const getStudentPYQAttemptDetail = async (req, res) => {
+  try {
+    const { studentId, attemptId } = req.params;
+
+    const check = await verifyStudentAccess(req.teacher, studentId);
+    if (!check.allowed) {
+      return res.status(check.status).json({ success: false, message: check.message });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
+      return res.status(400).json({ success: false, message: "Invalid Attempt ID" });
+    }
+
+    const attempt = await PreviousYearAttempt.findOne({ _id: attemptId, userId: studentId });
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: "This attempt was not found." });
+    }
+
+    const test = await PreviousYearTest.findById(attempt.testId);
+    if (!test) {
+      return res.status(404).json({ success: false, message: "The original test is no longer available." });
+    }
+
+    const questionMap = {};
+    for (const subj of test.subjects) {
+      for (const q of subj.questions) questionMap[q._id.toString()] = q;
+    }
+
+    const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
+    const questionIds = attempt.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean);
+    const batchTimeMap = await getBatchAverageTimePerEmbeddedQuestion(PreviousYearAttempt, test._id, questionIds);
+
+    const questionBreakdown = attempt.attemptedQuestions
+      .map((aq) => {
+        const qId = aq.questionId ? aq.questionId.toString() : null;
+        const q = qId ? questionMap[qId] : null;
+        if (!q) return null;
+        if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, q.subjectName))) return null;
+
+        const batchTime = qId ? batchTimeMap[qId] : null;
+
+        return {
+          questionId: q._id,
+          question: q.question,
+          options: { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 },
+          correctOption: q.correctOption,
+          userAnswer: aq.userAnswer,
+          isCorrect: aq.isCorrect,
+          answerExplain: q.answerExplain || null,
+          topicName: q.topicName,
+          subjectName: q.subjectName,
+          timeTakenInSeconds: aq.timeTakenInSeconds,
+          batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+          batchTimeSampleSize: batchTime?.sampleSize ?? 0,
+        };
+      })
+      .filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      studentName: check.student.name,
+      data: {
+        attemptId: attempt._id,
+        testName: attempt.testName,
+        year: attempt.year,
+        overview: {
+          totalScore: attempt.totalScore,
+          correctCount: attempt.correctCount,
+          wrongCount: attempt.wrongCount,
+          unattemptedCount: attempt.unattemptedCount,
+          totalTimeTakenInSeconds: attempt.totalTimeTakenInSeconds,
+        },
+        questionBreakdown,
+      },
+    });
+  } catch (error) {
+    console.error("getStudentPYQAttemptDetail error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getStudentCustomTestAttemptDetail = async (req, res) => {
+  try {
+    const { studentId, attemptId } = req.params;
+
+    const check = await verifyStudentAccess(req.teacher, studentId);
+    if (!check.allowed) {
+      return res.status(check.status).json({ success: false, message: check.message });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(attemptId)) {
+      return res.status(400).json({ success: false, message: "Invalid Attempt ID" });
+    }
+
+    const attempt = await CustomTestAttempt.findOne({ _id: attemptId, userId: studentId });
+    if (!attempt) {
+      return res.status(404).json({ success: false, message: "This attempt was not found." });
+    }
+
+    const test = await CustomTest.findById(attempt.testId);
+    if (!test) {
+      return res.status(404).json({ success: false, message: "The original test is no longer available." });
+    }
+
+    const questionMap = {};
+    for (const subj of test.subjects) {
+      for (const q of subj.questions) questionMap[q._id.toString()] = q;
+    }
+
+    const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
+    const questionIds = attempt.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean);
+    const batchTimeMap = await getBatchAverageTimePerEmbeddedQuestion(CustomTestAttempt, test._id, questionIds);
+
+    const questionBreakdown = attempt.attemptedQuestions
+      .map((aq) => {
+        const qId = aq.questionId ? aq.questionId.toString() : null;
+        const q = qId ? questionMap[qId] : null;
+        if (!q) return null;
+        if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, q.subjectName))) return null;
+
+        const batchTime = qId ? batchTimeMap[qId] : null;
+
+        return {
+          questionId: q._id,
+          question: q.question,
+          questionPhoto: q.questionPhoto || null,
+          options: { option1: q.option1, option2: q.option2, option3: q.option3, option4: q.option4 },
+          correctOption: q.correctOption,
+          userAnswer: aq.userAnswer,
+          isCorrect: aq.isCorrect,
+          answerExplain: q.answerExplain || null,
+          answerExplainWithPhoto: q.answerExplainWithPhoto || null,
+          askedIn: q.askedIn || null,
+          topicName: q.topicName,
+          subjectName: q.subjectName,
+          timeTakenInSeconds: aq.timeTakenInSeconds,
+          batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+          batchTimeSampleSize: batchTime?.sampleSize ?? 0,
+        };
+      })
+      .filter(Boolean);
+
+    return res.status(200).json({
+      success: true,
+      studentName: check.student.name,
+      data: {
+        attemptId: attempt._id,
+        testName: attempt.testName,
+        overview: {
+          totalScore: attempt.totalScore,
+          correctCount: attempt.correctCount,
+          wrongCount: attempt.wrongCount,
+          unattemptedCount: attempt.unattemptedCount,
+          totalTimeTakenInSeconds: attempt.totalTimeTakenInSeconds,
+        },
+        questionBreakdown,
+      },
+    });
+  } catch (error) {
+    console.error("getStudentCustomTestAttemptDetail error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 export const getStudentSubjectAnalysis = async (req, res) => {
   try {
     const { studentId, examName, subjectName } = req.params;
@@ -334,6 +518,11 @@ export const getStudentSubjectAnalysis = async (req, res) => {
     const check = await verifyStudentAccess(req.teacher, studentId);
     if (!check.allowed) {
       return res.status(check.status).json({ success: false, message: check.message });
+    }
+
+    const subjectCheck = await assertSubjectAllowed(req.teacher, subjectName);
+    if (!subjectCheck.allowed) {
+      return res.status(403).json({ success: false, message: `You are not authorized for the '${subjectName}' subject.` });
     }
 
     const last3Tests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 }).limit(3);
@@ -432,10 +621,6 @@ export const getStudentSubjectAnalysis = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────
-// TEACHER — Topic-wise Analysis (koi change nahi — already sahi tha)
-// Route: GET /teacher/analysis/topic/:studentId/:examName/:subjectName/:topicName
-// ─────────────────────────────────────────────
 export const getStudentTopicAnalysis = async (req, res) => {
   try {
     const { studentId, examName, subjectName, topicName } = req.params;
@@ -443,6 +628,11 @@ export const getStudentTopicAnalysis = async (req, res) => {
     const check = await verifyStudentAccess(req.teacher, studentId);
     if (!check.allowed) {
       return res.status(check.status).json({ success: false, message: check.message });
+    }
+
+    const subjectCheck = await assertSubjectAllowed(req.teacher, subjectName);
+    if (!subjectCheck.allowed) {
+      return res.status(403).json({ success: false, message: `You are not authorized for the '${subjectName}' subject.` });
     }
 
     const allTests = await Performance.find({ userId: studentId, examName }).sort({ createdAt: -1 });
@@ -492,7 +682,7 @@ export const getStudentTopicAnalysis = async (req, res) => {
           correctOption: qDoc.correctOption,
           userAnswer: aq.userAnswer,
           answerExplain: qDoc.answerExplain,
-          askedIn: qDoc.askedIn ?? null, // 🆕
+          askedIn: qDoc.askedIn ?? null,
           timeTakenInSeconds: aq.timeTakenInSeconds,
         };
 

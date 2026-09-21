@@ -21,7 +21,7 @@ const PageSkeleton = () => (
 );
 
 const FILTERS = [
-  { key: "all", label: "Sabhi Students" },
+  { key: "all", label: "All Students" },
   { key: "top25", label: "Top 25%" },
   { key: "bottom25", label: "Bottom 25%" },
   { key: "custom", label: "Custom" },
@@ -33,13 +33,30 @@ const wrongColor = (pct) => {
   return "text-green-400 bg-green-500/10 border-green-500/30";
 };
 
+const timeColor = (seconds, allSeconds) => {
+  if (seconds == null) return "text-gray-500 bg-gray-500/10 border-gray-500/30";
+  const sorted = [...allSeconds].sort((a, b) => a - b);
+  const idx = sorted.indexOf(seconds);
+  const pct = sorted.length > 1 ? idx / (sorted.length - 1) : 0;
+  if (pct >= 0.66) return "text-orange-400 bg-orange-500/10 border-orange-500/30";
+  if (pct >= 0.33) return "text-yellow-400 bg-yellow-500/10 border-yellow-500/30";
+  return "text-blue-400 bg-blue-500/10 border-blue-500/30";
+};
+
+const formatTime = (seconds) => {
+  if (seconds == null) return "—";
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}m ${s}s`;
+};
+
 const sourceLabelColor = {
   "Mock Test": "text-[#A78BFA] bg-[#A78BFA]/10 border-[#A78BFA]/30",
   "Previous Year Paper": "text-blue-400 bg-blue-500/10 border-blue-500/30",
   "Custom Test": "text-orange-400 bg-orange-500/10 border-orange-500/30",
 };
 
-// 🆕 Test-Type Comparison — Mock vs PYQ vs Custom Test, ek nazar mein
 const accuracyBarColor = (acc) => (acc >= 70 ? "#34D399" : acc >= 40 ? "#FBBF24" : "#F87171");
 
 const TestTypeComparisonChart = ({ data }) => {
@@ -47,7 +64,7 @@ const TestTypeComparisonChart = ({ data }) => {
   if (withData.length === 0) {
     return (
       <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-        <p className="text-sm text-gray-400">Abhi kisi bhi test-type mein attempt data nahi hai.</p>
+        <p className="text-sm text-gray-400">No attempt data yet for any test-type.</p>
       </div>
     );
   }
@@ -55,7 +72,7 @@ const TestTypeComparisonChart = ({ data }) => {
     <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
       <div className="px-4 py-3 border-b border-gray-800">
         <h3 className="font-semibold text-sm">Test-Type Comparison</h3>
-        <p className="text-[11px] text-gray-500 mt-0.5">Batch kis type ke test mein sabse zyada struggle kar rahi hai</p>
+        <p className="text-[11px] text-gray-500 mt-0.5">Where the batch struggles the most, by test type</p>
       </div>
       <div className="px-2 py-4">
         <ResponsiveContainer width="100%" height={Math.max(100, withData.length * 50)}>
@@ -78,7 +95,6 @@ const TestTypeComparisonChart = ({ data }) => {
   );
 };
 
-// 🆕 Ek topic ke andar kis test-type se kitni galtiyan aayi — chhote badges
 const SourceBreakdownBadges = ({ bySource }) => {
   if (!bySource) return null;
   const items = [
@@ -200,7 +216,7 @@ const TeacherClassAnalysis = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -208,18 +224,21 @@ const TeacherClassAnalysis = () => {
     );
   }
 
-  // ── Drill-down view ──
   if (drillDown) {
+    const allTimes = (questionData?.questions || [])
+      .map((q) => q.averageTimeSeconds)
+      .filter((v) => v != null);
+
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
         <div className="max-w-2xl mx-auto space-y-6">
           <button onClick={closeDrillDown} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-            &larr; Topics Par Wapas
+            &larr; Back to Topics
           </button>
 
           <div>
             <h1 className="text-xl font-bold mb-1">{drillDown.topicName}</h1>
-            <p className="text-gray-400 text-sm">{drillDown.subjectName} &middot; question-level breakdown (sabhi test-types se)</p>
+            <p className="text-gray-400 text-sm">{drillDown.subjectName} &middot; question-level breakdown (all test-types)</p>
           </div>
 
           {questionPhase === "loading" && (
@@ -237,12 +256,12 @@ const TeacherClassAnalysis = () => {
           {questionPhase === "loaded" && questionData && (
             <>
               <p className="text-xs text-gray-500">
-                {questionData.selectedCount} students ka data (batch mein total {questionData.totalBatchStudents})
+                {questionData.selectedCount} students' data (batch total: {questionData.totalBatchStudents})
               </p>
 
               {questionData.questions.length === 0 ? (
                 <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-                  <p className="text-sm text-gray-400">Is topic ke liye koi attempt data nahi mila.</p>
+                  <p className="text-sm text-gray-400">No attempt data found for this topic.</p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -251,9 +270,17 @@ const TeacherClassAnalysis = () => {
                       <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${wrongColor(q.wrongPercentage)}`}>
-                            {q.wrongPercentage}% galat
+                            {q.wrongPercentage}% wrong
                           </span>
-                          {/* 🆕 Ye sawaal kis test-type/paper ka hai */}
+                          {q.averageTimeSeconds != null ? (
+                            <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${timeColor(q.averageTimeSeconds, allTimes)}`}>
+                              ⏱ {formatTime(q.averageTimeSeconds)} avg
+                            </span>
+                          ) : (
+                            <span className="text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 text-gray-500 bg-gray-500/10 border-gray-500/30">
+                              ⏱ not enough data
+                            </span>
+                          )}
                           <span className={`text-[10px] px-2 py-0.5 rounded-full border ${sourceLabelColor[q.sourceType] || "text-gray-400 bg-gray-500/10 border-gray-500/30"}`}>
                             {q.sourceType}{q.sourceName ? ` · ${q.sourceName}` : ""}
                           </span>
@@ -293,24 +320,40 @@ const TeacherClassAnalysis = () => {
     );
   }
 
-  // ── Main topic-list view ──
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold mb-1">Class Analysis</h1>
-            <p className="text-gray-400 text-sm">Combining Mock Tests, Previous Year Papers, and Custom Tests — which topics the whole class struggles with the most</p>
+            <p className="text-gray-400 text-sm">Combining Mock Tests, Previous Year Papers, and Custom Tests — which topics the whole class struggles with the most, including how long each one takes</p>
           </div>
         </div>
 
-        {/* 🆕 Ek student ka individual analysis dekhna ho to yahan se search karein */}
         <button
           onClick={() => navigate("/TeacherStudentSearch")}
           className="w-full flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
         >
           <span className="text-lg">🔍</span>
-          <span className="text-sm font-medium flex-1">Kisi Ek Student Ka Analysis Dekhein</span>
+          <span className="text-sm font-medium flex-1">View an Individual Student's Analysis</span>
+          <span className="text-gray-600">→</span>
+        </button>
+
+        <button
+          onClick={() => navigate("/TeacherMockLeaderboard")}
+          className="w-full flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
+        >
+          <span className="text-lg">🏆</span>
+          <span className="text-sm font-medium flex-1">Mock Test Leaderboard</span>
+          <span className="text-gray-600">→</span>
+        </button>
+
+        <button
+          onClick={() => navigate("/TeacherBulkStudents")}
+          className="w-full flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
+        >
+          <span className="text-lg">👥</span>
+          <span className="text-sm font-medium flex-1">Bulk Student Management</span>
           <span className="text-gray-600">→</span>
         </button>
 
@@ -363,40 +406,79 @@ const TeacherClassAnalysis = () => {
             {topicPhase === "loaded" && topicData && (
               <>
                 <p className="text-xs text-gray-500">
-                  {topicData.selectedCount} students ka data &middot; batch mein total {topicData.totalBatchStudents} students
+                  {topicData.selectedCount} students' data &middot; batch total: {topicData.totalBatchStudents} students
                 </p>
 
-                {/* 🆕 Test-Type Comparison */}
+                {topicData.misconceptions?.length > 0 && (
+                  <div className="bg-[#111827] border border-orange-500/30 rounded-2xl overflow-hidden shadow-lg">
+                    <div className="px-4 py-3 border-b border-orange-500/20 bg-orange-500/5">
+                      <h3 className="font-semibold text-sm text-orange-400">⚠️ Biggest Misconceptions</h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Questions where most students who got it wrong all picked the SAME wrong option — a clear conceptual gap, not random mistakes (Mock Test data)</p>
+                    </div>
+                    <div className="divide-y divide-gray-800">
+                      {topicData.misconceptions.map((m) => (
+                        <div key={m.questionId} className="px-4 py-3">
+                          <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+                            <span className="text-[11px] text-gray-500">{m.subjectName} &middot; {m.topicName}</span>
+                            <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-500/10 text-orange-400 border border-orange-500/30">
+                              {m.dominantWrongPercentage}% picked the same wrong option
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-200 mb-2">{m.question}</p>
+                          <p className="text-xs text-gray-400">
+                            Most picked: <span className="text-orange-400 font-medium">Option {m.dominantWrongOption} — {m.options[`option${m.dominantWrongOption}`]}</span>
+                            <span className="text-gray-600"> (correct: Option {m.correctOption} — {m.options[`option${m.correctOption}`]})</span>
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <TestTypeComparisonChart data={topicData.testTypeComparison} />
 
                 {topicData.topics.length === 0 ? (
                   <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-                    <p className="text-sm text-gray-400">Is filter ke liye koi attempt data nahi mila.</p>
+                    <p className="text-sm text-gray-400">No attempt data found for this filter.</p>
                   </div>
                 ) : (
                   <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-800">
                       <h3 className="font-semibold text-sm">Topic-wise Error Breakdown</h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Topics with the most mistakes appear first &middot; the Mock/PYQ/Custom badge shows where the data comes from</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Topics with the most mistakes appear first &middot; the clock badge shows average time spent per question</p>
                     </div>
                     <div className="divide-y divide-gray-800">
-                      {topicData.topics.map((t, i) => (
-                        <button
-                          key={i}
-                          onClick={() => openDrillDown(t.subjectName, t.topicName)}
-                          className="w-full text-left px-4 py-3.5 hover:bg-[#1F2937]/50 transition-colors flex items-center gap-3"
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-gray-200 truncate">{t.topicName}</p>
-                            <p className="text-[11px] text-gray-500 mt-0.5">{t.subjectName} &middot; {t.totalAttempts} attempts</p>
-                            <SourceBreakdownBadges bySource={t.bySource} />
-                          </div>
-                          <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex-shrink-0 ${wrongColor(t.wrongPercentage)}`}>
-                            {t.wrongPercentage}% galat
-                          </span>
-                          <span className="text-[#A78BFA] text-xs flex-shrink-0">→</span>
-                        </button>
-                      ))}
+                      {topicData.topics.map((t, i) => {
+                        const allTimes = topicData.topics.map((x) => x.averageTimeSeconds).filter((v) => v != null);
+                        return (
+                          <button
+                            key={i}
+                            onClick={() => openDrillDown(t.subjectName, t.topicName)}
+                            className="w-full text-left px-4 py-3.5 hover:bg-[#1F2937]/50 transition-colors flex items-center gap-3"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm text-gray-200 truncate">{t.topicName}</p>
+                              <p className="text-[11px] text-gray-500 mt-0.5">{t.subjectName} &middot; {t.totalAttempts} attempts</p>
+                              <SourceBreakdownBadges bySource={t.bySource} />
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${wrongColor(t.wrongPercentage)}`}>
+                                {t.wrongPercentage}% wrong
+                              </span>
+                              {t.averageTimeSeconds != null ? (
+                                <span className={`text-[10px] px-2 py-0.5 rounded-full border ${timeColor(t.averageTimeSeconds, allTimes)}`}>
+                                  ⏱ {formatTime(t.averageTimeSeconds)} avg
+                                </span>
+                              ) : (
+                                <span className="text-[10px] px-2 py-0.5 rounded-full border text-gray-500 bg-gray-500/10 border-gray-500/30">
+                                  ⏱ n/a
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[#A78BFA] text-xs flex-shrink-0">→</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

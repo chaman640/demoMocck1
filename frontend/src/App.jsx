@@ -45,7 +45,10 @@ import TeacherStudentTopicAnalysis from './pages/teacher/TeacherStudentTopicAnal
 import TeacherClassAnalysis from './pages/teacher/TeacherClassAnalysis';
 import TeacherCoupons from './pages/teacher/TeacherCoupons';
 import TeacherBatchStudents from './pages/teacher/TeacherBatchStudents'; // 🆕
-import TeacherForgotPassword from './pages/teacher/TeacherForgotPassword'; // 🆕
+import TeacherForgotPassword from './pages/teacher/TeacherForgotPassword';
+import TeacherMockLeaderboard from "./pages/teacher/TeacherMockLeaderboard.jsx";
+import TeacherStudentReportPrint from "./pages/teacher/TeacherStudentReportPrint.jsx";
+import TeacherBulkStudents from "./pages/teacher/TeacherBulkStudents.jsx"; // 🆕
 
 // 🆕 Admin pages (magic-link login)
 import AdminLogin from './pages/AdminLogin';
@@ -189,7 +192,10 @@ const App = () => {
 
             {/* Galat URL par blank page ke bajaye ab helpful screen */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
+                  <Route path="/TeacherMockLeaderboard" element={<TeacherMockLeaderboard />} />
+        <Route path="/TeacherStudentReportPrint" element={<TeacherStudentReportPrint />} />
+              <Route path="/TeacherBulkStudents" element={<TeacherBulkStudents />} />
+      </Routes>
         </div>
       </HashRouter>
       </QueryClientProvider>

@@ -1,18 +1,4 @@
-// backend/utils/classAnalytics.js
-//
-// 🆕 REDESIGN — pehle ye sirf Mock Test (Performance model) ka data dekhta
-// tha. Teacher khud jo Previous Year Papers aur Custom Tests banata hai,
-// unke attempts (PreviousYearAttempt, CustomTestAttempt) is analysis mein
-// KABHI shaamil hi nahi hote the — matlab teacher ko apne khud ke banaye
-// content ka koi feedback hi nahi milta tha.
-//
-// Ab teenon sources merge hote hain:
-//   1. Mock Test        → Performance + rowQuestion pool
-//   2. Previous Year    → PreviousYearAttempt + PreviousYearTest (embedded questions)
-//   3. Custom Test      → CustomTestAttempt + CustomTest (embedded questions)
-//
-// Reusable aggregation helpers — teacher ke active-coupon ke students ka
-// class-level topic/question analysis banane ke liye.
+import mongoose from "mongoose";
 import User from "../models/User.js";
 import Coupon from "../models/Coupon.js";
 import CouponAccess from "../models/CouponAccess.js";
@@ -24,10 +10,9 @@ import PreviousYearTest from "../models/PreviousYearTest.js";
 import { Question as RowQuestion } from "../models/rowQuestionSchema.js";
 import { ciExact, subjectKey, sameSubject } from "./subjectName.js";
 
-// ─────────────────────────────────────────────
-// Sub-teacher ke liye uske active-coupon mein authorized subjects.
-// Main Teacher ke liye null (koi restriction nahi).
-// ─────────────────────────────────────────────
+const TOPIC_TIME_MIN_SAMPLE = 5;
+const QUESTION_TIME_MIN_SAMPLE = 3;
+
 export const getAllowedSubjectsForTeacher = async (teacher) => {
   if (teacher.role === "main") return null;
   const records = await CouponAccess.find({
@@ -37,13 +22,6 @@ export const getAllowedSubjectsForTeacher = async (teacher) => {
   return records.map((r) => r.subject);
 };
 
-// ─────────────────────────────────────────────
-// 🆕 Helper: embedded question schema wale test models (CustomTest,
-// PreviousYearTest) dono ka structure same hai — subjects[].questions[]
-// jisme har question ka apna _id, topicName, subjectName hai. Ek hi
-// helper dono ke liye reuse hota hai.
-// Returns Map: "testId::questionId" → { subjectName, topicName, ...fullData }
-// ─────────────────────────────────────────────
 const buildEmbeddedQuestionMap = (testDocs, { fullData = false } = {}) => {
   const map = new Map();
   for (const doc of testDocs) {
@@ -69,13 +47,6 @@ const buildEmbeddedQuestionMap = (testDocs, { fullData = false } = {}) => {
   return map;
 };
 
-// ─────────────────────────────────────────────
-// Teacher ke active-coupon ke students ko percentile-filter ke hisaab se
-// resolve karta hai. examName bhi coupon se hi derive hota hai.
-// 🆕 Ranking ab sirf Mock Test se nahi — Mock + Custom Test + PYQ teenon
-// ke correct/wrong/unattempted jod ke banti hai, taaki "top/bottom 25%"
-// poore performance ko reflect kare, sirf mock test ko nahi.
-// ─────────────────────────────────────────────
 export const resolveFilteredStudentIds = async (
   teacher,
   { filter = "all", minPercentile, maxPercentile }
@@ -128,14 +99,13 @@ export const resolveFilteredStudentIds = async (
     },
   };
 
-  // 🆕 Teenon sources se ranking data jod rahe hain
   const [mockAgg, customAgg, pyqAgg] = await Promise.all([
     Performance.aggregate([{ $match: { userId: { $in: studentObjIds }, examName: coupon.exam } }, groupStage]),
     CustomTestAttempt.aggregate([{ $match: { userId: { $in: studentObjIds }, examName: coupon.exam } }, groupStage]),
     PreviousYearAttempt.aggregate([{ $match: { userId: { $in: studentObjIds }, examName: coupon.exam } }, groupStage]),
   ]);
 
-  const combined = new Map(); // userId → { correct, wrong, unattempted }
+  const combined = new Map();
   for (const arr of [mockAgg, customAgg, pyqAgg]) {
     for (const row of arr) {
       const key = row._id.toString();
@@ -190,10 +160,6 @@ export const resolveFilteredStudentIds = async (
   };
 };
 
-// ─────────────────────────────────────────────
-// 🆕 Test-Type Comparison — batch Mock/PYQ/Custom Test mein se kis type
-// mein sabse zyada struggle kar rahi hai, ek nazar mein.
-// ─────────────────────────────────────────────
 export const getTestTypeComparison = async (studentIds, examName) => {
   if (studentIds.length === 0) return [];
 
@@ -233,16 +199,14 @@ export const getTestTypeComparison = async (studentIds, examName) => {
   ];
 };
 
-// ─────────────────────────────────────────────
-// CORE 1: Topic-wise wrong% breakdown — 🆕 ab teenon sources se merge hota hai
-// allowedSubjects === null matlab koi restriction nahi (Main Teacher).
-// ─────────────────────────────────────────────
 export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubjects) => {
-  if (studentIds.length === 0) return [];
+  if (Array.isArray(studentIds) && studentIds.length === 0) return [];
 
-  const topicGroups = new Map(); // "subject::topic" → { subjectName, topicName, total, wrong, bySource }
+  const baseMatch = Array.isArray(studentIds) ? { userId: { $in: studentIds }, examName } : { examName };
 
-  const addToGroup = (subjectName, topicName, isCorrect, sourceKey) => {
+  const topicGroups = new Map();
+
+  const addToGroup = (subjectName, topicName, isCorrect, timeSeconds, sourceKey) => {
     if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, subjectName))) return;
     const key = `${subjectKey(subjectName)}::${subjectKey(topicName)}`;
     if (!topicGroups.has(key)) {
@@ -251,7 +215,9 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
         topicName,
         total: 0,
         wrong: 0,
-        bySource: { mock: 0, pyq: 0, customTest: 0 }, // sirf galat count, source-wise
+        bySource: { mock: 0, pyq: 0, customTest: 0 },
+        totalTime: 0,
+        timedCount: 0,
       });
     }
     const g = topicGroups.get(key);
@@ -260,11 +226,14 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
       g.wrong++;
       g.bySource[sourceKey]++;
     }
+    if (typeof timeSeconds === "number" && timeSeconds >= 0) {
+      g.totalTime += timeSeconds;
+      g.timedCount++;
+    }
   };
 
-  // ── Source 1: Mock Test (Performance → RowQuestion pool) ──
   const mockPipeline = [
-    { $match: { userId: { $in: studentIds }, examName } },
+    { $match: baseMatch },
     { $unwind: "$attemptedQuestions" },
     { $match: { "attemptedQuestions.isCorrect": { $ne: null } } },
     {
@@ -282,16 +251,14 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
         subjectName: "$questionDoc.subjectName",
         topicName: "$questionDoc.topicName",
         isCorrect: "$attemptedQuestions.isCorrect",
+        timeTakenInSeconds: "$attemptedQuestions.timeTakenInSeconds",
       },
     },
   ];
   const mockRows = await Performance.aggregate(mockPipeline);
-  mockRows.forEach((r) => addToGroup(r.subjectName, r.topicName, r.isCorrect, "mock"));
+  mockRows.forEach((r) => addToGroup(r.subjectName, r.topicName, r.isCorrect, r.timeTakenInSeconds, "mock"));
 
-  // ── Source 2: Previous Year Papers (embedded questions) ──
-  const pyqAttempts = await PreviousYearAttempt.find({ userId: { $in: studentIds }, examName }).select(
-    "testId attemptedQuestions"
-  );
+  const pyqAttempts = await PreviousYearAttempt.find(baseMatch).select("testId attemptedQuestions");
   if (pyqAttempts.length > 0) {
     const pyqTestIds = [...new Set(pyqAttempts.map((a) => a.testId.toString()))];
     const pyqTests = await PreviousYearTest.find({ _id: { $in: pyqTestIds } }).select("subjects");
@@ -301,15 +268,12 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
         if (aq.isCorrect === null || aq.isCorrect === undefined) continue;
         const meta = pyqMetaMap.get(`${attempt.testId}::${aq.questionId}`);
         if (!meta) continue;
-        addToGroup(meta.subjectName, meta.topicName, aq.isCorrect, "pyq");
+        addToGroup(meta.subjectName, meta.topicName, aq.isCorrect, aq.timeTakenInSeconds, "pyq");
       }
     }
   }
 
-  // ── Source 3: Custom Tests (embedded questions) ──
-  const customAttempts = await CustomTestAttempt.find({ userId: { $in: studentIds }, examName }).select(
-    "testId attemptedQuestions"
-  );
+  const customAttempts = await CustomTestAttempt.find(baseMatch).select("testId attemptedQuestions");
   if (customAttempts.length > 0) {
     const customTestIds = [...new Set(customAttempts.map((a) => a.testId.toString()))];
     const customTests = await CustomTest.find({ _id: { $in: customTestIds } }).select("subjects");
@@ -319,7 +283,7 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
         if (aq.isCorrect === null || aq.isCorrect === undefined) continue;
         const meta = customMetaMap.get(`${attempt.testId}::${aq.questionId}`);
         if (!meta) continue;
-        addToGroup(meta.subjectName, meta.topicName, aq.isCorrect, "customTest");
+        addToGroup(meta.subjectName, meta.topicName, aq.isCorrect, aq.timeTakenInSeconds, "customTest");
       }
     }
   }
@@ -331,24 +295,21 @@ export const getTopicWiseBreakdown = async (studentIds, examName, allowedSubject
       totalAttempts: g.total,
       wrongCount: g.wrong,
       wrongPercentage: g.total === 0 ? 0 : Number(((g.wrong / g.total) * 100).toFixed(2)),
-      bySource: g.bySource, // 🆕 { mock, pyq, customTest } — kis test-type se zyada galtiyan aa rahi hain
+      bySource: g.bySource,
+      averageTimeSeconds: g.timedCount >= TOPIC_TIME_MIN_SAMPLE ? Math.round(g.totalTime / g.timedCount) : null,
+      timeSampleSize: g.timedCount,
     }))
     .sort((a, b) => b.wrongPercentage - a.wrongPercentage || b.totalAttempts - a.totalAttempts);
 };
 
-// ─────────────────────────────────────────────
-// CORE 2: Ek topic ke andar question-level breakdown + wrong-option
-// distribution — 🆕 teenon sources se, har question par uska source label
-// (Mock Test / Previous Year Paper naam / Custom Test naam) ke saath.
-// ─────────────────────────────────────────────
 export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName, topicName) => {
-  if (studentIds.length === 0) return [];
+  if (Array.isArray(studentIds) && studentIds.length === 0) return [];
 
+  const baseMatch = Array.isArray(studentIds) ? { userId: { $in: studentIds }, examName } : { examName };
   const results = [];
 
-  // ── Source 1: Mock Test ──
   const mockPipeline = [
-    { $match: { userId: { $in: studentIds }, examName } },
+    { $match: baseMatch },
     { $unwind: "$attemptedQuestions" },
     { $match: { "attemptedQuestions.isCorrect": { $ne: null } } },
     {
@@ -376,29 +337,24 @@ export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName
         opt2Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "2"] }, 1, 0] } },
         opt3Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "3"] }, 1, 0] } },
         opt4Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "4"] }, 1, 0] } },
+        totalTime: { $sum: { $cond: [{ $ne: ["$attemptedQuestions.timeTakenInSeconds", null] }, "$attemptedQuestions.timeTakenInSeconds", 0] } },
+        timedCount: { $sum: { $cond: [{ $ne: ["$attemptedQuestions.timeTakenInSeconds", null] }, 1, 0] } },
       },
     },
   ];
   const mockRows = await Performance.aggregate(mockPipeline);
   mockRows.forEach((r) => results.push(formatQuestionRow(r, "Mock Test", null)));
 
-  // ── Source 2: Previous Year Papers ──
-  const pyqAttempts = await PreviousYearAttempt.find({ userId: { $in: studentIds }, examName }).select(
-    "testId attemptedQuestions"
-  );
+  const pyqAttempts = await PreviousYearAttempt.find(baseMatch).select("testId attemptedQuestions");
   if (pyqAttempts.length > 0) {
     const pyqTestIds = [...new Set(pyqAttempts.map((a) => a.testId.toString()))];
     const pyqTests = await PreviousYearTest.find({ _id: { $in: pyqTestIds } }).select("testName year subjects");
     const pyqFullMap = buildEmbeddedQuestionMap(pyqTests, { fullData: true });
-    const testNameMap = new Map(pyqTests.map((t) => [t._id.toString(), `${t.testName}${t.year ? ` (${t.year})` : ""}`]));
     const pyqRows = aggregateEmbeddedAttempts(pyqAttempts, pyqFullMap, subjectName, topicName);
     pyqRows.forEach((r) => results.push(formatQuestionRow(r, "Previous Year Paper", r.testName)));
   }
 
-  // ── Source 3: Custom Tests ──
-  const customAttempts = await CustomTestAttempt.find({ userId: { $in: studentIds }, examName }).select(
-    "testId attemptedQuestions"
-  );
+  const customAttempts = await CustomTestAttempt.find(baseMatch).select("testId attemptedQuestions");
   if (customAttempts.length > 0) {
     const customTestIds = [...new Set(customAttempts.map((a) => a.testId.toString()))];
     const customTests = await CustomTest.find({ _id: { $in: customTestIds } }).select("testName subjects");
@@ -410,13 +366,8 @@ export const getQuestionWiseBreakdown = async (studentIds, examName, subjectName
   return results.sort((a, b) => b.wrongPercentage - a.wrongPercentage);
 };
 
-// ─────────────────────────────────────────────
-// 🆕 Helper — CustomTestAttempt / PreviousYearAttempt (embedded question)
-// attempts ko question-level counts mein group karta hai (JS mein, kyunki
-// embedded nested-array par MongoDB aggregation lookup possible nahi hai).
-// ─────────────────────────────────────────────
 function aggregateEmbeddedAttempts(attempts, fullMetaMap, subjectName, topicName) {
-  const groups = new Map(); // "testId::questionId" → counts
+  const groups = new Map();
 
   for (const attempt of attempts) {
     for (const aq of attempt.attemptedQuestions) {
@@ -442,6 +393,8 @@ function aggregateEmbeddedAttempts(attempts, fullMetaMap, subjectName, topicName
           opt2Picked: 0,
           opt3Picked: 0,
           opt4Picked: 0,
+          totalTime: 0,
+          timedCount: 0,
         });
       }
       const g = groups.get(mapKey);
@@ -451,18 +404,19 @@ function aggregateEmbeddedAttempts(attempts, fullMetaMap, subjectName, topicName
       else if (aq.userAnswer === "2") g.opt2Picked++;
       else if (aq.userAnswer === "3") g.opt3Picked++;
       else if (aq.userAnswer === "4") g.opt4Picked++;
+      if (typeof aq.timeTakenInSeconds === "number" && aq.timeTakenInSeconds >= 0) {
+        g.totalTime += aq.timeTakenInSeconds;
+        g.timedCount++;
+      }
     }
   }
 
   return Array.from(groups.values());
 }
 
-// ─────────────────────────────────────────────
-// 🆕 Helper — ek consistent shape mein question row banata hai, source
-// label ke saath (frontend ko dikhane ke liye "Mock Test" / "PYQ 2023" / etc)
-// ─────────────────────────────────────────────
 function formatQuestionRow(r, sourceType, sourceName) {
   const totalAttempts = r.totalAttempts;
+  const timedCount = r.timedCount || 0;
   return {
     questionId: r._id || r.questionId,
     question: r.question,
@@ -477,7 +431,215 @@ function formatQuestionRow(r, sourceType, sourceName) {
       option3: totalAttempts === 0 ? 0 : Number(((r.opt3Picked / totalAttempts) * 100).toFixed(2)),
       option4: totalAttempts === 0 ? 0 : Number(((r.opt4Picked / totalAttempts) * 100).toFixed(2)),
     },
-    sourceType, // "Mock Test" | "Previous Year Paper" | "Custom Test"
-    sourceName, // e.g. "UPSC Prelims 2023 (2023)" — null for Mock Test
+    averageTimeSeconds: timedCount >= QUESTION_TIME_MIN_SAMPLE ? Math.round(r.totalTime / timedCount) : null,
+    timeSampleSize: timedCount,
+    sourceType,
+    sourceName,
   };
 }
+
+export const getBatchAverageTimeForTopic = async (examName, subjectName, topicName) => {
+  let totalTime = 0;
+  let timedCount = 0;
+
+  const mockRows = await Performance.aggregate([
+    { $match: { examName } },
+    { $unwind: "$attemptedQuestions" },
+    { $match: { "attemptedQuestions.timeTakenInSeconds": { $ne: null } } },
+    {
+      $lookup: {
+        from: RowQuestion.collection.name,
+        localField: "attemptedQuestions.questionId",
+        foreignField: "_id",
+        as: "questionDoc",
+      },
+    },
+    { $unwind: "$questionDoc" },
+    { $match: { "questionDoc.subjectName": ciExact(subjectName), "questionDoc.topicName": ciExact(topicName) } },
+    {
+      $group: {
+        _id: null,
+        totalTime: { $sum: "$attemptedQuestions.timeTakenInSeconds" },
+        timedCount: { $sum: 1 },
+      },
+    },
+  ]);
+  if (mockRows[0]) {
+    totalTime += mockRows[0].totalTime;
+    timedCount += mockRows[0].timedCount;
+  }
+
+  const pyqAttempts = await PreviousYearAttempt.find({ examName }).select("testId attemptedQuestions");
+  if (pyqAttempts.length > 0) {
+    const pyqTestIds = [...new Set(pyqAttempts.map((a) => a.testId.toString()))];
+    const pyqTests = await PreviousYearTest.find({ _id: { $in: pyqTestIds } }).select("subjects");
+    const pyqMetaMap = buildEmbeddedQuestionMap(pyqTests);
+    for (const attempt of pyqAttempts) {
+      for (const aq of attempt.attemptedQuestions) {
+        if (aq.timeTakenInSeconds == null) continue;
+        const meta = pyqMetaMap.get(`${attempt.testId}::${aq.questionId}`);
+        if (!meta) continue;
+        if (!sameSubject(meta.subjectName, subjectName) || !sameSubject(meta.topicName, topicName)) continue;
+        totalTime += aq.timeTakenInSeconds;
+        timedCount++;
+      }
+    }
+  }
+
+  const customAttempts = await CustomTestAttempt.find({ examName }).select("testId attemptedQuestions");
+  if (customAttempts.length > 0) {
+    const customTestIds = [...new Set(customAttempts.map((a) => a.testId.toString()))];
+    const customTests = await CustomTest.find({ _id: { $in: customTestIds } }).select("subjects");
+    const customMetaMap = buildEmbeddedQuestionMap(customTests);
+    for (const attempt of customAttempts) {
+      for (const aq of attempt.attemptedQuestions) {
+        if (aq.timeTakenInSeconds == null) continue;
+        const meta = customMetaMap.get(`${attempt.testId}::${aq.questionId}`);
+        if (!meta) continue;
+        if (!sameSubject(meta.subjectName, subjectName) || !sameSubject(meta.topicName, topicName)) continue;
+        totalTime += aq.timeTakenInSeconds;
+        timedCount++;
+      }
+    }
+  }
+
+  if (timedCount < TOPIC_TIME_MIN_SAMPLE) return { averageTimeSeconds: null, sampleSize: timedCount };
+  return { averageTimeSeconds: Math.round(totalTime / timedCount), sampleSize: timedCount };
+};
+
+export const getBatchAverageTimePerQuestion = async (examName, questionIds) => {
+  if (!questionIds || questionIds.length === 0) return {};
+  const objectIds = questionIds
+    .filter((id) => id && mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (objectIds.length === 0) return {};
+
+  const rows = await Performance.aggregate([
+    { $match: { examName } },
+    { $unwind: "$attemptedQuestions" },
+    {
+      $match: {
+        "attemptedQuestions.questionId": { $in: objectIds },
+        "attemptedQuestions.timeTakenInSeconds": { $ne: null },
+      },
+    },
+    {
+      $group: {
+        _id: "$attemptedQuestions.questionId",
+        totalTime: { $sum: "$attemptedQuestions.timeTakenInSeconds" },
+        timedCount: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const map = {};
+  for (const r of rows) {
+    const id = r._id.toString();
+    map[id] =
+      r.timedCount >= QUESTION_TIME_MIN_SAMPLE
+        ? { averageTimeSeconds: Math.round(r.totalTime / r.timedCount), sampleSize: r.timedCount }
+        : { averageTimeSeconds: null, sampleSize: r.timedCount };
+  }
+  return map;
+};
+
+export const getBatchAverageTimePerEmbeddedQuestion = async (AttemptModel, testId, questionIds) => {
+  if (!questionIds || questionIds.length === 0) return {};
+  const idSet = new Set(questionIds.map(String));
+  const attempts = await AttemptModel.find({ testId }).select("attemptedQuestions");
+  const acc = {};
+
+  for (const attempt of attempts) {
+    for (const aq of attempt.attemptedQuestions) {
+      if (aq.timeTakenInSeconds == null) continue;
+      const qId = aq.questionId.toString();
+      if (!idSet.has(qId)) continue;
+      if (!acc[qId]) acc[qId] = { totalTime: 0, timedCount: 0 };
+      acc[qId].totalTime += aq.timeTakenInSeconds;
+      acc[qId].timedCount += 1;
+    }
+  }
+
+  const map = {};
+  for (const [qId, v] of Object.entries(acc)) {
+    map[qId] =
+      v.timedCount >= QUESTION_TIME_MIN_SAMPLE
+        ? { averageTimeSeconds: Math.round(v.totalTime / v.timedCount), sampleSize: v.timedCount }
+        : { averageTimeSeconds: null, sampleSize: v.timedCount };
+  }
+  return map;
+};
+
+export const getTopMisconceptions = async (studentIds, examName, allowedSubjects, limit = 6) => {
+  if (Array.isArray(studentIds) && studentIds.length === 0) return [];
+  const baseMatch = Array.isArray(studentIds) ? { userId: { $in: studentIds }, examName } : { examName };
+
+  const rows = await Performance.aggregate([
+    { $match: baseMatch },
+    { $unwind: "$attemptedQuestions" },
+    { $match: { "attemptedQuestions.isCorrect": { $ne: null } } },
+    {
+      $lookup: {
+        from: RowQuestion.collection.name,
+        localField: "attemptedQuestions.questionId",
+        foreignField: "_id",
+        as: "questionDoc",
+      },
+    },
+    { $unwind: "$questionDoc" },
+    {
+      $group: {
+        _id: "$attemptedQuestions.questionId",
+        question: { $first: "$questionDoc.question" },
+        subjectName: { $first: "$questionDoc.subjectName" },
+        topicName: { $first: "$questionDoc.topicName" },
+        option1: { $first: "$questionDoc.option1" },
+        option2: { $first: "$questionDoc.option2" },
+        option3: { $first: "$questionDoc.option3" },
+        option4: { $first: "$questionDoc.option4" },
+        correctOption: { $first: "$questionDoc.correctOption" },
+        totalAttempts: { $sum: 1 },
+        wrongCount: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.isCorrect", false] }, 1, 0] } },
+        opt1Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "1"] }, 1, 0] } },
+        opt2Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "2"] }, 1, 0] } },
+        opt3Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "3"] }, 1, 0] } },
+        opt4Picked: { $sum: { $cond: [{ $eq: ["$attemptedQuestions.userAnswer", "4"] }, 1, 0] } },
+      },
+    },
+    { $match: { totalAttempts: { $gte: 8 } } },
+  ]);
+
+  const results = [];
+  for (const r of rows) {
+    if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, r.subjectName))) continue;
+
+    const wrongPercentage = r.totalAttempts === 0 ? 0 : (r.wrongCount / r.totalAttempts) * 100;
+    if (wrongPercentage < 35) continue;
+
+    const picks = [
+      { option: 1, count: r.opt1Picked },
+      { option: 2, count: r.opt2Picked },
+      { option: 3, count: r.opt3Picked },
+      { option: 4, count: r.opt4Picked },
+    ].filter((p) => p.option !== r.correctOption);
+
+    const dominant = picks.sort((a, b) => b.count - a.count)[0];
+    const dominantPercentage = r.totalAttempts === 0 ? 0 : (dominant.count / r.totalAttempts) * 100;
+    if (dominantPercentage < 25) continue;
+
+    results.push({
+      questionId: r._id,
+      question: r.question,
+      subjectName: r.subjectName,
+      topicName: r.topicName,
+      totalAttempts: r.totalAttempts,
+      wrongPercentage: Number(wrongPercentage.toFixed(2)),
+      dominantWrongOption: dominant.option,
+      dominantWrongPercentage: Number(dominantPercentage.toFixed(2)),
+      options: { option1: r.option1, option2: r.option2, option3: r.option3, option4: r.option4 },
+      correctOption: r.correctOption,
+    });
+  }
+
+  return results.sort((a, b) => b.dominantWrongPercentage - a.dominantWrongPercentage).slice(0, limit);
+};

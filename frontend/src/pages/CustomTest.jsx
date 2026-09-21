@@ -978,7 +978,10 @@ const QuestionDetailCard = ({ q }) => {
       )}
 
       {q.timeTakenInSeconds != null && (
-        <p className="text-xs text-gray-500 mb-4">Time taken: {q.timeTakenInSeconds}s</p>
+        <p className="text-xs text-gray-500 mb-4">
+          Time taken: {q.timeTakenInSeconds}s
+          {q.batchAverageTimeSeconds != null && <span className="text-gray-600"> (batch average: {q.batchAverageTimeSeconds}s)</span>}
+        </p>
       )}
 
       {q.answerExplain && (

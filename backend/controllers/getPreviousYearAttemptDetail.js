@@ -1,9 +1,7 @@
-// controllers/getPreviousYearAttemptDetail.js
-// Submit ke baad review screen isi se poora breakdown (correct answer +
-// explanation ke sath) fetch karti hai
 import mongoose from "mongoose";
 import PreviousYearTest from "../models/PreviousYearTest.js";
 import PreviousYearAttempt from "../models/PreviousYearAttempt.js";
+import { getBatchAverageTimePerEmbeddedQuestion } from "../utils/classAnalytics.js";
 
 export const getPreviousYearAttemptDetail = async (req, res) => {
   try {
@@ -14,14 +12,12 @@ export const getPreviousYearAttemptDetail = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid Attempt ID" });
     }
 
-    // STEP 1: Attempt dhundo — sirf apna hi dekh sake
     const attempt = await PreviousYearAttempt.findOne({ _id: attemptId, userId });
 
     if (!attempt) {
       return res.status(404).json({ success: false, message: "Ye attempt nahi mila." });
     }
 
-    // STEP 2: Test dhundo (question, options, correctOption, explanation)
     const test = await PreviousYearTest.findById(attempt.testId);
 
     if (!test) {
@@ -38,12 +34,16 @@ export const getPreviousYearAttemptDetail = async (req, res) => {
       }
     }
 
-    // STEP 3: Har attempted question ko full detail ke sath merge karo
+    const questionIds = attempt.attemptedQuestions.map((aq) => aq.questionId).filter(Boolean);
+    const batchTimeMap = await getBatchAverageTimePerEmbeddedQuestion(PreviousYearAttempt, test._id, questionIds);
+
     const questionBreakdown = attempt.attemptedQuestions
       .map((aq) => {
         const qId = aq.questionId ? aq.questionId.toString() : null;
         const q = qId ? questionMap[qId] : null;
         if (!q) return null;
+
+        const batchTime = qId ? batchTimeMap[qId] : null;
 
         return {
           questionId: q._id,
@@ -61,6 +61,8 @@ export const getPreviousYearAttemptDetail = async (req, res) => {
           topicName: q.topicName,
           subjectName: q.subjectName,
           timeTakenInSeconds: aq.timeTakenInSeconds,
+          batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
+          batchTimeSampleSize: batchTime?.sampleSize ?? 0,
         };
       })
       .filter(Boolean);

@@ -280,6 +280,46 @@ const UserTopicAnalysis = () => {
           </div>
         </div>
 
+        <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
+          <p className="text-xs text-gray-500 font-medium mb-2">Average Time per Question</p>
+          <div className="flex items-center gap-6 flex-wrap">
+            <div>
+              <p className="text-lg font-bold text-[#A78BFA]">{data.summary?.averageTimePerQuestion}s</p>
+              <p className="text-[10px] text-gray-500">You</p>
+            </div>
+            <div>
+              {data.summary?.batchAverageTimeSeconds != null ? (
+                <>
+                  <p className="text-lg font-bold text-gray-300">{data.summary.batchAverageTimeSeconds}s</p>
+                  <p className="text-[10px] text-gray-500">Batch average</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg font-bold text-gray-600">—</p>
+                  <p className="text-[10px] text-gray-600">Not enough batch data yet</p>
+                </>
+              )}
+            </div>
+            {data.summary?.batchAverageTimeSeconds != null && (
+              <span
+                className={`ml-auto text-xs px-2.5 py-1 rounded-full border font-medium ${
+                  data.summary.averageTimePerQuestion > data.summary.batchAverageTimeSeconds * 1.2
+                    ? "text-orange-400 bg-orange-500/10 border-orange-500/30"
+                    : data.summary.averageTimePerQuestion < data.summary.batchAverageTimeSeconds * 0.8
+                    ? "text-blue-400 bg-blue-500/10 border-blue-500/30"
+                    : "text-green-400 bg-green-500/10 border-green-500/30"
+                }`}
+              >
+                {data.summary.averageTimePerQuestion > data.summary.batchAverageTimeSeconds * 1.2
+                  ? "Slower than batch"
+                  : data.summary.averageTimePerQuestion < data.summary.batchAverageTimeSeconds * 0.8
+                  ? "Faster than batch"
+                  : "About average"}
+              </span>
+            )}
+          </div>
+        </div>
+
         {/* Status filter tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           {STATUS_FILTERS.map((f) => (
@@ -384,7 +424,10 @@ const QuestionCard = ({ q, index, onDelete, deleting }) => {
             })}
           </span>
           <span>•</span>
-          <span>Time: {q.timeTakenInSeconds ?? "—"}s</span>
+          <span>
+            Time: {q.timeTakenInSeconds ?? "—"}s
+            {q.batchAverageTimeSeconds != null && ` (batch avg: ${q.batchAverageTimeSeconds}s)`}
+          </span>
         </div>
       </div>
 

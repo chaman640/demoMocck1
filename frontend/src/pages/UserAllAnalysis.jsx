@@ -837,6 +837,7 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
         <p className="text-xs text-gray-500 mb-2">
           Time taken: {q.timeTakenInSeconds}s
           {averageTimePerQuestion > 0 && <span className="text-gray-600"> (your average: {averageTimePerQuestion}s)</span>}
+          {q.batchAverageTimeSeconds != null && <span className="text-gray-600"> (batch average: {q.batchAverageTimeSeconds}s)</span>}
         </p>
       )}
 

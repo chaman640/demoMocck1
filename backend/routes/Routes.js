@@ -119,12 +119,7 @@ import { getCustomTest } from "../controllers/getCustomTest.js";
 import { submitCustomTest } from "../controllers/submitCustomTest.js";
 import { getCustomTestAttemptDetail } from "../controllers/getCustomTestAttemptDetail.js";
 import { searchStudentByPhone } from "../controllers/searchStudentByPhone.js";
-import {
-  getStudentOverview,
-  getStudentMockDetail,
-  getStudentSubjectAnalysis,
-  getStudentTopicAnalysis,
-} from "../pages/teacher/analysisTeacher.js";
+import { getStudentOverview, getStudentMockDetail, getStudentSubjectAnalysis, getStudentTopicAnalysis, getStudentPYQAttemptDetail, getStudentCustomTestAttemptDetail } from "../pages/teacher/analysisTeacher.js";
 import { getClassTopicAnalysis } from "../controllers/getClassTopicAnalysis.js";
 import { getClassQuestionAnalysis } from "../controllers/getClassQuestionAnalysis.js";
 
@@ -139,6 +134,9 @@ import { getCustomTestLeaderboard, getCustomTestQuestionAnalysis } from "../cont
 import { sendSignupOtp } from "../controllers/sendSignupOtp.js";
 import { requestResetOtp } from "../controllers/requestResetOtp.js";
 import { resetPassword } from "../controllers/resetPassword.js";
+import { addStudentNote, getStudentNotes, deleteStudentNote } from "../controllers/manageStudentNotes.js";
+import { getMockLeaderboardBlueprints, getMockLeaderboard } from "../controllers/getMockLeaderboard.js";
+import { bulkImportStudents, getBatchRoster, getMyManagedCoupons, bulkMoveStudents, bulkRemoveStudents, uploadStudentFileMiddleware, parseStudentFile } from "../controllers/bulkManageStudents.js";
 
 const router = express.Router();
 
@@ -372,5 +370,22 @@ router.get("/teacher/analysis/subject/:studentId/:examName/:subjectName", teache
 router.get("/teacher/analysis/topic/:studentId/:examName/:subjectName/:topicName", teacherInfo, getStudentTopicAnalysis);
 router.get("/teacher/class-analysis/topics", teacherInfo, getClassTopicAnalysis);
 router.get("/teacher/class-analysis/questions/:subjectName/:topicName", teacherInfo, getClassQuestionAnalysis);
+
+
+router.get("/teacher/analysis/pyq-detail/:studentId/:attemptId", teacherInfo, getStudentPYQAttemptDetail);
+router.get("/teacher/analysis/custom-test-detail/:studentId/:attemptId", teacherInfo, getStudentCustomTestAttemptDetail);
+router.post("/teacher/student-notes/:studentId", teacherInfo, writeLimiter, addStudentNote);
+router.get("/teacher/student-notes/:studentId", teacherInfo, getStudentNotes);
+router.delete("/teacher/student-notes/:noteId", teacherInfo, writeLimiter, deleteStudentNote);
+router.get("/teacher/mock-leaderboard/blueprints", teacherInfo, getMockLeaderboardBlueprints);
+router.get("/teacher/mock-leaderboard/:blueprintName", teacherInfo, getMockLeaderboard);
+
+
+router.post("/teacher/bulk-students/parse-file", teacherInfo, uploadStudentFileMiddleware, parseStudentFile);
+router.post("/teacher/bulk-students/import", teacherInfo, writeLimiter, bulkImportStudents);
+router.get("/teacher/bulk-students/roster", teacherInfo, getBatchRoster);
+router.get("/teacher/bulk-students/my-coupons", teacherInfo, getMyManagedCoupons);
+router.post("/teacher/bulk-students/move", teacherInfo, writeLimiter, bulkMoveStudents);
+router.post("/teacher/bulk-students/remove", teacherInfo, writeLimiter, bulkRemoveStudents);
 
 export default router;
