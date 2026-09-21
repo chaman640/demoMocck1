@@ -71,7 +71,7 @@ const TeacherCustomTestResults = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{leaderboardQuery.error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <p className="text-gray-300">{leaderboardQuery.error?.response?.data?.message || "Could not load data."}</p>
           <button onClick={() => navigate("/TeacherCustomTests")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Wapas Jaayein</button>
         </div>
         <TeacherBottomNav />
@@ -104,7 +104,7 @@ const TeacherCustomTestResults = () => {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Student ka naam ya phone search karein..."
+              placeholder="Search by student name or phone..."
               className="w-full px-4 py-2.5 text-sm bg-[#111827] border border-gray-800 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600"
             />
 
@@ -122,7 +122,7 @@ const TeacherCustomTestResults = () => {
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{r.name}</p>
                           <p className="text-[11px] text-gray-500">
-                            {r.attempted ? `${r.correctCount} sahi · ${r.wrongCount} galat · ${r.unattemptedCount} chhoda` : "Abhi tak attempt nahi kiya"}
+                            {r.attempted ? `${r.correctCount} sahi · ${r.wrongCount} galat · ${r.unattemptedCount} chhoda` : "Not attempted yet"}
                           </p>
                         </div>
                       </div>
@@ -145,7 +145,7 @@ const TeacherCustomTestResults = () => {
 
             {analysisQuery.isError && (
               <div className="p-4 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">
-                {analysisQuery.error?.response?.data?.message || "Analysis load nahi ho paaya."}
+                {analysisQuery.error?.response?.data?.message || "Could not load analysis."}
               </div>
             )}
 

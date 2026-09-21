@@ -52,7 +52,7 @@ const TeacherCoupons = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Coupons load nahi ho paaye.");
+      setErrorMsg(err.response?.data?.message || "Could not load coupons.");
       setPhase("error");
     }
   }, [navigate]);
@@ -69,7 +69,7 @@ const TeacherCoupons = () => {
     e.preventDefault();
     setFormError("");
     if (!formData.name.trim() || !formData.exam) {
-      setFormError("Batch ka naam aur exam dono zaroori hain!");
+      setFormError("Batch name and exam are both required!");
       return;
     }
     setCreating(true);
@@ -79,7 +79,7 @@ const TeacherCoupons = () => {
       setShowForm(false);
       await load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Batch nahi ban paaya.");
+      setFormError(err.response?.data?.message || "Could not create the batch.");
     } finally {
       setCreating(false);
     }
@@ -91,7 +91,7 @@ const TeacherCoupons = () => {
       await api.post("/switch-active-coupon", { couponId });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Switch nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not switch.");
     } finally {
       setSwitchingId(null);
     }
@@ -116,7 +116,7 @@ const TeacherCoupons = () => {
       setConfirmDeleteId(null);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Batch delete nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not delete the batch.");
     } finally {
       setDeletingId(null);
     }
@@ -160,7 +160,7 @@ const TeacherCoupons = () => {
         <p className="text-gray-400 text-sm mb-4">
           {isMain
             ? "Har batch ek unique coupon code se students ko join hone dega"
-            : "Ye batches aapko Main Teacher ne assign ki hain"}
+            : "These batches were assigned to you by the Main Teacher"}
         </p>
 
         {/* 🆕 Team link — bottom nav se hata ke yahan de diya, kyunki
@@ -216,7 +216,7 @@ const TeacherCoupons = () => {
                 disabled={creating}
                 className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
               >
-                {creating ? "Ban raha hai..." : "Batch Banayein"}
+                {creating ? "Creating..." : "Batch Banayein"}
               </button>
             </form>
           </div>
@@ -226,8 +226,8 @@ const TeacherCoupons = () => {
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
             <p className="text-sm text-gray-400">
               {isMain
-                ? "Abhi koi batch nahi bana. Upar wale button se pehla batch banayein."
-                : "Aapko abhi tak koi batch assign nahi hui hai."}
+                ? "No batches created yet. Use the button above to create your first batch."
+                : "You have not been assigned any batch yet."}
             </p>
           </div>
         ) : (
@@ -277,7 +277,7 @@ const TeacherCoupons = () => {
                       disabled={switchingId === c._id}
                       className="w-full py-2 rounded-lg border border-[#7C3AED]/40 text-[#A78BFA] hover:bg-[#7C3AED]/10 text-sm font-medium disabled:opacity-50"
                     >
-                      {switchingId === c._id ? "Switch ho raha hai..." : "Ise Active Batch Banayein"}
+                      {switchingId === c._id ? "Switching..." : "Ise Active Batch Banayein"}
                     </button>
                   )}
 
@@ -305,10 +305,10 @@ const TeacherCoupons = () => {
                       }`}
                     >
                       {deletingId === c._id
-                        ? "Delete ho raha hai..."
+                        ? "Deleting..."
                         : confirmDeleteId === c._id
-                        ? "⚠️ Pakka? Dobara dabao — Custom Tests aur is batch ke questions bhi delete ho jaayenge"
-                        : "🗑️ Batch Delete Karein"}
+                        ? "⚠️ Are you sure? Tap again — this batch's Custom Tests and questions will also be deleted"
+                        : "🗑️ Delete Batch"}
                     </button>
                   )}
                 </div>

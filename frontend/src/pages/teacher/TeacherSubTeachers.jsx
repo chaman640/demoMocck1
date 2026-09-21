@@ -98,7 +98,7 @@ const TeacherSubTeachers = () => {
         setPhase("forbidden");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Data load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load data.");
       setPhase("error");
     }
   }, [navigate]);
@@ -154,7 +154,7 @@ const TeacherSubTeachers = () => {
       setAssignments([{ couponId: "", subjects: [] }]);
       await load();
     } catch (err) {
-      setInviteError(err.response?.data?.message || "Invite nahi bhej paaye.");
+      setInviteError(err.response?.data?.message || "Could not send invite.");
     } finally {
       setInviting(false);
     }
@@ -187,7 +187,7 @@ const TeacherSubTeachers = () => {
   const handleAssign = async (subTeacherId) => {
     setAssignError("");
     if (!assignForm.couponId || assignForm.subjects.length === 0) {
-      setAssignError("Coupon aur kam se kam ek subject zaroori hai!");
+      setAssignError("Coupon and at least one subject are required!");
       return;
     }
 
@@ -201,7 +201,7 @@ const TeacherSubTeachers = () => {
       setAssignForm({ couponId: "", subjects: [] });
       await load();
     } catch (err) {
-      setAssignError(err.response?.data?.message || "Access assign nahi ho paaya.");
+      setAssignError(err.response?.data?.message || "Could not assign access.");
     } finally {
       setAssigning(false);
     }
@@ -214,20 +214,20 @@ const TeacherSubTeachers = () => {
       await api.post("/manage-coupon-access/revoke", { subTeacherId, couponId, subject });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Revoke nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not revoke.");
     } finally {
       setRevokingKey(null);
     }
   };
 
   const handleRemove = async (subTeacherId, name) => {
-    if (!window.confirm(`${name} ko remove karein? Unka bana hua content safe rahega.`)) return;
+    if (!window.confirm(`Remove ${name}? Their created content will remain safe.`)) return;
     setRemovingId(subTeacherId);
     try {
       await api.post(`/remove-sub-teacher/${subTeacherId}`);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Remove nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not remove.");
     } finally {
       setRemovingId(null);
     }
@@ -241,7 +241,7 @@ const TeacherSubTeachers = () => {
       const link = `${window.location.origin}${window.location.pathname}#/AcceptInvite/${token}`;
       setResendLink((prev) => ({ ...prev, [subTeacherId]: link }));
     } catch (err) {
-      alert(err.response?.data?.message || "Resend nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not resend.");
     } finally {
       setResendingId(null);
     }
@@ -285,7 +285,7 @@ const TeacherSubTeachers = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold mb-1">Team / Sub-Teachers</h1>
-          <p className="text-gray-400 text-sm">Apni team invite karein aur unka subject-access manage karein</p>
+          <p className="text-gray-400 text-sm">Invite your team and manage their subject access</p>
         </div>
 
         {/* ── Invite Form ── */}
@@ -345,7 +345,7 @@ const TeacherSubTeachers = () => {
                           onChange={(e) => updateAssignmentCoupon(idx, e.target.value)}
                           className="flex-1 px-3 py-2 text-xs bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-lg outline-none text-white appearance-none cursor-pointer"
                         >
-                          <option value="">Coupon chunein</option>
+                          <option value="">Select Coupon</option>
                           {coupons.map((c) => (
                             <option key={c._id} value={c._id}>{c.name}</option>
                           ))}
@@ -365,7 +365,7 @@ const TeacherSubTeachers = () => {
                         <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
                       )}
                       {a.couponId && subjectsLoadingFor !== a.couponId && subjectList.length === 0 && (
-                        <p className="text-[11px] text-amber-400">⚠️ Is coupon ke exam ke liye koi Blueprint nahi mila — Admin se blueprint banwayein.</p>
+                        <p className="text-[11px] text-amber-400">⚠️ No Blueprint found for this coupon's exam — ask the Admin to create one.</p>
                       )}
                       {subjectList.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
@@ -392,7 +392,7 @@ const TeacherSubTeachers = () => {
                 onClick={addAssignmentRow}
                 className="text-xs text-[#A78BFA] mt-2 hover:underline"
               >
-                + Ek aur coupon/subject add karein
+                + Add another coupon/subject
               </button>
             </div>
 
@@ -401,7 +401,7 @@ const TeacherSubTeachers = () => {
               disabled={inviting}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
             >
-              {inviting ? "Invite bhej rahe hain..." : "Invite Link Banayein"}
+              {inviting ? "Sending invite..." : "Invite Link Banayein"}
             </button>
           </form>
         </div>
@@ -493,7 +493,7 @@ const TeacherSubTeachers = () => {
                                 onChange={(e) => updateAssignFormCoupon(e.target.value)}
                                 className="w-full px-3 py-2 text-xs bg-[#111827] border border-gray-700 rounded-lg outline-none text-white appearance-none cursor-pointer"
                               >
-                                <option value="">Coupon chunein</option>
+                                <option value="">Select Coupon</option>
                                 {coupons.map((c) => (
                                   <option key={c._id} value={c._id}>{c.name}</option>
                                 ))}
@@ -504,7 +504,7 @@ const TeacherSubTeachers = () => {
                                 <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
                               )}
                               {assignForm.couponId && subjectsLoadingFor !== assignForm.couponId && (subjectsByCoupon[assignForm.couponId] || []).length === 0 && (
-                                <p className="text-[11px] text-amber-400">⚠️ Is coupon ke exam ke liye koi Blueprint nahi mila — Admin se blueprint banwayein.</p>
+                                <p className="text-[11px] text-amber-400">⚠️ No Blueprint found for this coupon's exam — ask the Admin to create one.</p>
                               )}
                               {(subjectsByCoupon[assignForm.couponId] || []).length > 0 && (
                                 <div className="flex flex-wrap gap-1.5">
@@ -553,7 +553,7 @@ const TeacherSubTeachers = () => {
                                 disabled={resendingId === t._id}
                                 className="text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500 disabled:opacity-50"
                               >
-                                {resendingId === t._id ? "Bhej rahe hain..." : "Invite Link Dobara Bhejein"}
+                                {resendingId === t._id ? "Sending..." : "Invite Link Dobara Bhejein"}
                               </button>
                             )}
                           </div>
@@ -566,7 +566,7 @@ const TeacherSubTeachers = () => {
                             disabled={removingId === t._id}
                             className="w-full py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-medium disabled:opacity-50"
                           >
-                            {removingId === t._id ? "Remove ho raha hai..." : "Sub-Teacher Remove Karein"}
+                            {removingId === t._id ? "Removing..." : "Sub-Teacher Remove Karein"}
                           </button>
                         )}
                       </div>

@@ -49,7 +49,7 @@ const TeacherCurrentAffairs = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Data load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load data.");
       setPhase("error");
     }
   }, [navigate]);
@@ -93,7 +93,7 @@ const TeacherCurrentAffairs = () => {
     setMessage("");
     const validItems = items.filter((it) => it.headline.trim() && it.content.trim());
     if (validItems.length === 0) {
-      setMessage("❌ Kam se kam ek item (headline + content ke saath) dalein.");
+      setMessage("❌ Please add at least one item (with headline + content).");
       return;
     }
     setSaving(true);
@@ -108,9 +108,9 @@ const TeacherCurrentAffairs = () => {
           source: it.source.trim() || undefined,
         })),
       });
-      setMessage("✅ Save ho gaya! Aapke batch ke students ko ye Admin ke global updates ke saath dikhega.");
+      setMessage("✅ Saved! This will appear for your batch's students alongside the Admin's global updates.");
     } catch (err) {
-      setMessage(err.response?.data?.message || "Save nahi ho paaya.");
+      setMessage(err.response?.data?.message || "Could not save.");
     } finally {
       setSaving(false);
     }
@@ -142,14 +142,14 @@ const TeacherCurrentAffairs = () => {
 
         <div>
           <h1 className="text-2xl font-bold mb-1">Batch Current Affairs</h1>
-          <p className="text-gray-400 text-sm">Ye sirf aapke active batch ke students ko dikhega — Admin ke global updates ke saath jud kar.</p>
+          <p className="text-gray-400 text-sm">This will only be visible to your active batch's students — combined with the Admin's global updates.</p>
         </div>
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
 
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Current affairs add karne se pehle ek active batch select karein.</p>
+            <p className="text-sm text-gray-400">Please select an active batch before adding current affairs.</p>
           </div>
         ) : (
           <form onSubmit={handleSave} className="space-y-4">
@@ -194,7 +194,7 @@ const TeacherCurrentAffairs = () => {
             </button>
 
             <button type="submit" disabled={saving} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50">
-              {saving ? "Save ho raha hai..." : "Save Karein"}
+              {saving ? "Saving..." : "Save Karein"}
             </button>
           </form>
         )}

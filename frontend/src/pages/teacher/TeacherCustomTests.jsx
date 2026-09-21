@@ -90,7 +90,7 @@ const TeacherCustomTests = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Tests load nahi ho paaye.");
+      setErrorMsg(err.response?.data?.message || "Could not load tests.");
       setPhase("error");
     }
   }, [navigate]);
@@ -117,7 +117,7 @@ const TeacherCustomTests = () => {
     const name = newSubjectName.trim();
     if (!name) return;
     if (subjects.some((s) => s.subjectName === name)) {
-      setBuilderError("Ye subject pehle se add hai.");
+      setBuilderError("This subject has already been added.");
       return;
     }
     setSubjects((prev) => [...prev, { subjectName: name, questions: [] }]);
@@ -149,7 +149,7 @@ const TeacherCustomTests = () => {
       const res = await api.post("/teacher/upload-image", fd, { headers: { "Content-Type": "multipart/form-data" } });
       setQForm((prev) => ({ ...prev, [field]: res.data.url }));
     } catch (err) {
-      setBuilderError(err.response?.data?.message || "Photo upload nahi ho paayi.");
+      setBuilderError(err.response?.data?.message || "Photo upload failed.");
     } finally {
       setUploadingPhoto(null);
     }
@@ -166,7 +166,7 @@ const TeacherCustomTests = () => {
       !qForm.option4.trim() ||
       !qForm.correctOption
     ) {
-      setBuilderError("Sabhi question fields zaroori hain!");
+      setBuilderError("All question fields are required!");
       return;
     }
 
@@ -201,16 +201,16 @@ const TeacherCustomTests = () => {
     setBuilderError("");
 
     if (!meta.testName.trim() || !meta.durationMinutes) {
-      setBuilderError("Test naam aur duration zaroori hain!");
+      setBuilderError("Test name and duration are required!");
       return;
     }
     if (subjects.length === 0) {
-      setBuilderError("Kam se kam ek subject add karein!");
+      setBuilderError("Please add at least one subject!");
       return;
     }
     const emptySubject = subjects.find((s) => s.questions.length === 0);
     if (emptySubject) {
-      setBuilderError(`'${emptySubject.subjectName}' mein kam se kam ek question add karein.`);
+      setBuilderError(`Please add at least one question in '${emptySubject.subjectName}'.`);
       return;
     }
 
@@ -227,7 +227,7 @@ const TeacherCustomTests = () => {
       resetBuilder();
       await load();
     } catch (err) {
-      setBuilderError(err.response?.data?.message || "Test nahi ban paaya.");
+      setBuilderError(err.response?.data?.message || "Could not create the test.");
     } finally {
       setCreating(false);
     }
@@ -245,7 +245,7 @@ const TeacherCustomTests = () => {
       setConfirmDeleteTestId(null);
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Test delete nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not delete the test.");
     } finally {
       setDeletingTestId(null);
     }
@@ -262,13 +262,13 @@ const TeacherCustomTests = () => {
         subjectName: "Reasoning",
         questions: [
           {
-            question: "यहाँ सवाल लिखें?",
-            option1: "पहला विकल्प",
-            option2: "दूसरा विकल्प",
-            option3: "तीसरा विकल्प",
-            option4: "चौथा विकल्प",
+            question: "Write the question here?",
+            option1: "First option",
+            option2: "Second option",
+            option3: "Third option",
+            option4: "Fourth option",
             correctOption: 1,
-            answerExplain: "यहाँ व्याख्या लिखें",
+            answerExplain: "Write the explanation here",
             topicName: "Blood Relations",
           },
         ],
@@ -276,15 +276,15 @@ const TeacherCustomTests = () => {
     ],
   };
   const AI_TEST_PROMPT_HINT =
-    "Neeche diye JSON format mein mujhe [SUBJECT NAAM BADLEIN] subject ka ek poora practice test do — [KITNE QUESTIONS CHAHIYE] MCQ questions Hindi mein, [KITNA DURATION] minute ka test. Sirf ek JSON object return karo, koi extra text mat likhna. correctOption hamesha 1,2,3,4 mein se ek number ho.";
+    "In the JSON format below, give me a complete practice test for [CHANGE SUBJECT NAME] — [HOW MANY QUESTIONS] MCQ questions in English, a [DURATION] minute test. Return only a JSON object, no extra text. correctOption should always be a number from 1,2,3,4.";
 
   const copyTestDemoForAI = async () => {
     const text = `${AI_TEST_PROMPT_HINT}\n\n${JSON.stringify(DEMO_TEST_JSON, null, 2)}`;
     try {
       await navigator.clipboard.writeText(text);
-      setBulkMessage("📋 Demo JSON + prompt copy ho gaya — kisi AI chatbot mein paste karke bhej dein.");
+      setBulkMessage("📋 Demo JSON + prompt copied — paste it into any AI chatbot and send.");
     } catch {
-      setBulkMessage("❌ Copy nahi ho paaya.");
+      setBulkMessage("❌ Could not copy.");
     }
   };
 
@@ -296,11 +296,11 @@ const TeacherCustomTests = () => {
     try {
       parsed = JSON.parse(bulkTestJson);
     } catch {
-      setBulkMessage("❌ JSON format galat hai — check karein.");
+      setBulkMessage("❌ Invalid JSON format — please check.");
       return;
     }
     if (!parsed.testName || !parsed.durationMinutes || !Array.isArray(parsed.subjects) || parsed.subjects.length === 0) {
-      setBulkMessage("❌ testName, durationMinutes aur subjects (kam se kam 1) zaroori hain.");
+      setBulkMessage("❌ testName, durationMinutes, and at least 1 subject are required.");
       return;
     }
 
@@ -314,13 +314,13 @@ const TeacherCustomTests = () => {
         negativeMarking: Number(parsed.negativeMarking) || 0,
         subjects: parsed.subjects,
       });
-      setBulkMessage("✅ Test ban gaya!");
+      setBulkMessage("✅ Test created!");
       setBulkTestJson("");
       resetBuilder();
       setShowBuilder(false);
       await load();
     } catch (err) {
-      setBulkMessage(err.response?.data?.message || "Test nahi ban paaya.");
+      setBulkMessage(err.response?.data?.message || "Could not create the test.");
     } finally {
       setCreating(false);
     }
@@ -351,7 +351,7 @@ const TeacherCustomTests = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-1">Custom Tests</h1>
-            <p className="text-gray-400 text-sm">Weekly ya chapter-wise test banayein</p>
+            <p className="text-gray-400 text-sm">Create weekly or chapter-wise tests</p>
           </div>
           {teacher?.activeCoupon && (
             <button
@@ -367,7 +367,7 @@ const TeacherCustomTests = () => {
 
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Test banane ke liye pehle active batch select karein.</p>
+            <p className="text-sm text-gray-400">Please select an active batch before creating a test.</p>
           </div>
         ) : (
           <>
@@ -399,16 +399,16 @@ const TeacherCustomTests = () => {
                     <button type="button" onClick={copyTestDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
                       📋 Demo JSON + AI Prompt Copy Karein
                     </button>
-                    <p className="text-[11px] text-gray-500">Upar wala button dabao → AI chatbot mein paste karo → poora test JSON mile to neeche paste karke banayein.</p>
+                    <p className="text-[11px] text-gray-500">Tap the button above → paste it into an AI chatbot → paste the resulting test JSON below to create it.</p>
                     <textarea
                       value={bulkTestJson}
                       onChange={(e) => setBulkTestJson(e.target.value)}
                       rows={14}
-                      placeholder="Yahan AI se mila poora test JSON paste karein..."
+                      placeholder="Paste the full test JSON you got from the AI here..."
                       className={`${inputClass} font-mono`}
                     />
                     <button type="button" onClick={handleBulkCreateTest} disabled={creating || !bulkTestJson.trim()} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-                      {creating ? "Ban raha hai..." : "Test Banayein"}
+                      {creating ? "Creating..." : "Test Banayein"}
                     </button>
                   </div>
                 ) : (
@@ -461,7 +461,7 @@ const TeacherCustomTests = () => {
                         onChange={(e) => setNewSubjectName(e.target.value)}
                         className={`${inputClass} flex-1 appearance-none cursor-pointer`}
                       >
-                        <option value="">Subject chunein</option>
+                        <option value="">Select Subject</option>
                         {subjectOptions
                           .filter((s) => !subjects.some((sub) => sub.subjectName === s))
                           .map((s) => (
@@ -516,7 +516,7 @@ const TeacherCustomTests = () => {
                   {activeSubjectIdx !== null && subjects[activeSubjectIdx] && (
                     <div className="bg-[#0A0D14] border border-gray-800 rounded-xl p-4 space-y-3">
                       <p className="text-xs text-gray-500">
-                        '{subjects[activeSubjectIdx].subjectName}' mein question add karein
+                        Add question to '{subjects[activeSubjectIdx].subjectName}'
                       </p>
 
                       <input
@@ -547,7 +547,7 @@ const TeacherCustomTests = () => {
                           className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
                         />
                         {uploadingPhoto === "question" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
-                        {qForm.questionPhoto && uploadingPhoto !== "question" && <p className="text-[10px] text-green-400 mt-1">✅ Photo lag gayi</p>}
+                        {qForm.questionPhoto && uploadingPhoto !== "question" && <p className="text-[10px] text-green-400 mt-1">✅ Photo attached</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -596,7 +596,7 @@ const TeacherCustomTests = () => {
                           className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
                         />
                         {uploadingPhoto === "explain" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
-                        {qForm.answerExplainWithPhoto && uploadingPhoto !== "explain" && <p className="text-[10px] text-green-400 mt-1">✅ Photo lag gayi</p>}
+                        {qForm.answerExplainWithPhoto && uploadingPhoto !== "explain" && <p className="text-[10px] text-green-400 mt-1">✅ Photo attached</p>}
                       </div>
 
                       {/* 🆕 Ye sawaal pehle kis exam/saal mein aa chuka hai — student ko sawaal ke niche dikhega */}
@@ -605,7 +605,7 @@ const TeacherCustomTests = () => {
                         name="askedIn"
                         value={qForm.askedIn}
                         onChange={handleQChange}
-                        placeholder="Pehle kab pucha gaya? jaise: UPSSSC PET 2019 (optional)"
+                        placeholder="Previously asked in? e.g. UPSSSC PET 2019 (optional)"
                         className={inputClass}
                       />
 
@@ -642,7 +642,7 @@ const TeacherCustomTests = () => {
                   disabled={creating || totalQuestionsInBuilder === 0}
                   className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
                 >
-                  {creating ? "Ban raha hai..." : `Test Banayein (${totalQuestionsInBuilder} sawaal)`}
+                  {creating ? "Creating..." : `Test Banayein (${totalQuestionsInBuilder} sawaal)`}
                 </button>
                   </>
                 )}
@@ -652,7 +652,7 @@ const TeacherCustomTests = () => {
             {/* ── List ── */}
             {tests.length === 0 ? (
               <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-                <p className="text-sm text-gray-400">Is batch ke liye abhi koi custom test nahi bana.</p>
+                <p className="text-sm text-gray-400">No custom test has been created for this batch yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -685,10 +685,10 @@ const TeacherCustomTests = () => {
                       }`}
                     >
                       {deletingTestId === t.testId
-                        ? "Delete ho raha hai..."
+                        ? "Deleting..."
                         : confirmDeleteTestId === t.testId
-                        ? "⚠️ Pakka? Dobara dabao"
-                        : "🗑️ Test Delete Karein"}
+                        ? "⚠️ Are you sure? Tap again"
+                        : "🗑️ Delete Test"}
                     </button>
                   </div>
                 ))}

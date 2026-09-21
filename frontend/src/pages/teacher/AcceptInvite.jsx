@@ -43,7 +43,7 @@ const AcceptInvite = () => {
       });
       navigate("/TeacherDashboard");
     } catch (err) {
-      setError(err.response?.data?.message || "Invite accept nahi ho paaya.");
+      setError(err.response?.data?.message || "Could not accept invite.");
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,7 @@ const AcceptInvite = () => {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50 mt-2"
             >
-              {loading ? "Activate ho raha hai..." : "Account Activate Karein"}
+              {loading ? "Activating..." : "Account Activate Karein"}
             </button>
           </form>
         </div>

@@ -87,7 +87,7 @@ const Singup = () => {
 
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
-      showToast("Kripya highlighted fields sahi se bharein.");
+      showToast("Please fill in the highlighted fields correctly.");
       return false;
     }
     return true;
@@ -101,11 +101,11 @@ const Singup = () => {
     setSendingOtp(true);
     try {
       await api.post(SEND_OTP_ENDPOINT, { email: formData.email }); // 🆕 email par OTP
-      showToast("OTP bhej diya gaya hai!");
+      showToast("OTP sent!");
       setStep("otp");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Something went wrong while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -116,10 +116,10 @@ const Singup = () => {
     setSendingOtp(true);
     try {
       await api.post(SEND_OTP_ENDPOINT, { email: formData.email }); // 🆕 email par OTP
-      showToast("OTP dobara bhej diya gaya hai!");
+      showToast("OTP resent!");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Something went wrong while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -129,7 +129,7 @@ const Singup = () => {
   const handleVerifyAndSignup = async (e) => {
     e.preventDefault();
     if (otp.trim().length !== 6) {
-      showToast("6-digit OTP dalein.");
+      showToast("Please enter the 6-digit OTP.");
       return;
     }
 
@@ -138,7 +138,7 @@ const Singup = () => {
       await api.post(SIGNUP_ENDPOINT, { ...formData, otp: otp.trim() });
       navigate("/HomePage");
     } catch (err) {
-      showToast(err.response?.data?.message || "Signup fail ho gaya.");
+      showToast(err.response?.data?.message || "Signup failed.");
     } finally {
       setVerifying(false);
     }
@@ -181,7 +181,7 @@ const Singup = () => {
         <img src="/logo.svg" alt="BatchMock.in" className="w-14 h-14 object-contain mb-6" />
         <h1 className="text-3xl font-bold mb-3">BatchMock.in mein Swagat Hai</h1>
         <p className="text-blue-100 text-sm leading-relaxed max-w-md mb-8">
-          Sarkari exam ki taiyari ke liye best mock tests, previous year papers aur detailed performance analysis — sab ek hi jagah.
+          The best mock tests, previous year papers, and detailed performance analysis for government exam preparation — all in one place.
         </p>
         <img src="/poster.svg" alt="Student preparing for exams" className="w-full max-w-md mx-auto" />
       </div>
@@ -192,12 +192,12 @@ const Singup = () => {
       <div className="flex-1 flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6 sm:p-8">
           <h2 className="text-xl font-bold text-[#1E293B] mb-1">
-            {step === "details" ? "Account Banayein" : "Email Verify Karein"}
+            {step === "details" ? "Create Account" : "Verify Email"}
           </h2>
           <p className="text-xs text-[#64748B] mb-6">
             {step === "details"
               ? "Apni details bharein, email pe OTP bheja jayega"
-              : `${formData.email} pe bheja gaya 6-digit code dalein`}
+              : `Enter the 6-digit code sent to ${formData.email}`}
           </p>
 
           {/* ══════════════ STEP 1: DETAILS FORM ══════════════ */}
@@ -212,7 +212,7 @@ const Singup = () => {
                   <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.name ? 'text-red-400' : 'text-[#94A3B8]'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                   </span>
-                  <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Aapka naam" className={getInputClass('name')} />
+                  <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Your name" className={getInputClass('name')} />
                 </div>
               </div>
 
@@ -251,7 +251,7 @@ const Singup = () => {
                   <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.address ? 'text-red-400' : 'text-[#94A3B8]'}`}>
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   </span>
-                  <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Aapka sheher" className={getInputClass('address')} />
+                  <input type="text" name="address" value={formData.address} onChange={handleChange} placeholder="Your city" className={getInputClass('address')} />
                 </div>
               </div>
 
@@ -295,7 +295,7 @@ const Singup = () => {
                       joinMode === "exam" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
                     }`}
                   >
-                    Exam Chunein
+                    Choose Exam
                   </button>
                   <button
                     type="button"
@@ -304,7 +304,7 @@ const Singup = () => {
                       joinMode === "coupon" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
                     }`}
                   >
-                    Coupon Code Hai
+                    I Have a Coupon Code
                   </button>
                 </div>
 
@@ -314,7 +314,7 @@ const Singup = () => {
                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </span>
                     <select name="exam" value={formData.exam} onChange={handleChange} className={`${getInputClass('exam')} appearance-none cursor-pointer`}>
-                      <option value="" disabled>Exam chunein</option>
+                      <option value="" disabled>Select Exam</option>
                       {examList.length > 0 ? (
                         examList.map((examName, index) => (
                           <option key={index} value={examName}>{examName}</option>
@@ -337,7 +337,7 @@ const Singup = () => {
                       name="couponCode"
                       value={formData.couponCode}
                       onChange={(e) => setFormData((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
-                      placeholder="Apne teacher se mila hua code"
+                      placeholder="Code given by your teacher"
                       className={getInputClass('couponCode')}
                     />
                   </div>
@@ -355,7 +355,7 @@ const Singup = () => {
                   sendingOtp ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
                 }`}
               >
-                {sendingOtp ? 'OTP Bheja Ja Raha Hai...' : 'OTP Bhejein'}
+                {sendingOtp ? 'Sending OTP...' : 'Send OTP'}
               </button>
             </form>
           )}
@@ -383,12 +383,12 @@ const Singup = () => {
                   verifying ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
                 }`}
               >
-                {verifying ? 'Verify Ho Raha Hai...' : 'Verify Karein & Account Banayein'}
+                {verifying ? 'Verifying...' : 'Verify & Create Account'}
               </button>
 
               <div className="flex items-center justify-between text-xs pt-1">
                 <button type="button" onClick={changePhoneNumber} className="text-[#64748B] hover:text-[#334155]">
-                  &larr; Number badlein
+                  &larr; Change Number
                 </button>
                 <button
                   type="button"
@@ -396,7 +396,7 @@ const Singup = () => {
                   disabled={resendCooldown > 0 || sendingOtp}
                   className={resendCooldown > 0 ? "text-[#94A3B8] cursor-not-allowed" : "text-[#2563EB] font-medium hover:underline"}
                 >
-                  {resendCooldown > 0 ? `Dobara bhejein (${resendCooldown}s)` : "OTP Dobara Bhejein"}
+                  {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend OTP"}
                 </button>
               </div>
             </form>

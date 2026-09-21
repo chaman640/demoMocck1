@@ -150,7 +150,7 @@ const HomePage = () => {
     {
       icon: "📰",
       label: "Current Affairs",
-      sub: "Roz ki khabrein",
+      sub: "Daily updates",
       onClick: () => navigate("/CurrentAffairs"),
     },
     // 👇 NAYA: teacher ke banaye Custom Tests ka link. Pehle backend mein
@@ -159,19 +159,19 @@ const HomePage = () => {
     {
       icon: "📋",
       label: "Batch Tests",
-      sub: "Teacher ke test",
+      sub: "From your teacher",
       onClick: () => navigate("/CustomTests"),
     },
     {
       icon: "👥",
-      label: "Meri Batch",
-      sub: "Coupon / teacher",
+      label: "My Batch",
+      sub: "Coupon & teacher",
       onClick: () => navigate("/MyBatch"),
     },
     {
       icon: "🏆",
       label: "My Challenges",
-      sub: "Dekho",
+      sub: "View",
       onClick: () => navigate("/MyChallenges"),
     },
   ];
@@ -181,28 +181,28 @@ const HomePage = () => {
     {
       icon: "📝",
       title: "Full Mock",
-      desc: "Real exam jaisa",
+      desc: "Real exam experience",
       primary: true,
       onClick: () => navigate('/MockTest', { state: { mockType: "Full" } }),
     },
     {
       icon: "⚡",
       title: "Mini Mock",
-      desc: "10 min ka practice",
+      desc: "10-min practice",
       primary: true,
       onClick: () => navigate('/MockTest', { state: { mockType: "Mini" } }),
     },
     {
       icon: "📚",
       title: "Prev. Papers",
-      desc: "Purane saal ke",
+      desc: "From past years",
       primary: false,
       onClick: () => navigate("/PreviousYearTests"),
     },
     {
       icon: "⚔️",
       title: "Challenge",
-      desc: "Dost ko bulao",
+      desc: "Challenge a friend",
       primary: false,
       onClick: () => navigate("/Challenge"),
     },
@@ -227,11 +227,11 @@ const HomePage = () => {
         {/* Welcome */}
         <section className="mb-5">
           <h1 className="text-[26px] leading-tight font-extrabold mb-1.5">
-            Padhai Shuru<br />
-            <span className="text-[#A78BFA]">Karo Yahan Se</span>
+            Start Studying<br />
+            <span className="text-[#A78BFA]">Right Here</span>
           </h1>
           <p className="text-gray-400 text-sm">
-            Mock test do, score badhao, selection pakka karo
+            Take mock tests, raise your score, and secure your selection
           </p>
         </section>
 
@@ -243,7 +243,7 @@ const HomePage = () => {
           <div className="absolute top-0 right-0 w-28 h-28 bg-[#8B5CF6] opacity-10 rounded-full -translate-y-1/2 translate-x-1/2" />
           
           <p className="text-[11px] text-[#A5B4FC] uppercase tracking-wider mb-1.5 relative z-10">
-            Aapka Average Score
+            Your Average Score
           </p>
           <p className="text-[44px] font-extrabold text-white mb-1 relative z-10 leading-none">
             {averageScore === null
@@ -253,17 +253,17 @@ const HomePage = () => {
               : averageScore}
           </p>
           <p className="text-xs text-[#C4B5FD] mb-3 relative z-10">
-            {totalTests > 0 ? `${totalTests} test diye hain` : "Abhi koi test nahi diya"}
+            {totalTests > 0 ? `${totalTests} tests taken` : "No tests taken yet"}
           </p>
           <span className="inline-block px-4 py-1.5 bg-white/10 border border-white/20 rounded-full text-xs font-medium relative z-10">
-            Analysis Dekho →
+            View Analysis →
           </span>
         </section>
 
         {/* Quick Actions — Horizontal Scroll Row */}
         <section className="mb-5">
           <p className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold mb-2.5">
-            Jaldi Kya?
+            Quick Actions
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
             {quickActions.map((action) => (
@@ -285,7 +285,7 @@ const HomePage = () => {
         {/* Main Actions — 4 Big Buttons */}
         <section className="mb-5">
           <p className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold mb-2.5">
-            Sara Kuchh
+            Explore More
           </p>
           <div className="grid grid-cols-2 gap-2.5">
             {mainActions.map((action) => (
@@ -319,7 +319,7 @@ const HomePage = () => {
             </div>
             
             {averageScore === null ? (
-              <p className="text-sm text-gray-400">Rank dekhne ke liye pehle ek test do</p>
+              <p className="text-sm text-gray-400">Take a test first to see your rank</p>
             ) : autoRankLoading ? (
               <div className="h-7 bg-gray-800 rounded animate-pulse w-28" />
             ) : autoRank ? (
@@ -328,20 +328,20 @@ const HomePage = () => {
                   #{autoRank.rankRangeLow?.toLocaleString("en-IN")} – {autoRank.rankRangeHigh?.toLocaleString("en-IN")}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  Aapke {averageScoreOutOf ? `${averageScore}/${averageScoreOutOf}` : averageScore} score ke hisaab se
+                  Based on your score of {averageScoreOutOf ? `${averageScore}/${averageScoreOutOf}` : averageScore}
                 </p>
                 {autoRank.selectionChance && (
                   <p className={`text-[11px] mt-1.5 font-medium ${
                     autoRank.selectionChance === "strong" ? "text-green-400" :
                     autoRank.selectionChance === "borderline" ? "text-yellow-400" : "text-red-400"
                   }`}>
-                    {autoRank.selectionChance === "strong" ? "✅ Achi sambhavna" :
-                     autoRank.selectionChance === "borderline" ? "⚠️ Borderline" : "❌ Kam sambhavna"}
+                    {autoRank.selectionChance === "strong" ? "✅ Strong chance" :
+                     autoRank.selectionChance === "borderline" ? "⚠️ Borderline" : "❌ Low chance"}
                   </p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-gray-400">Data available nahi hai</p>
+              <p className="text-sm text-gray-400">No data available</p>
             )}
           </section>
         )}

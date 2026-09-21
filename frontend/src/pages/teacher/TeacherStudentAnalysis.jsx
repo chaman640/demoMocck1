@@ -31,9 +31,9 @@ const STATUS_FILTERS = [
 const TrendBadge = ({ trend }) => {
   if (!trend) return null;
   const map = {
-    improving: { label: "Improve ho raha/rahi hai", color: "text-green-400 bg-green-500/10 border-green-500/30", arrow: "↑" },
-    declining: { label: "Score gir raha hai", color: "text-red-400 bg-red-500/10 border-red-500/30", arrow: "↓" },
-    same: { label: "Steady hai", color: "text-gray-400 bg-gray-500/10 border-gray-500/30", arrow: "→" },
+    improving: { label: "Improving", color: "text-green-400 bg-green-500/10 border-green-500/30", arrow: "↑" },
+    declining: { label: "Score is dropping", color: "text-red-400 bg-red-500/10 border-red-500/30", arrow: "↓" },
+    same: { label: "Steady", color: "text-gray-400 bg-gray-500/10 border-gray-500/30", arrow: "→" },
   };
   const t = map[trend.direction];
   if (!t) return null;
@@ -118,7 +118,7 @@ const TeacherStudentAnalysis = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load data."}</p>
           <button onClick={() => navigate("/TeacherStudentSearch")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Search Par Wapas</button>
         </div>
         <TeacherBottomNav />
@@ -206,7 +206,7 @@ const TeacherStudentAnalysis = () => {
           <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
             <div className="px-4 py-3 border-b border-gray-800 bg-red-900/10">
               <h3 className="font-semibold text-sm text-red-400">Sabse Badi Galtiyan</h3>
-              <p className="text-[11px] text-gray-500 mt-0.5">Yahan focus karwaao — score sabse zyada yahin se sudhrega</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">Focus here — this is where score improves the most</p>
             </div>
             <div className="divide-y divide-gray-800">
               {overview.topWeakTopics.map((t, i) => (
@@ -308,7 +308,7 @@ const MockDetailScreen = ({ studentId, performanceId, onBack }) => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load data."}</p>
           <button onClick={onBack} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Wapas Jaayein</button>
         </div>
         <TeacherBottomNav />
@@ -450,7 +450,7 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
         </p>
       )}
       {isSlowAndWrong && (
-        <p className="text-xs text-orange-400 mb-3 flex items-center gap-1.5">🐢 Average se kaafi zyada time liya aur phir bhi galat hua.</p>
+        <p className="text-xs text-orange-400 mb-3 flex items-center gap-1.5">🐢 Took far longer than average and still got it wrong.</p>
       )}
       {q.answerExplain && (
         <div className="bg-[#1F2937]/50 border border-gray-700/50 rounded-lg p-4">

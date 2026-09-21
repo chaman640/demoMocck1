@@ -45,7 +45,7 @@ const TeacherBatchStudents = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Students load nahi ho paaye.");
+      setErrorMsg(err.response?.data?.message || "Could not load students.");
       setPhase("error");
     }
   }, [couponId, navigate]);
@@ -56,7 +56,7 @@ const TeacherBatchStudents = () => {
     e.preventDefault();
     setFormError("");
     if (!form.phone.trim() && !form.email.trim()) {
-      setFormError("Phone ya email mein se ek zaroori hai!");
+      setFormError("Either phone or email is required!");
       return;
     }
     setAdding(true);
@@ -70,7 +70,7 @@ const TeacherBatchStudents = () => {
       setForm(EMPTY_FORM);
       await load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Student add nahi ho paaya.");
+      setFormError(err.response?.data?.message || "Could not add student.");
     } finally {
       setAdding(false);
     }
@@ -81,7 +81,7 @@ const TeacherBatchStudents = () => {
       await api.delete(`/teacher/batch-students/${id}`);
       setStudents((prev) => prev.filter((s) => s._id !== id));
     } catch (err) {
-      alert(err.response?.data?.message || "Delete nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not delete.");
     }
   };
 
@@ -115,8 +115,8 @@ const TeacherBatchStudents = () => {
           <p className="text-gray-400 text-sm">
             {batchName ? `'${batchName}' ` : "Is batch "}
             {students.length > 0
-              ? "ab sirf yahan list kiye students hi join kar sakte hain."
-              : "abhi khula hai — koi bhi valid coupon code se join kar sakta hai. Neeche pehla student add karte hi ye invite-only ban jayegi."}
+              ? "only the students listed here can join now."
+              : "is currently open — anyone with a valid coupon code can join. It will become invite-only as soon as you add the first student below."}
           </p>
         </div>
 
@@ -151,9 +151,9 @@ const TeacherBatchStudents = () => {
               placeholder="Email"
               className={inputClass}
             />
-            <p className="text-[11px] text-gray-500">Phone ya email mein se ek dena zaroori hai, dono bhi de sakte hain.</p>
+            <p className="text-[11px] text-gray-500">Either phone or email is required — you can provide both.</p>
             <button type="submit" disabled={adding} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-              {adding ? "Add ho raha hai..." : "Student Add Karein"}
+              {adding ? "Adding..." : "Student Add Karein"}
             </button>
           </form>
         </div>

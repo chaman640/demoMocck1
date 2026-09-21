@@ -40,11 +40,11 @@ const Login = () => {
 
     if (formData.phone.length !== 10) {
       setFieldErrors({ phone: true });
-      return setError("Phone number bilkul 10 anko (digits) ka hona chahiye!");
+      return setError("Phone number must be exactly 10 digits!");
     }
     if (!formData.password) {
       setFieldErrors({ password: true });
-      return setError("Kripya apna password darj karein!");
+      return setError("Please enter your password!");
     }
 
     setLoading(true);
@@ -64,7 +64,7 @@ const Login = () => {
       }
     } catch (err) {
       // Axios error handling
-      const errorMessage = err.response?.data?.message || "Login fail ho gaya.";
+      const errorMessage = err.response?.data?.message || "Login failed.";
       setError(errorMessage);
       
       const errorMsgLower = errorMessage.toLowerCase();
@@ -244,7 +244,7 @@ const Login = () => {
           </div>
           <div className="text-right -mt-2 mb-2">
   <Link to="/ForgotPassword" className="text-xs text-[#2563EB] hover:underline">
-    Password bhool gaye?
+    Forgot Password?
   </Link>
 </div>
           {/* 🆕 CHANGE — student Login/Signup pages se Teacher Login/Signup

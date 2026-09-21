@@ -6,8 +6,8 @@ const options = [
   // 🆕 HATA DIYA — "Question Add Karein" (Mock Test wala Question Bank).
   // Ab sirf Admin Question Bank mein sawaal add kar sakta hai. Teacher
   // apne students ke liye "Custom Tests" se hi sawaal daal sakta hai.
-  { title: "Previous Year Papers", desc: "Paper-shell banayein ya apna subject fill karein", path: "/TeacherPYQPapers", icon: "📚" },
-  { title: "Custom Tests", desc: "Weekly/chapter-wise test banayein", path: "/TeacherCustomTests", icon: "📝" },
+  { title: "Previous Year Papers", desc: "Create a paper shell or fill in your subject", path: "/TeacherPYQPapers", icon: "📚" },
+  { title: "Custom Tests", desc: "Create weekly or chapter-wise tests", path: "/TeacherCustomTests", icon: "📝" },
   // 🆕 NAYA — apne batch ke liye current affairs
   { title: "Batch Current Affairs", desc: "Apne batch ke students ke liye daily updates daalein", path: "/TeacherCurrentAffairs", icon: "📰" },
   // 🆕 HATA DIYA — "Class Analysis" ab bottom nav mein seedha "Analysis" hai
@@ -19,7 +19,7 @@ const TeacherContent = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">Content Manage Karein</h1>
-        <p className="text-gray-400 text-sm mb-8">Apne active batch ke liye content banayein</p>
+        <p className="text-gray-400 text-sm mb-8">Create content for your active batch</p>
 
         <div className="space-y-3">
           {options.map((o) => (

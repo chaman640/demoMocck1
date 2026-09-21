@@ -48,13 +48,13 @@ const TeacherForgotPassword = () => {
     e.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email)) {
       setFieldErrors({ email: true });
-      showToast("Sahi email address dalein.");
+      showToast("Please enter a valid email address.");
       return;
     }
     setSendingOtp(true);
     try {
       await api.post(REQUEST_OTP_ENDPOINT, { email });
-      showToast("OTP email par bhej diya gaya hai!");
+      showToast("OTP has been sent to your email!");
       setStep("reset");
       setResendCooldown(60);
     } catch (err) {
@@ -69,7 +69,7 @@ const TeacherForgotPassword = () => {
     setSendingOtp(true);
     try {
       await api.post(REQUEST_OTP_ENDPOINT, { email });
-      showToast("OTP dobara bhej diya gaya hai!");
+      showToast("OTP has been resent!");
       setResendCooldown(60);
     } catch (err) {
       showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
@@ -95,10 +95,10 @@ const TeacherForgotPassword = () => {
     setResetting(true);
     try {
       await api.post(RESET_PASSWORD_ENDPOINT, { email, otp: otp.trim(), newPassword });
-      showToast("Password reset ho gaya! Login karein.");
+      showToast("Password reset successful! Please log in.");
       setTimeout(() => navigate("/TeacherLogin"), 1200);
     } catch (err) {
-      showToast(err.response?.data?.message || "Password reset nahi ho paaya.");
+      showToast(err.response?.data?.message || "Could not reset password.");
     } finally {
       setResetting(false);
     }
@@ -125,7 +125,7 @@ const TeacherForgotPassword = () => {
           <img src={LOGO_URL} alt="BatchMock.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">{step === "email" ? "Password Bhool Gaye?" : "Naya Password Set Karein"}</h1>
           <p className="text-gray-400 text-sm mt-1">
-            {step === "email" ? "Apna registered email dalein, OTP bheja jayega" : `${email} pe bheja gaya OTP aur naya password dalein`}
+            {step === "email" ? "Enter your registered email, an OTP will be sent" : `Enter the OTP sent to ${email} and your new password`}
           </p>
         </div>
 

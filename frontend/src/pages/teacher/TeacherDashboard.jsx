@@ -68,9 +68,9 @@ const TeacherDashboard = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Dashboard load nahi ho paaya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load the dashboard."}</p>
           <button onClick={() => refetch()} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -128,7 +128,7 @@ const TeacherDashboard = () => {
             {dashboard.coupons.length > 0 && (
               <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-800">
-                  <h3 className="font-semibold text-sm">Aapke Batches</h3>
+                  <h3 className="font-semibold text-sm">Your Batches</h3>
                 </div>
                 <div className="divide-y divide-gray-800">
                   {dashboard.coupons.map((c) => (
@@ -161,7 +161,7 @@ const TeacherDashboard = () => {
             {dashboard.coupons.length > 0 && (
               <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-gray-800">
-                  <h3 className="font-semibold text-sm">Aapke Authorized Batches</h3>
+                  <h3 className="font-semibold text-sm">Your Authorized Batches</h3>
                 </div>
                 <div className="divide-y divide-gray-800">
                   {dashboard.coupons.map((c) => (
@@ -182,12 +182,12 @@ const TeacherDashboard = () => {
         {/* Empty state */}
         {isMain && dashboard.totalCoupons === 0 && (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400 mb-4">Shuru karne ke liye pehla batch/coupon banayein</p>
+            <p className="text-sm text-gray-400 mb-4">Create your first batch to get started</p>
             <button
               onClick={() => navigate("/TeacherCoupons")}
               className="px-5 py-2.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
             >
-              Pehla Batch Banayein
+              Create First Batch
             </button>
           </div>
         )}

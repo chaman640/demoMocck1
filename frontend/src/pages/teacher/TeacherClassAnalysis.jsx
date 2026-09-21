@@ -129,7 +129,7 @@ const TeacherClassAnalysis = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Data load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load data.");
       setPhase("error");
     }
   }, [navigate]);
@@ -150,7 +150,7 @@ const TeacherClassAnalysis = () => {
       setTopicData(res.data.data);
       setTopicPhase("loaded");
     } catch (err) {
-      setTopicError(err.response?.data?.message || "Topic analysis load nahi ho paaya.");
+      setTopicError(err.response?.data?.message || "Could not load topic analysis.");
       setTopicPhase("error");
     }
   }, [filter, minPercentile, maxPercentile]);
@@ -182,7 +182,7 @@ const TeacherClassAnalysis = () => {
       setQuestionData(res.data.data);
       setQuestionPhase("loaded");
     } catch (err) {
-      setQuestionError(err.response?.data?.message || "Question analysis load nahi ho paaya.");
+      setQuestionError(err.response?.data?.message || "Could not load question analysis.");
       setQuestionPhase("error");
     }
   };
@@ -300,7 +300,7 @@ const TeacherClassAnalysis = () => {
         <div className="flex items-center justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold mb-1">Class Analysis</h1>
-            <p className="text-gray-400 text-sm">Mock Test, Previous Year Papers aur Custom Tests — sabhi mila ke, kaunse topics mein poori class ko sabse zyada dikkat hai</p>
+            <p className="text-gray-400 text-sm">Combining Mock Tests, Previous Year Papers, and Custom Tests — which topics the whole class struggles with the most</p>
           </div>
         </div>
 
@@ -318,7 +318,7 @@ const TeacherClassAnalysis = () => {
 
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Analysis dekhne ke liye pehle active batch select karein.</p>
+            <p className="text-sm text-gray-400">Please select an active batch to view analysis.</p>
           </div>
         ) : (
           <>
@@ -377,7 +377,7 @@ const TeacherClassAnalysis = () => {
                   <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
                     <div className="px-4 py-3 border-b border-gray-800">
                       <h3 className="font-semibold text-sm">Topic-wise Error Breakdown</h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Sabse zyada galti wale topics upar &middot; Mock/PYQ/Custom badge se pata chalega kahan se aa rahi hai</p>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Topics with the most mistakes appear first &middot; the Mock/PYQ/Custom badge shows where the data comes from</p>
                     </div>
                     <div className="divide-y divide-gray-800">
                       {topicData.topics.map((t, i) => (

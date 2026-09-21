@@ -80,7 +80,7 @@ const TeacherStudentTopicAnalysis = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load data."}</p>
           <button onClick={() => navigate(-1)} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
             Wapas Jaayein
           </button>

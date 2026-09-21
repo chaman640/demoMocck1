@@ -50,7 +50,7 @@ const TeacherProfile = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Profile load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load profile.");
       setPhase("error");
     }
   }, [navigate]);
@@ -63,7 +63,7 @@ const TeacherProfile = () => {
       await api.post("/switch-active-coupon", { couponId });
       await load();
     } catch (err) {
-      alert(err.response?.data?.message || "Switch nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not switch.");
     } finally {
       setSwitchingId(null);
     }
@@ -133,7 +133,7 @@ const TeacherProfile = () => {
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">Active Batch</p>
-            <button onClick={() => navigate("/TeacherCoupons")} className="text-[11px] text-[#A78BFA] hover:underline">Sab Batches →</button>
+            <button onClick={() => navigate("/TeacherCoupons")} className="text-[11px] text-[#A78BFA] hover:underline">All Batches →</button>
           </div>
           {activeCoupon ? (
             <div>
@@ -146,7 +146,7 @@ const TeacherProfile = () => {
 
           {coupons.length > 1 && (
             <div className="pt-2 border-t border-gray-800 space-y-1.5">
-              <p className="text-[10px] text-gray-600 uppercase tracking-wide">Jaldi switch karein</p>
+              <p className="text-[10px] text-gray-600 uppercase tracking-wide">Quick switch</p>
               {coupons.filter((c) => c._id !== teacher.activeCoupon).map((c) => (
                 <button
                   key={c._id}
@@ -165,12 +165,12 @@ const TeacherProfile = () => {
         {/* ── Account actions ── */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
           <button onClick={() => navigate("/TeacherForgotPassword")} className="w-full flex items-center justify-between px-5 py-4 text-sm hover:bg-white/5 border-b border-gray-800">
-            <span>🔑 Password Badlein</span>
+            <span>🔑 Change Password</span>
             <span className="text-gray-600">→</span>
           </button>
           {teacher.role === "main" && (
             <button onClick={() => navigate("/TeacherSubTeachers")} className="w-full flex items-center justify-between px-5 py-4 text-sm hover:bg-white/5 border-b border-gray-800">
-              <span>👥 Team Manage Karein</span>
+              <span>👥 Manage Team</span>
               <span className="text-gray-600">→</span>
             </button>
           )}
