@@ -1,9 +1,12 @@
 import mongoose from "mongoose";
 import multer from "multer";
 import XLSX from "xlsx";
-import pdfParse from "pdf-parse";
+import { createRequire } from "module";
 import User from "../models/User.js";
 import Coupon from "../models/Coupon.js";
+
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const MAX_BULK_SIZE = 1000;
 
