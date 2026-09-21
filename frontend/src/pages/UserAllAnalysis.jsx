@@ -16,11 +16,11 @@ import {
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
 
-// 🆕 Naya logo (BatchMock.in rebrand)
+// Logo
 const LOGO_URL = "/logo.svg";
 
 // ──────────────────────────────────────────────
-// Seconds ko readable "Xm Ys" format me convert karta hai
+// Converts seconds into a readable "Xm Ys" format
 // ──────────────────────────────────────────────
 const formatDuration = (totalSeconds) => {
   if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
@@ -94,14 +94,14 @@ const MockDetailSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 🆕 Trend badge — pichle 3 vs uske pehle wale 3 mocks
+// Trend badge — last 3 vs the 3 mocks before that
 // ──────────────────────────────────────────────
 const TrendBadge = ({ trend }) => {
   if (!trend) return null;
   const map = {
-    improving: { label: "Improve ho rahe ho", color: "text-green-400 bg-green-500/10 border-green-500/30", arrow: "↑" },
-    declining: { label: "Score gir raha hai", color: "text-red-400 bg-red-500/10 border-red-500/30", arrow: "↓" },
-    same: { label: "Steady hai", color: "text-gray-400 bg-gray-500/10 border-gray-500/30", arrow: "→" },
+    improving: { label: "You're improving", color: "text-green-400 bg-green-500/10 border-green-500/30", arrow: "↑" },
+    declining: { label: "Score is dropping", color: "text-red-400 bg-red-500/10 border-red-500/30", arrow: "↓" },
+    same: { label: "Steady", color: "text-gray-400 bg-gray-500/10 border-gray-500/30", arrow: "→" },
   };
   const t = map[trend.direction];
   if (!t) return null;
@@ -117,13 +117,13 @@ const TrendBadge = ({ trend }) => {
 };
 
 // ──────────────────────────────────────────────
-// 🆕 Score trend line chart — poori lifetime history
+// Score trend line chart — full lifetime history
 // ──────────────────────────────────────────────
 const ScoreTrendChart = ({ graphData, onPointClick }) => {
   if (!graphData || graphData.length < 2) {
     return (
       <div className="px-4 sm:px-6 py-10 text-center text-sm text-gray-500">
-        Trend dekhne ke liye kam se kam 2 mocks chahiye — abhi sirf {graphData?.length || 0} hai.
+        You need at least 2 mocks to see a trend — you currently have {graphData?.length || 0}.
       </div>
     );
   }
@@ -150,13 +150,13 @@ const ScoreTrendChart = ({ graphData, onPointClick }) => {
           />
         </LineChart>
       </ResponsiveContainer>
-      <p className="text-[11px] text-gray-500 text-center mt-1">Kisi bhi point par tap karke wo mock dekhein</p>
+      <p className="text-[11px] text-gray-500 text-center mt-1">Tap on any point to view that mock</p>
     </div>
   );
 };
 
 // ──────────────────────────────────────────────
-// 🆕 Subject comparison bar chart — ek nazar mein sabse kamzor subject
+// Subject comparison bar chart — spot your weakest subject at a glance
 // ──────────────────────────────────────────────
 const barColor = (accuracy) => (accuracy >= 70 ? "#34D399" : accuracy >= 40 ? "#FBBF24" : "#F87171");
 
@@ -184,7 +184,7 @@ const SubjectBarChart = ({ subjectAnalysis }) => {
 };
 
 // ──────────────────────────────────────────────
-// 🆕 Top Weak Topics — cross-subject, seedha click se galat sawaal khulte hain
+// Top Weak Topics — across all subjects, click to see the wrong questions
 // ──────────────────────────────────────────────
 const WeakTopicRow = ({ topic, onClick }) => (
   <button
@@ -198,14 +198,14 @@ const WeakTopicRow = ({ topic, onClick }) => (
       </p>
     </div>
     <span className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-semibold text-red-400 bg-red-500/10">
-      {topic.wrongCount} galat
+      {topic.wrongCount} wrong
     </span>
     <span className="flex-shrink-0 text-xs font-medium text-red-300">&rarr;</span>
   </button>
 );
 
 // ──────────────────────────────────────────────
-// Test History ke Level-1 filter tabs
+// Test History filter tabs
 // ──────────────────────────────────────────────
 const MOCK_TYPE_FILTERS = [
   { key: "all", label: "All" },
@@ -305,7 +305,7 @@ const UserAllAnalysis = () => {
         });
         setSubjectQuestionCounts(countMap);
       } catch (err) {
-        setError(err.response?.data?.message || err.message || "Data laane mein error aaya.");
+        setError(err.response?.data?.message || err.message || "Something went wrong while loading this data.");
       } finally {
         setLoading(false);
       }
@@ -386,10 +386,10 @@ const UserAllAnalysis = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col items-center justify-center px-4 pb-20">
         <div className="bg-[#111827] border border-red-500/30 p-6 sm:p-8 rounded-2xl max-w-md w-full text-center shadow-2xl">
           <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">!</div>
-          <h2 className="text-xl font-bold mb-2">Oops! Error Aaya</h2>
+          <h2 className="text-xl font-bold mb-2">Oops! An Error Occurred</h2>
           <p className="text-gray-400 mb-6 text-sm">{error}</p>
           <button onClick={() => navigate("/Login")} className="w-full sm:w-auto px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium">
-            Login Page Par Jaayein
+            Go to Login Page
           </button>
         </div>
         <BottomNav />
@@ -406,10 +406,10 @@ const UserAllAnalysis = () => {
               <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <h2 className="text-xl font-bold mb-2">Koi Data Nahi Mila</h2>
-          <p className="text-gray-400 mb-6 text-sm">Aapne abhi tak {examName} ka koi mock test nahi diya hai.</p>
+          <h2 className="text-xl font-bold mb-2">No Data Found</h2>
+          <p className="text-gray-400 mb-6 text-sm">You haven't taken any {examName} mock test yet.</p>
           <button onClick={() => navigate("/MockTest")} className="w-full sm:w-auto px-6 py-2.5 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded-lg transition-colors text-sm font-medium">
-            Test Dena Shuru Karein
+            Start Taking Tests
           </button>
         </div>
         <BottomNav />
@@ -436,13 +436,13 @@ const UserAllAnalysis = () => {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Detailed Analysis</h1>
             <p className="text-gray-400 mt-1.5 text-sm">
-              <span className="text-[#A78BFA] font-medium">{examName}</span> mocks ke aapke performance ke hisaab se
+              Based on your performance across <span className="text-[#A78BFA] font-medium">{examName}</span> mocks
             </p>
           </div>
           <TrendBadge trend={overview.trend} />
         </div>
 
-        {/* 🆕 Lifetime stats — headline number ab sirf "last 3" tak simit nahi */}
+        {/* Lifetime stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
             <p className="text-xs text-gray-500 font-medium mb-1">Lifetime Average</p>
@@ -455,32 +455,32 @@ const UserAllAnalysis = () => {
             <p className="text-2xl sm:text-3xl font-bold text-white">{overview.totalTestsGiven}</p>
           </div>
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Total Galat (Lifetime)</p>
+            <p className="text-xs text-gray-500 font-medium mb-1">Total Wrong (Lifetime)</p>
             <p className="text-2xl sm:text-3xl font-bold text-red-400">{overview.totalWrongLifetime}</p>
           </div>
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 shadow-lg">
-            <p className="text-xs text-gray-500 font-medium mb-1">Negative Marking Se Kata</p>
+            <p className="text-xs text-gray-500 font-medium mb-1">Lost to Negative Marking</p>
             <p className="text-2xl sm:text-3xl font-bold text-orange-400">-{overview.marksLostToNegativeLifetime}</p>
           </div>
         </div>
 
-        {/* 🆕 Score Trend Chart */}
+        {/* Score Trend Chart */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-base sm:text-lg">Score Trend</h3>
-            <p className="text-xs text-gray-500 mt-1">Har mock ka score, time ke saath</p>
+            <p className="text-xs text-gray-500 mt-1">Your score across mocks over time</p>
           </div>
           <ScoreTrendChart graphData={overview.graphData} onPointClick={setViewingMockId} />
         </div>
 
-        {/* 🆕 Top Weak Topics — cross-subject, seedha click se galat sawaal */}
+        {/* Top Weak Topics */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-red-900/10">
-            <h3 className="font-semibold text-base sm:text-lg text-red-400">Aapki Sabse Badi Galtiyan</h3>
-            <p className="text-xs text-gray-500 mt-1">Sabhi subjects mile-jule — inpe focus karo</p>
+            <h3 className="font-semibold text-base sm:text-lg text-red-400">Your Biggest Weak Areas</h3>
+            <p className="text-xs text-gray-500 mt-1">Across all subjects — focus here</p>
           </div>
           {!overview.topWeakTopics || overview.topWeakTopics.length === 0 ? (
-            <p className="p-6 text-sm text-green-400 text-center">Badhiya! Koi khaas kamzor topic nahi mila.</p>
+            <p className="p-6 text-sm text-green-400 text-center">Great! No major weak topics found.</p>
           ) : (
             <div className="divide-y divide-gray-800">
               {overview.topWeakTopics.map((t, i) => (
@@ -490,14 +490,14 @@ const UserAllAnalysis = () => {
           )}
         </div>
 
-        {/* Subject Analysis — ab chart ke saath */}
+        {/* Subject Analysis — with chart */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-base sm:text-lg">Subject Comparison</h3>
-            <p className="text-xs text-gray-500 mt-1">Last 3 mocks ka average — ek nazar mein sabse kamzor subject</p>
+            <p className="text-xs text-gray-500 mt-1">Average of your last 3 mocks — spot your weakest subject at a glance</p>
           </div>
           {overview.subjectAnalysis?.length === 0 ? (
-            <div className="p-6 text-center text-yellow-500 bg-yellow-500/5 text-sm">Subject analysis data khali hai. Apne agle mock ke baad check karein.</div>
+            <div className="p-6 text-center text-yellow-500 bg-yellow-500/5 text-sm">Subject analysis data is empty. Check again after your next mock.</div>
           ) : (
             <>
               <SubjectBarChart subjectAnalysis={overview.subjectAnalysis} />
@@ -524,7 +524,7 @@ const UserAllAnalysis = () => {
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-base sm:text-lg">Test History</h3>
-            <p className="text-xs text-gray-500 mt-1">Kisi bhi mock par tap karke uska poora result dekhein</p>
+            <p className="text-xs text-gray-500 mt-1">Tap any mock to view its full result</p>
           </div>
 
           <div className="px-4 sm:px-6 pt-4 pb-3 border-b border-gray-800 space-y-3">
@@ -538,7 +538,7 @@ const UserAllAnalysis = () => {
             {mockTypeFilter === "Mini" && miniSubjects.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 <button onClick={() => setMiniSubjectFilter("all")} className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${miniSubjectFilter === "all" ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40" : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"}`}>
-                  Sabhi Subjects ({miniSubjectCounts.all || 0})
+                  All Subjects ({miniSubjectCounts.all || 0})
                 </button>
                 {miniSubjects.map((subj) => (
                   <button key={subj} onClick={() => setMiniSubjectFilter(subj)} className={`px-3.5 py-1 rounded-full text-xs whitespace-nowrap transition-colors flex-shrink-0 ${miniSubjectFilter === subj ? "bg-[#A78BFA]/20 text-[#A78BFA] border border-[#A78BFA]/40" : "bg-transparent border border-gray-800 text-gray-500 hover:text-gray-300"}`}>
@@ -550,7 +550,7 @@ const UserAllAnalysis = () => {
           </div>
 
           {filteredHistory.length === 0 ? (
-            <p className="px-4 sm:px-6 py-8 text-sm text-gray-400 text-center">Is category mein koi mock nahi mila.</p>
+            <p className="px-4 sm:px-6 py-8 text-sm text-gray-400 text-center">No mocks found in this category.</p>
           ) : (
             <div className="divide-y divide-gray-800">
               {filteredHistory.map((g) => (
@@ -567,7 +567,7 @@ const UserAllAnalysis = () => {
 };
 
 // ──────────────────────────────────────────────
-// Ek specific mock ka poora result + question review
+// Full result + question review for one specific mock
 // ──────────────────────────────────────────────
 
 const Stat = ({ label, value }) => (
@@ -584,7 +584,7 @@ const STATUS_FILTERS = [
   { key: "unattempted", label: "Unattempted" },
 ];
 
-// 🆕 Question Map — poore mock ka ek-nazar-mein scan, real exam apps jaisa
+// Question Map — a full scan of the mock, like real exam apps
 const QuestionMap = ({ questions, onJump }) => {
   const colorOf = (q) =>
     q.isCorrect === true
@@ -596,7 +596,7 @@ const QuestionMap = ({ questions, onJump }) => {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 mb-6">
       <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mb-3">
-        Question Map — tap karke seedha wahan jaayein
+        Question Map — tap to jump directly there
       </p>
       <div className="grid grid-cols-8 sm:grid-cols-10 gap-1.5">
         {questions.map((q, i) => (
@@ -659,7 +659,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
     setIndex(0);
   };
 
-  // 🆕 Question Map se seedha kisi bhi question par jump karna
+  // Jump directly to any question via the Question Map
   const jumpToQuestion = (i) => {
     setSubjectFilter("all");
     setStatusFilter("all");
@@ -674,8 +674,8 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-4 pb-20">
         <div className="max-w-md w-full text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
-          <button onClick={onBack} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Wapas Jaayein</button>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load this data."}</p>
+          <button onClick={onBack} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Go Back</button>
         </div>
         <BottomNav />
       </div>
@@ -688,12 +688,12 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-6 sm:py-8 pb-24">
         <div className="max-w-3xl mx-auto">
-          <button onClick={closeReview} className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1">&larr; Result par wapas jaayein</button>
+          <button onClick={closeReview} className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1">&larr; Back to Result</button>
           <h1 className="text-xl sm:text-2xl font-bold mb-4">Question Review</h1>
 
           {subjects.length > 1 && (
             <div className="flex gap-2 mb-4 overflow-x-auto pb-1">
-              <button onClick={() => { setSubjectFilter("all"); setIndex(0); }} className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${subjectFilter === "all" ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"}`}>Sabhi Subjects</button>
+              <button onClick={() => { setSubjectFilter("all"); setIndex(0); }} className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${subjectFilter === "all" ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"}`}>All Subjects</button>
               {subjects.map((s) => (
                 <button key={s} onClick={() => { setSubjectFilter(s); setIndex(0); }} className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-colors flex-shrink-0 ${subjectFilter === s ? "bg-[#7C3AED] text-white" : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"}`}>{s}</button>
               ))}
@@ -707,7 +707,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
           </div>
 
           {filteredQuestions.length === 0 && (
-            <p className="text-gray-400 text-sm py-10 text-center">Is category mein koi sawaal nahi hai.</p>
+            <p className="text-gray-400 text-sm py-10 text-center">No questions in this category.</p>
           )}
 
           {currentQ && (
@@ -729,7 +729,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 sm:py-12 pb-24">
       <div className="max-w-2xl mx-auto">
-        <button onClick={onBack} className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1">&larr; Test History par wapas jaayein</button>
+        <button onClick={onBack} className="text-sm text-gray-400 hover:text-white mb-5 sm:mb-6 flex items-center gap-1">&larr; Back to Test History</button>
 
         <h1 className="text-xl sm:text-2xl font-bold mb-1">{overview.blueprintName}</h1>
         <p className="text-gray-400 text-sm mb-6 sm:mb-8">{overview.examName}</p>
@@ -739,12 +739,12 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
           <p className="text-sm text-gray-500 mt-1">Total Score &middot; {overview.accuracy}% Accuracy</p>
         </div>
 
-        {/* 🆕 Negative marking impact — pehle ye kabhi nahi dikhta tha */}
+        {/* Negative marking impact */}
         {overview.negativeMarking > 0 && overview.marksLostToNegative > 0 && (
           <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-orange-300 font-medium">Negative marking se {overview.marksLostToNegative} marks kate</p>
-              <p className="text-[11px] text-gray-500 mt-0.5">Agar galat guess na karte to score {overview.scoreIfLeftBlankInsteadOfWrong} hota (blank chhodne par)</p>
+              <p className="text-sm text-orange-300 font-medium">You lost {overview.marksLostToNegative} marks to negative marking</p>
+              <p className="text-[11px] text-gray-500 mt-0.5">If you hadn't guessed those wrong, your score would have been {overview.scoreIfLeftBlankInsteadOfWrong} (leaving them blank instead)</p>
             </div>
             <span className="text-2xl flex-shrink-0">⚠️</span>
           </div>
@@ -765,10 +765,10 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
           </button>
         </div>
 
-        {/* 🆕 Poore mock ka ek-nazar-mein scan */}
+        {/* Full-mock scan */}
         <QuestionMap questions={allQuestions} onJump={(i) => { jumpToQuestion(i); }} />
 
-        <button onClick={() => openReview("all")} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Sabhi Sawaal Dekhein</button>
+        <button onClick={() => openReview("all")} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">View All Questions</button>
       </div>
       <BottomNav />
     </div>
@@ -776,7 +776,7 @@ const MockDetailScreen = ({ performanceId, onBack }) => {
 };
 
 // ──────────────────────────────────────────────
-// Single question detail card — 🆕 "too slow" flag add hua
+// Single question detail card — "too slow" flag included
 // ──────────────────────────────────────────────
 const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
   const statusLabel = q.isCorrect === true ? "Correct" : q.isCorrect === false ? "Wrong" : "Unattempted";
@@ -787,7 +787,7 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
       ? "text-red-400 bg-red-500/10 border-red-500/30"
       : "text-gray-400 bg-gray-500/10 border-gray-500/30";
 
-  // 🆕 Agar average se 1.5x zyada time laga aur galat bhi kiya — highlight karo
+  // Flag if it took 1.5x longer than average AND was still wrong
   const isSlowAndWrong =
     q.isCorrect === false &&
     q.timeTakenInSeconds != null &&
@@ -803,7 +803,6 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
 
       <div className="mb-6">
         <p className="text-base sm:text-lg leading-relaxed">{q.question}</p>
-        {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
         {q.askedIn && (
           <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
             📌 {q.askedIn}
@@ -825,26 +824,25 @@ const QuestionDetailCard = ({ q, averageTimePerQuestion }) => {
             <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
               <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">{n}</span>
               <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
-              {isUserPick && !isCorrectOpt && <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>}
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Correct answer</span>}
+              {isUserPick && !isCorrectOpt && <span className="text-xs flex-shrink-0">❌ Your answer</span>}
             </div>
           );
         })}
       </div>
 
-      {q.userAnswer == null && <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>}
+      {q.userAnswer == null && <p className="text-xs text-yellow-500 mb-4">You did not attempt this question.</p>}
 
       {q.timeTakenInSeconds != null && (
         <p className="text-xs text-gray-500 mb-2">
-          Time liya gaya: {q.timeTakenInSeconds}s
-          {averageTimePerQuestion > 0 && <span className="text-gray-600"> (aapka average: {averageTimePerQuestion}s)</span>}
+          Time taken: {q.timeTakenInSeconds}s
+          {averageTimePerQuestion > 0 && <span className="text-gray-600"> (your average: {averageTimePerQuestion}s)</span>}
         </p>
       )}
 
-      {/* 🆕 */}
       {isSlowAndWrong && (
         <p className="text-xs text-orange-400 mb-4 flex items-center gap-1.5">
-          🐢 Isme average se kaafi zyada time liya aur phir bhi galat hua — is topic ki practice zaroori hai.
+          🐢 This took much longer than your average and you still got it wrong — this topic needs more practice.
         </p>
       )}
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import api from "../api/api";
 
-// 🆕 Naya logo (BatchMock.in rebrand)
+// Logo
 const LOGO_URL = "/logo.svg";
 
 // ──────────────────────────────────────────────
@@ -73,7 +73,7 @@ const UserTopicAnalysis = () => {
 
   const [statusFilter, setStatusFilter] = useState("all");
   const [index, setIndex] = useState(0);
-  const [deletingId, setDeletingId] = useState(null); // 👈 NAYA
+  const [deletingId, setDeletingId] = useState(null);
 
   const subjectNameFromState = location.state?.subjectName;
   const examNameFromState = location.state?.examName;
@@ -107,7 +107,7 @@ const UserTopicAnalysis = () => {
 
         setData(res.data.data);
       } catch (err) {
-        setError(err.response?.data?.message || "Data laane mein error aaya.");
+        setError(err.response?.data?.message || "Something went wrong while loading this data.");
       } finally {
         setLoading(false);
       }
@@ -148,12 +148,12 @@ const UserTopicAnalysis = () => {
     };
   }, [combinedQuestions, data]);
 
-  // 👇 NAYA: question ko is topic analysis se hamesha ke liye hide karna
+  // Permanently hide a question from this topic's analysis
   const handleDeleteQuestion = async (questionId) => {
     if (!questionId || deletingId) return;
 
     const confirmDelete = window.confirm(
-      "Ye sawaal is topic analysis se hamesha ke liye hata diya jayega. Pakka?"
+      "This question will be permanently removed from this topic's analysis. Are you sure?"
     );
     if (!confirmDelete) return;
 
@@ -190,7 +190,7 @@ const UserTopicAnalysis = () => {
 
       setIndex(0);
     } catch (err) {
-      alert(err.response?.data?.message || "Sawaal delete nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not delete the question.");
     } finally {
       setDeletingId(null);
     }
@@ -252,11 +252,11 @@ const UserTopicAnalysis = () => {
             {data.topicName}
           </h1>
           <p className="text-gray-400 mt-1.5 sm:mt-2 text-xs sm:text-sm">
-            Subject: {data.subjectName} &middot; Combined data from all lifetime mocks
+            Subject: {data.subjectName} &middot; Combined data from all your mocks
           </p>
         </div>
 
-        {/* Stats Row — mobile pe 2 cols, tablet 3, desktop 5 */}
+        {/* Stats Row */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
           <div className="bg-[#111827] border border-gray-800 rounded-xl sm:rounded-2xl p-3 sm:p-4 shadow-lg">
             <p className="text-[11px] sm:text-xs text-gray-500 font-medium mb-1">Efficiency</p>
@@ -280,7 +280,7 @@ const UserTopicAnalysis = () => {
           </div>
         </div>
 
-        {/* Status filter tabs — mobile pe edge-to-edge scroll */}
+        {/* Status filter tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           {STATUS_FILTERS.map((f) => (
             <button
@@ -299,7 +299,7 @@ const UserTopicAnalysis = () => {
 
         {filteredQuestions.length === 0 && (
           <div className="bg-[#111827] border border-gray-800 rounded-xl p-6 text-gray-500 text-sm text-center">
-            Is category mein koi sawaal nahi hai.
+            No questions in this category.
           </div>
         )}
 
@@ -359,7 +359,7 @@ const QuestionCard = ({ q, index, onDelete, deleting }) => {
     <div
       className={`bg-[#111827] border border-gray-800 rounded-xl p-4 sm:p-6 shadow-md border-l-4 ${borderColorClass}`}
     >
-      {/* Status + Delete (upar), Meta info (niche) — mobile-friendly stack */}
+      {/* Status + Delete, then meta info */}
       <div className="flex flex-col gap-3 mb-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className={`text-[11px] sm:text-xs px-2.5 py-1 rounded-full border font-medium ${statusColor}`}>
@@ -370,14 +370,14 @@ const QuestionCard = ({ q, index, onDelete, deleting }) => {
             disabled={deleting}
             className="text-[11px] sm:text-xs px-2.5 py-1 rounded-full border border-red-500/40 text-red-400 hover:bg-red-500/10 active:bg-red-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {deleting ? "Delete ho raha hai..." : "🗑️ Delete"}
+            {deleting ? "Deleting..." : "🗑️ Delete"}
           </button>
         </div>
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px] sm:text-xs text-gray-500 font-mono">
           <span>Mock ID: {String(q.performanceId).slice(-6)}</span>
           <span>•</span>
           <span>
-            {new Date(q.mockDate).toLocaleDateString("hi-IN", {
+            {new Date(q.mockDate).toLocaleDateString("en-IN", {
               day: "numeric",
               month: "short",
               year: "numeric",
@@ -394,7 +394,6 @@ const QuestionCard = ({ q, index, onDelete, deleting }) => {
           <span className="text-gray-500 mr-2">Q{index + 1}.</span>
           {q.question}
         </p>
-        {/* 🆕 Ye sawaal pehle kahan pucha gaya (agar bataya gaya hai) */}
         {q.askedIn && (
           <span className="inline-block mt-2 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
             📌 {q.askedIn}

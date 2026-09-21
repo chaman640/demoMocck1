@@ -73,7 +73,7 @@ const ProfilePage = () => {
       } catch (err) {
         if (cancelled) return;
         if (err.response?.status === 401) { navigate("/Login"); return; }
-        setErrorMsg(err.response?.data?.message || "Profile load nahi ho paayi.");
+        setErrorMsg(err.response?.data?.message || "Could not load your profile.");
         setPhase("error");
       }
     };
@@ -83,7 +83,7 @@ const ProfilePage = () => {
   }, []);
 
   const startEdit = () => {
-    // 👇 FIX: Edit shuru karte waqt formData mein current user ka exam correctly set karo
+    // Reset form with the current user's saved values when opening the edit screen
     setFormData({
       name: user.name || "",
       email: user.email || "",
@@ -132,7 +132,7 @@ const ProfilePage = () => {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setErrorMsg("Kripya highlighted fields sahi se bharein.");
+      setErrorMsg("Please fill in the highlighted fields correctly.");
       return;
     }
 
@@ -140,11 +140,11 @@ const ProfilePage = () => {
     try {
       const res = await api.post("/user-update", formData);
       setUser(res.data.data);
-      setSuccessMsg("Profile update ho gayi!");
+      setSuccessMsg("Your profile has been updated!");
       setPhase("view");
       setTimeout(() => setSuccessMsg(""), 3000);
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Update fail ho gaya.");
+      setErrorMsg(err.response?.data?.message || "Update failed.");
       setPhase("editing");
     }
   };
@@ -169,7 +169,7 @@ const ProfilePage = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={() => navigate("/HomePage")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Home Jaayein
+            Go Home
           </button>
         </div>
         <BottomNav navigate={navigate} activePage="profile" />
@@ -240,12 +240,12 @@ const ProfilePage = () => {
               ))}
             </div>
 
-            {/* 👇 NAYA: Meri Batch button — coupon/batch dekhne ke liye */}
+            {/* My Batch button */}
             <button
               onClick={() => navigate("/MyBatch")}
               className="w-full py-3 rounded-xl border border-[#7C3AED]/40 text-[#A78BFA] hover:bg-[#7C3AED]/10 font-medium mb-3 transition-colors"
             >
-              Meri Batch
+              My Batch
             </button>
 
             {/* Action buttons */}
@@ -253,7 +253,7 @@ const ProfilePage = () => {
               onClick={startEdit}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3 transition-colors shadow-lg shadow-purple-900/20"
             >
-              Profile Edit Karein
+              Edit Profile
             </button>
             
             <button
@@ -278,7 +278,7 @@ const ProfilePage = () => {
               </label>
               <input
                 type="text" name="name" value={formData.name}
-                onChange={handleChange} placeholder="Aapka naam"
+                onChange={handleChange} placeholder="Your name"
                 className={getInputClass("name")}
               />
             </div>
@@ -314,12 +314,12 @@ const ProfilePage = () => {
               </label>
               <input
                 type="text" name="address" value={formData.address}
-                onChange={handleChange} placeholder="Aapka sheher"
+                onChange={handleChange} placeholder="Your city"
                 className={getInputClass("address")}
               />
             </div>
 
-            {/* Exam — 👇 FIX: value={formData.exam} correctly set ho raha hai ab */}
+            {/* Exam */}
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
                 Exam Category
@@ -331,7 +331,6 @@ const ProfilePage = () => {
                   onChange={handleChange}
                   className={`${getInputClass("exam")} appearance-none cursor-pointer pr-10`}
                 >
-                  {/* 👇 FIX: pehle ek empty disabled option nahi — agar exam selected hai to wahi show hoga */}
                   {examList.length === 0 && (
                     <option value="" disabled>Loading...</option>
                   )}
@@ -362,7 +361,7 @@ const ProfilePage = () => {
                 disabled={phase === "saving"}
                 className="flex-1 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium transition-colors disabled:opacity-50"
               >
-                {phase === "saving" ? "Save ho raha hai..." : "Save Karein"}
+                {phase === "saving" ? "Saving..." : "Save"}
               </button>
             </div>
           </div>

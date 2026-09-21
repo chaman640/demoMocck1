@@ -79,24 +79,35 @@ const HomePageSkeleton = () => (
 const HomePage = () => {
   const navigate = useNavigate();
 
-  // 👇 NAYA: 30 second staleTime — is duration ke andar agar user wapas
-  // Home page pe aata hai, to cache se turant purana data dikhega,
-  // dobara loading/spinner nahi dikhega. 30s ke baad background mein
-  // refresh ho jayega (data dikhte hue hi).
-
-  // User data
-  const { data: user, isLoading: userLoading, isError: userError } = useQuery({
+  // 🐛 FIX (Sept 2026): Pehle koi bhi error (chahe wo network blip ho,
+  // ya server cold-start ho — jaisa Render free plan par idle rehne ke
+  // baad hota hai) is user ko turant "logged out" maan kar Signup page
+  // par bhej deta tha. Isi wajah se site band karke thodi der baad
+  // wapas kholne par baar-baar login karna padta tha, jabki session
+  // (cookie) abhi bhi valid hota tha.
+  //
+  // Ab: 2 baar retry karte hain (server jaagne ka time dete hain), aur
+  // sirf 401 (matlab sach mein session expire/invalid) milne par hi
+  // Signup/Login page par bhejte hain — kisi bhi doosri temporary
+  // error par nahi.
+  const { data: user, isLoading: userLoading, error: userError } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const res = await api.get("/me");
       return res.data.data;
     },
     staleTime: 30 * 1000,
-    retry: false,
+    retry: 2,
+    retryDelay: 1500,
   });
 
   useEffect(() => {
-    if (userError) navigate("/Singup");
+    // 👇 Sirf real "session expire/invalid" (401) par hi logout jaisa
+    // treat karo — server slow/down hone par user ko chup-chaap wapas
+    // signup par mat bhejo.
+    if (userError?.response?.status === 401) {
+      navigate("/Singup");
+    }
   }, [userError, navigate]);
 
   const examName = user?.exam;
@@ -207,8 +218,6 @@ const HomePage = () => {
       onClick: () => navigate("/Challenge"),
     },
   ];
-
-  // (unused `navItems` hata diya gaya — bottom nav ab <BottomNav /> se aata hai)
 
   // 👇 UPDATED: spinner ki jagah ab skeleton layout dikhega
   if (isLoading) {

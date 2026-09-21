@@ -2,13 +2,12 @@ import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import api from "../api/api";
-import BottomNav from "../components/BottomNav";
 
-// 🆕 Naya logo (BatchMock.in rebrand)
+// Logo
 const LOGO_URL = "/logo.svg";
 
 // ──────────────────────────────────────────────
-// Seconds ko readable "Xm Ys" format me convert karta hai
+// Converts seconds into a readable "Xm Ys" format
 // ──────────────────────────────────────────────
 const formatDuration = (totalSeconds) => {
   if (totalSeconds == null || isNaN(totalSeconds)) return "N/A";
@@ -73,8 +72,7 @@ const SubjectAnalysisSkeleton = () => (
 );
 
 // ──────────────────────────────────────────────
-// 🆕 Accuracy trend chart — is subject ka backend `graphData` pehle
-// fetch to hota tha, lekin kahin render hi nahi hota tha. Ab dikhega.
+// Accuracy trend chart
 // ──────────────────────────────────────────────
 const SubjectTrendChart = ({ graphData }) => {
   if (!graphData || graphData.length < 2) return null;
@@ -83,7 +81,7 @@ const SubjectTrendChart = ({ graphData }) => {
     <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
         <h3 className="font-semibold text-base sm:text-lg">Accuracy Trend</h3>
-        <p className="text-xs text-gray-500 mt-1">Is subject mein aapki accuracy, mock-dar-mock</p>
+        <p className="text-xs text-gray-500 mt-1">Your accuracy in this subject, mock by mock</p>
       </div>
       <div className="px-2 sm:px-4 py-4">
         <ResponsiveContainer width="100%" height={200}>
@@ -162,7 +160,7 @@ const UserSubjectAnallysis = () => {
         const res = await api.get(`/analysis/subject/active_user/${examEncoded}/${subjectEncoded}`);
         setData(res.data.data);
       } catch (err) {
-        setError(err.response?.data?.message || "Data laane mein error aaya.");
+        setError(err.response?.data?.message || "Something went wrong while loading this data.");
       } finally {
         setLoading(false);
       }
@@ -220,7 +218,7 @@ const UserSubjectAnallysis = () => {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 mt-6 sm:mt-10 space-y-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight"><span className="text-[#A78BFA]">{data.subjectName}</span></h1>
-          <p className="text-gray-400 mt-1.5 text-sm">Aapke last 3 mocks ke hisaab se is subject ki deep analysis.</p>
+          <p className="text-gray-400 mt-1.5 text-sm">A deep analysis of this subject based on your last 3 mocks.</p>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -238,16 +236,15 @@ const UserSubjectAnallysis = () => {
           </div>
         </div>
 
-        {/* 🆕 Ab render hota hai — pehle data fetch hota tha, dikhta kahin nahi tha */}
         <SubjectTrendChart graphData={data.graphData} />
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
             <h3 className="font-semibold text-base sm:text-lg">Topic-wise Efficiency</h3>
-            <p className="text-xs text-gray-500 mt-1">{data.topicList?.length || 0} topics is subject mein cover hue</p>
+            <p className="text-xs text-gray-500 mt-1">{data.topicList?.length || 0} topics covered in this subject</p>
           </div>
           {data.topicList?.length === 0 ? (
-            <p className="p-6 text-sm text-yellow-500">Is subject ke liye abhi koi topic data nahi hai.</p>
+            <p className="p-6 text-sm text-yellow-500">No topic data available for this subject yet.</p>
           ) : (
             <div className="divide-y divide-gray-800">
               {data.topicList?.map((t, i) => (
@@ -260,10 +257,10 @@ const UserSubjectAnallysis = () => {
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-red-900/10">
             <h3 className="font-semibold text-base sm:text-lg text-red-400">Top Weak Topics</h3>
-            <p className="text-xs text-gray-500 mt-1">Inpe focus karo — score sabse zyada yahin se sudhrega</p>
+            <p className="text-xs text-gray-500 mt-1">Focus here — this is where your score will improve the most</p>
           </div>
           {data.weakTopics?.length === 0 ? (
-            <p className="p-6 text-sm text-green-400">Badhiya! Koi khaas kamzor topic nahi mila.</p>
+            <p className="p-6 text-sm text-green-400">Great! No major weak topics found.</p>
           ) : (
             <div className="divide-y divide-gray-800">
               {data.weakTopics?.map((t, i) => (
@@ -273,7 +270,6 @@ const UserSubjectAnallysis = () => {
           )}
         </div>
       </div>
-      <BottomNav />
     </div>
   );
 };
