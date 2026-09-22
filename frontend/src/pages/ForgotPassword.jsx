@@ -2,15 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../api/api";
 
-// 🆕 CHANGE — pehle phone par SMS OTP jaata tha, ab email par (free).
 const REQUEST_OTP_ENDPOINT = "/request-reset-otp";
 const RESET_PASSWORD_ENDPOINT = "/reset-password";
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState("email"); // "email" | "reset"
-  const [email, setEmail] = useState("");
+  const [step, setStep] = useState("phone");
+  const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -36,9 +35,9 @@ const ForgotPassword = () => {
     toastTimerRef.current = setTimeout(() => setToastMsg(""), 3500);
   };
 
-  const handleEmailChange = (e) => {
-    if (fieldErrors.email) setFieldErrors((prev) => ({ ...prev, email: false }));
-    setEmail(e.target.value);
+  const handlePhoneChange = (e) => {
+    if (fieldErrors.phone) setFieldErrors((prev) => ({ ...prev, phone: false }));
+    setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10));
   };
 
   const getInputClass = (fieldName) => {
@@ -49,22 +48,21 @@ const ForgotPassword = () => {
     return `${baseClass} ${errorClass}`;
   };
 
-  // ── STEP 1: Email se OTP mangwana ──
   const handleSendOtp = async (e) => {
     e.preventDefault();
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      setFieldErrors({ email: true });
-      showToast("Sahi email address dalein.");
+    if (phone.length !== 10) {
+      setFieldErrors({ phone: true });
+      showToast("Please enter a valid 10-digit phone number.");
       return;
     }
     setSendingOtp(true);
     try {
-      await api.post(REQUEST_OTP_ENDPOINT, { email });
-      showToast("OTP email par bhej diya gaya hai!");
+      await api.post(REQUEST_OTP_ENDPOINT, { phone });
+      showToast("OTP sent!");
       setStep("reset");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Something went wrong while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -74,17 +72,16 @@ const ForgotPassword = () => {
     if (resendCooldown > 0) return;
     setSendingOtp(true);
     try {
-      await api.post(REQUEST_OTP_ENDPOINT, { email });
-      showToast("OTP dobara bhej diya gaya hai!");
+      await api.post(REQUEST_OTP_ENDPOINT, { phone });
+      showToast("OTP resent!");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Something went wrong while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
   };
 
-  // ── STEP 2: OTP verify + naya password set (ek hi backend call mein) ──
   const handleResetPassword = async (e) => {
     e.preventDefault();
     const errors = {};
@@ -94,28 +91,28 @@ const ForgotPassword = () => {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showToast("Kripya highlighted fields sahi se bharein.");
+      showToast("Please fill in the highlighted fields correctly.");
       return;
     }
 
     setResetting(true);
     try {
       await api.post(RESET_PASSWORD_ENDPOINT, {
-        email,
+        phone,
         otp: otp.trim(),
         newPassword,
       });
-      showToast("Password reset ho gaya! Login karein.");
+      showToast("Password reset! Please log in.");
       setTimeout(() => navigate("/Login"), 1200);
     } catch (err) {
-      showToast(err.response?.data?.message || "Password reset nahi ho paaya.");
+      showToast(err.response?.data?.message || "Could not reset the password.");
     } finally {
       setResetting(false);
     }
   };
 
-  const changeEmail = () => {
-    setStep("email");
+  const changePhoneNumber = () => {
+    setStep("phone");
     setOtp("");
     setNewPassword("");
     setConfirmPassword("");
@@ -134,40 +131,42 @@ const ForgotPassword = () => {
       )}
 
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] text-white flex-col justify-center px-16">
-        <img src="/logo.svg" alt="BatchMock.in" className="w-14 h-14 object-contain mb-6" />
-        <h1 className="text-3xl font-bold mb-3">Password Reset Karein</h1>
+        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center font-bold text-2xl mb-6">
+          mt
+        </div>
+        <h1 className="text-3xl font-bold mb-3">Reset Your Password</h1>
         <p className="text-blue-100 text-sm leading-relaxed max-w-md">
-          Chinta mat karein — apna email verify karke naya password set kar sakte hain, chand seconds mein.
+          No worries — verify your phone and set a new password in just a few seconds.
         </p>
       </div>
 
       <div className="flex-1 flex items-center justify-center px-4 py-10 sm:px-6 lg:px-10">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6 sm:p-8">
           <h2 className="text-xl font-bold text-[#1E293B] mb-1">
-            {step === "email" ? "Password Bhool Gaye?" : "Naya Password Set Karein"}
+            {step === "phone" ? "Forgot Password?" : "Set a New Password"}
           </h2>
           <p className="text-xs text-[#64748B] mb-6">
-            {step === "email"
-              ? "Apna registered email dalein, OTP bheja jayega"
-              : `${email} pe bheja gaya OTP aur naya password dalein`}
+            {step === "phone"
+              ? "Enter your registered phone number, an OTP will be sent"
+              : `Enter the OTP sent to ${phone} and your new password`}
           </p>
 
-          {step === "email" && (
+          {step === "phone" && (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <div>
-                <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.email ? 'text-red-500' : 'text-[#475569]'}`}>
-                  Email
+                <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.phone ? 'text-red-500' : 'text-[#475569]'}`}>
+                  Phone Number
                 </label>
                 <div className="relative">
-                  <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.email ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.phone ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                   </span>
                   <input
-                    type="email"
-                    value={email}
-                    onChange={handleEmailChange}
-                    placeholder="email@example.com"
-                    className={getInputClass('email')}
+                    type="text"
+                    value={phone}
+                    onChange={handlePhoneChange}
+                    placeholder="10 digit registered number"
+                    className={getInputClass('phone')}
                   />
                 </div>
               </div>
@@ -179,7 +178,7 @@ const ForgotPassword = () => {
                   sendingOtp ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
                 }`}
               >
-                {sendingOtp ? 'OTP Bheja Ja Raha Hai...' : 'OTP Bhejein'}
+                {sendingOtp ? 'Sending OTP...' : 'Send OTP'}
               </button>
             </form>
           )}
@@ -206,7 +205,7 @@ const ForgotPassword = () => {
 
               <div>
                 <label className={`block text-xs font-semibold mb-1.5 uppercase tracking-wide ${fieldErrors.newPassword ? 'text-red-500' : 'text-[#475569]'}`}>
-                  Naya Password
+                  New Password
                 </label>
                 <div className="relative">
                   <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.newPassword ? 'text-red-400' : 'text-[#94A3B8]'}`}>
@@ -260,12 +259,12 @@ const ForgotPassword = () => {
                   resetting ? 'bg-[#93C5FD] cursor-not-allowed' : 'bg-[#2563EB] hover:bg-[#1D4ED8] shadow-[0_4px_12px_rgba(37,99,235,0.2)]'
                 }`}
               >
-                {resetting ? 'Reset Ho Raha Hai...' : 'Password Reset Karein'}
+                {resetting ? 'Resetting...' : 'Reset Password'}
               </button>
 
               <div className="flex items-center justify-between text-xs pt-1">
-                <button type="button" onClick={changeEmail} className="text-[#64748B] hover:text-[#334155]">
-                  &larr; Email badlein
+                <button type="button" onClick={changePhoneNumber} className="text-[#64748B] hover:text-[#334155]">
+                  &larr; Change Number
                 </button>
                 <button
                   type="button"
@@ -273,14 +272,14 @@ const ForgotPassword = () => {
                   disabled={resendCooldown > 0 || sendingOtp}
                   className={resendCooldown > 0 ? "text-[#94A3B8] cursor-not-allowed" : "text-[#2563EB] font-medium hover:underline"}
                 >
-                  {resendCooldown > 0 ? `Dobara bhejein (${resendCooldown}s)` : "OTP Dobara Bhejein"}
+                  {resendCooldown > 0 ? `Resend in (${resendCooldown}s)` : "Resend OTP"}
                 </button>
               </div>
             </form>
           )}
 
           <div className="mt-5 text-center text-xs text-[#64748B]">
-            Yaad aa gaya password?{' '}
+            Remembered your password?{' '}
             <Link to="/Login" className="text-[#2563EB] font-bold hover:underline ml-1">
               Log In
             </Link>

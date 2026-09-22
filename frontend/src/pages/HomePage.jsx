@@ -97,8 +97,8 @@ const HomePage = () => {
       return res.data.data;
     },
     staleTime: 30 * 1000,
-    retry: 2,
-    retryDelay: 1500,
+    retry: 5,
+    retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 20000),
   });
 
   useEffect(() => {
