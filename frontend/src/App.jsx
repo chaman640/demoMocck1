@@ -23,7 +23,6 @@ import MyBatch from './pages/MyBatch';
 import CustomTests from './pages/CustomTests';
 import CustomTest from './pages/CustomTest';
 import ForgotPassword from './pages/ForgotPassword';
-import Landing from './pages/Landing';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Teacher pages
@@ -124,7 +123,7 @@ const App = () => {
           <div>
             <Routes>
               {/* ── Student ── */}
-              <Route path="/" element={<Landing />} /> {/* 🆕 pehle HomePage tha — ab public landing page */}
+              <Route path="/" element={<HomePage />} />
               <Route path="/HomePage" element={<HomePage />} />
               <Route path="/MockTest" element={<MockTest />} />
               <Route path="/UserAllAnalysis" element={<UserAllAnalysis />} />
