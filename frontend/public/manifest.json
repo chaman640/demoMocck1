@@ -1,0 +1,23 @@
+{
+  "name": "BatchMock.in",
+  "short_name": "BatchMock",
+  "description": "Mock tests, previous year papers, and personalized analysis for government exam preparation",
+  "start_url": "/",
+  "id": "/",
+  "display": "standalone",
+  "background_color": "#0A0D14",
+  "theme_color": "#7C3AED",
+  "icons": [
+    {
+      "src": "/icons.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

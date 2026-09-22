@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
+import AdBanner from "../components/AdBanner";
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -59,6 +60,7 @@ const MockTest = () => {
 
   // Question Review screen ke liye state
   const [reviewConfig, setReviewConfig] = useState({ subjectName: null, filter: "all" });
+  const [adRefreshCount, setAdRefreshCount] = useState(0);
 
   const questionStartRef = useRef(Date.now());
   const currentQIdRef = useRef(null);
@@ -253,8 +255,10 @@ const MockTest = () => {
     if (!mockData) return;
     const subj = mockData.subjects[activeSubjectIdx];
     if (activeQIdx < subj.questions.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx, activeQIdx + 1);
     } else if (activeSubjectIdx < mockData.subjects.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx + 1, 0);
     }
   };
@@ -584,6 +588,7 @@ const MockTest = () => {
         onMarkAndNext={markAndNext}
         onPrev={goPrev}
         onNext={goNext}
+        adRefreshTrigger={adRefreshCount}
         onSubmitClick={() => setShowSubmitConfirm(true)}
         showSubmitConfirm={showSubmitConfirm}
         onCancelSubmit={() => setShowSubmitConfirm(false)}
@@ -717,6 +722,7 @@ const TestScreen = ({
   onMarkAndNext,
   onPrev,
   onNext,
+  adRefreshTrigger,
   onSubmitClick,
   showSubmitConfirm,
   onCancelSubmit,
@@ -869,6 +875,7 @@ const TestScreen = ({
 
         {/* Palette sidebar */}
         <div className="w-full lg:w-72 bg-[#111827] border border-gray-800 rounded-2xl p-5 h-fit">
+          <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshTrigger} className="mb-4" />
           <div className="grid grid-cols-2 gap-2 text-[11px] mb-5">
             <LegendItem colorClass="bg-green-500" label="Answered" count={summary.answered} />
             <LegendItem colorClass="bg-red-500" label="Not Answered" count={summary.notAnswered} />

@@ -409,6 +409,12 @@ const Singup = () => {
               Log In
             </Link>
           </div>
+
+          <div className="mt-3 text-center text-[11px] text-[#94A3B8]">
+            <Link to="/PrivacyPolicy" className="hover:underline">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </div>
     </div>

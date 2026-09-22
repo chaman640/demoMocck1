@@ -23,6 +23,8 @@ import MyBatch from './pages/MyBatch';
 import CustomTests from './pages/CustomTests';
 import CustomTest from './pages/CustomTest';
 import ForgotPassword from './pages/ForgotPassword';
+import Landing from './pages/Landing';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Teacher pages
 import TeacherLogin from './pages/teacher/TeacherLogin';
@@ -136,6 +138,8 @@ const App = () => {
             {/* 🐛 FIX: "Signup" (sahi spelling) type karne par blank page aata tha */}
             <Route path="/Signup" element={<Singup />} />
             <Route path="/ForgotPassword" element={<ForgotPassword />} />
+            <Route path="/Landing" element={<Landing />} />
+            <Route path="/PrivacyPolicy" element={<PrivacyPolicy />} />
 
             {/* 🆕 Admin — passwordless magic-link login */}
             <Route path="/AdminLogin" element={<AdminLogin />} />
