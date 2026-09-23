@@ -97,16 +97,17 @@ const HomePage = () => {
       return res.data.data;
     },
     staleTime: 30 * 1000,
-    retry: 5,
+    retry: (failureCount, error) => {
+      const status = error?.response?.status;
+      if (status && status < 500) return false;
+      return failureCount < 5;
+    },
     retryDelay: (attempt) => Math.min(2000 * 2 ** attempt, 20000),
   });
 
   useEffect(() => {
-    // 👇 Sirf real "session expire/invalid" (401) par hi logout jaisa
-    // treat karo — server slow/down hone par user ko chup-chaap wapas
-    // signup par mat bhejo.
     if (userError?.response?.status === 401) {
-      navigate("/Singup");
+      navigate("/Landing");
     }
   }, [userError, navigate]);
 
