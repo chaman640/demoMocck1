@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-const AD_CLIENT = "ca-pub-XXXXXXXXXXXXXXXX";
+const AD_CLIENT = "ca-pub-2902001191700540";
 const MIN_REFRESH_GAP_MS = 5000;
 
 const AdBanner = ({ adSlot, refreshTrigger, className = "" }) => {

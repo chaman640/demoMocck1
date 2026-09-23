@@ -1,5 +1,5 @@
 # AdSense approve hone ke baad, neeche wali line mein
-# "pub-XXXXXXXXXXXXXXXX" ki jagah apni ASLI Publisher ID daal dein
+# "pub-2902001191700540" ki jagah apni ASLI Publisher ID daal dein
 # (wahi ID jo index.html aur AdBanner.jsx mein bhi daali thi).
 # Baaki kuch mat badlein — format bilkul yahi rehna chahiye.
-google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0
+google.com, pub-2902001191700540, DIRECT, f08c47fec0942fa0
