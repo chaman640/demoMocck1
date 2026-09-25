@@ -60,6 +60,12 @@ const userSchema = new mongoose.Schema(
         leftAt: { type: Date, default: null }, // null = abhi bhi active
       },
     ],
+
+    promoter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Promoter",
+      default: null,
+    },
   },
   {
     timestamps: true,

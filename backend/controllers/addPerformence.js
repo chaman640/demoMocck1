@@ -2,6 +2,8 @@
 import Performance from "../models/Performance.js";
 import Blueprint from "../models/bluePrint.js";
 import { Question } from "../models/rowQuestionSchema.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const addPerformence = async (req, res) => {
   try {
@@ -191,6 +193,8 @@ export const addPerformence = async (req, res) => {
     });
 
     await newPerformance.save();
+
+    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     // 9. Response
     return res.status(201).json({

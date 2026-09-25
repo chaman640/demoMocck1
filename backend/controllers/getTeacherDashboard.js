@@ -78,6 +78,11 @@ const buildMainTeacherDashboard = async (teacher) => {
     },
     totalCustomTests,
     coupons: couponBreakdown,
+    commission: {
+      pendingQuestionsCount: teacher.pendingQuestionsCount || 0,
+      totalQuestionsAllTime: teacher.totalQuestionsAllTime || 0,
+      paymentHistory: teacher.paymentHistory || [],
+    },
   };
 };
 

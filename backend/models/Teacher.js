@@ -27,6 +27,17 @@ const teacherSchema = new mongoose.Schema(
     // ---- Group (coupon) context ----
     activeCoupon: { type: mongoose.Schema.Types.ObjectId, ref: "Coupon", default: null },
     coupons: [{ type: mongoose.Schema.Types.ObjectId, ref: "Coupon" }],
+
+    pendingQuestionsCount: { type: Number, default: 0 },
+    totalQuestionsAllTime: { type: Number, default: 0 },
+    paymentHistory: [
+      {
+        amount: { type: Number, required: true },
+        questionsSettled: { type: Number, required: true },
+        settledAt: { type: Date, default: Date.now },
+        note: { type: String, trim: true, default: "" },
+      },
+    ],
   },
   { timestamps: true }
 );

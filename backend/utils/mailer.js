@@ -137,3 +137,39 @@ export const sendTeacherInviteEmail = async (toEmail, link, { role, teacherName 
     text: `Aapko ${roleText} invite kiya gaya hai. Account activate karein: ${link}`,
   });
 };
+
+export const sendPromoterCredentialsEmail = async (toEmail, { name, email, password, loginLink }) => {
+  await sendEmail({
+    to: toEmail,
+    subject: "BatchMock.in par Promoter account ban gaya hai",
+    html: wrapTemplate(
+      "Aapka Promoter account ban gaya hai",
+      `<p style="font-size: 14px; color: #D1D5DB;">${name ? `Namaste ${name},` : "Namaste,"} aapka login niche diya gaya hai.</p>
+       <div style="background: #111827; padding: 16px; border-radius: 12px; margin: 12px 0; font-size: 13px; color: #D1D5DB;">
+         <div>Email: <strong style="color:#fff;">${email}</strong></div>
+         <div>Password: <strong style="color:#fff;">${password}</strong></div>
+       </div>
+       <a href="${loginLink}" style="display: inline-block; background: #7C3AED; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 12px 0;">Login Karein</a>
+       <p style="font-size: 12px; color: #6B7280;">Pehli baar login karne ke baad apna password badalna zaroori hoga.</p>`
+    ),
+    text: `Aapka Promoter account ban gaya hai. Email: ${email}, Password: ${password}. Login karein: ${loginLink}`,
+  });
+};
+
+export const sendPromoterCredentialsEmail = async (toEmail, { name, email, password, loginLink }) => {
+  await sendEmail({
+    to: toEmail,
+    subject: "BatchMock.in par Promoter account ban gaya hai",
+    html: wrapTemplate(
+      "Aapka Promoter account ban gaya hai",
+      `<p style="font-size: 14px; color: #D1D5DB;">${name ? `Namaste ${name},` : "Namaste,"} aapka login niche diya gaya hai.</p>
+       <div style="background: #111827; padding: 16px; border-radius: 12px; margin: 12px 0; font-size: 13px; color: #D1D5DB;">
+         <div>Email: <strong style="color:#fff;">${email}</strong></div>
+         <div>Password: <strong style="color:#fff;">${password}</strong></div>
+       </div>
+       <a href="${loginLink}" style="display: inline-block; background: #7C3AED; color: #fff; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600; margin: 12px 0;">Login Karein</a>
+       <p style="font-size: 12px; color: #6B7280;">Pehli baar login karne ke baad apna password badalna zaroori hoga.</p>`
+    ),
+    text: `Aapka Promoter account ban gaya hai. Email: ${email}, Password: ${password}. Login karein: ${loginLink}`,
+  });
+};

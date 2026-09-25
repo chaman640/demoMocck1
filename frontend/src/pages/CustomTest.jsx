@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import AdBanner from "../components/AdBanner";
+import AdBanner from "../components/AdBanner";
 
 // ─────────────────────────────────────────────
 // Custom (batch) tests are practice tools set by a teacher — not exam
@@ -62,6 +64,7 @@ const CustomTest = () => {
 
   const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
   const [activeQIdx, setActiveQIdx] = useState(0);
+  const [adRefreshCount, setAdRefreshCount] = useState(0);
   const [answers, setAnswers] = useState({});
   const [visited, setVisited] = useState(() => new Set());
   const [revealed, setRevealed] = useState(() => new Set()); // 🆕 questions already checked
@@ -231,8 +234,10 @@ const CustomTest = () => {
     if (!testData) return;
     const subj = testData.subjects[activeSubjectIdx];
     if (activeQIdx < subj.questions.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx, activeQIdx + 1);
     } else if (activeSubjectIdx < testData.subjects.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx + 1, 0);
     }
   };
@@ -520,6 +525,7 @@ const CustomTest = () => {
           </div>
 
           <div className="w-full lg:w-72 bg-[#111827] border border-gray-800 rounded-2xl p-5 h-fit">
+            <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} className="mb-4" />
             <div className="grid grid-cols-1 gap-2 text-[11px] mb-5">
               <div className="flex items-center gap-1.5 text-gray-400">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Correct ({summary.correct})

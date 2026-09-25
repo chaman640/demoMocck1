@@ -75,6 +75,16 @@ import { requestTeacherResetOtp, resetTeacherPassword } from "../controllers/tea
 import { requestAdminLogin, verifyAdminLogin, getAdminSession, adminLogout } from "../controllers/adminAuth.js"; // 🆕
 import { adminCreateMainTeacher } from "../controllers/adminCreateMainTeacher.js"; // 🆕
 import { listExamNamesAdmin, addExamName, deleteExamName } from "../controllers/manageExamNames.js"; // 🆕
+import { loginPromoter, logoutPromoter, changePromoterPassword } from "../controllers/promoterAuthentication.js";
+import { promoterInfo } from "../middlewares/promoterInfo.js";
+import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetPromoterStatus } from "../controllers/adminManagePromoters.js";
+import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
+import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
+import { loginPromoter, logoutPromoter, changePromoterPassword } from "../controllers/promoterAuthentication.js";
+import { promoterInfo } from "../middlewares/promoterInfo.js";
+import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetPromoterStatus } from "../controllers/adminManagePromoters.js";
+import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
+import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { deleteCoupon } from "../controllers/deleteCoupon.js"; // 🆕
@@ -195,11 +205,31 @@ router.get("/admin/session", getAdminSession);
 router.post("/admin/logout", adminLogout);
 // Admin-only — naya Main Teacher banao (invite email jaati hai)
 router.post("/admin/create-main-teacher", adminLimiter, adminOnly, adminCreateMainTeacher);
+
+// 🆕 Promoter management
+router.post("/admin/create-promoter", adminLimiter, adminOnly, adminCreatePromoter);
+router.get("/admin/promoters", adminOnly, adminListPromoters);
+router.post("/admin/promoters/:promoterId/update", adminLimiter, adminOnly, adminUpdatePromoter);
+router.post("/admin/promoters/:promoterId/status", adminLimiter, adminOnly, adminSetPromoterStatus);
+router.post("/admin/promoters/:promoterId/settle", adminLimiter, adminOnly, adminSettlePromoterCommission);
+router.post("/admin/teachers/:teacherId/settle-commission", adminLimiter, adminOnly, adminSettleTeacherCommission);
+
 // 🆕 Exam names — Admin Panel se manage (add/delete). Public dropdown
 // abhi bhi "/allExamName" (upar) hai, wo yahi collection padhta hai.
 router.get("/admin/exam-names", adminOnly, listExamNamesAdmin);
 router.post("/admin/exam-names", adminLimiter, adminOnly, addExamName);
 router.delete("/admin/exam-names/:id", adminLimiter, adminOnly, deleteExamName);
+
+// ═════════════════════════════════════════════
+// PROMOTER ROUTES
+// ═════════════════════════════════════════════
+router.post("/promoter-login", loginIpLimiter, loginLimiter, loginEmailLimiter, loginPromoter);
+router.post("/promoter-logout", logoutPromoter);
+router.get("/promoter-me", promoterInfo, (req, res) => {
+  res.status(200).json({ success: true, data: req.promoter });
+});
+router.post("/promoter/change-password", promoterInfo, writeLimiter, changePromoterPassword);
+router.get("/promoter/dashboard", promoterInfo, getPromoterDashboard);
 
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)

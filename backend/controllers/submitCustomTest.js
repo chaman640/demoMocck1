@@ -4,6 +4,8 @@
 import mongoose from "mongoose";
 import CustomTest from "../models/CustomTest.js";
 import CustomTestAttempt from "../models/CustomTestAttempt.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitCustomTest = async (req, res) => {
   try {
@@ -102,6 +104,8 @@ export const submitCustomTest = async (req, res) => {
     });
 
     await newAttempt.save();
+
+    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     return res.status(201).json({
       success: true,

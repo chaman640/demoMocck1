@@ -4,6 +4,8 @@
 import mongoose from "mongoose";
 import PreviousYearTest from "../models/PreviousYearTest.js";
 import PreviousYearAttempt from "../models/PreviousYearAttempt.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitPreviousYearTest = async (req, res) => {
   try {
@@ -128,6 +130,8 @@ export const submitPreviousYearTest = async (req, res) => {
     });
 
     await newAttempt.save();
+
+    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     return res.status(201).json({
       success: true,

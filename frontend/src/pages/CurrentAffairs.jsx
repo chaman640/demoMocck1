@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
+import AdBanner from "../components/AdBanner";
+import AdBanner from "../components/AdBanner";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -55,6 +57,7 @@ const CurrentAffairs = () => {
   const [quiz, setQuiz] = useState(null);
   const [answers, setAnswers] = useState({});
   const [activeQIdx, setActiveQIdx] = useState(0);
+  const [adRefreshCount, setAdRefreshCount] = useState(0);
   const [resultData, setResultData] = useState(null);
 
   const [reviewData, setReviewData] = useState(null);
@@ -120,7 +123,10 @@ const CurrentAffairs = () => {
   };
 
   const goNext = () => {
-    if (quiz && activeQIdx < quiz.questions.length - 1) setActiveQIdx((i) => i + 1);
+    if (quiz && activeQIdx < quiz.questions.length - 1) {
+      setAdRefreshCount((c) => c + 1);
+      setActiveQIdx((i) => i + 1);
+    }
   };
   const goPrev = () => {
     if (activeQIdx > 0) setActiveQIdx((i) => i - 1);
@@ -311,6 +317,8 @@ const CurrentAffairs = () => {
               })}
             </div>
           </div>
+
+          <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} className="mb-4" />
 
           <div className="flex gap-3">
             <button onClick={goPrev} disabled={activeQIdx === 0} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 disabled:opacity-40">

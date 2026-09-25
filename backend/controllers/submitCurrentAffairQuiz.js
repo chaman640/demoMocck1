@@ -1,5 +1,7 @@
 import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
 import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitCurrentAffairQuiz = async (req, res) => {
   try {
@@ -77,6 +79,8 @@ export const submitCurrentAffairQuiz = async (req, res) => {
     });
 
     await newAttempt.save();
+
+    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     return res.status(201).json({
       success: true,

@@ -1,34 +1,29 @@
 // controllers/addUser.js
 import User from "../models/User.js";
-import Coupon from "../models/Coupon.js"; // 🆕 coupon-based signup ke liye
+import Coupon from "../models/Coupon.js";
+import Promoter from "../models/Promoter.js";
 import jwt from "jsonwebtoken";
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 import bcrypt from "bcrypt";
 import { verifyOtpCode } from "../utils/otpService.js";
 import { authCookieOptions } from "../utils/cookieOptions.js";
-import { checkAndMatchAllowedStudent } from "../utils/batchAccess.js"; // 🆕
+import { checkAndMatchAllowedStudent } from "../utils/batchAccess.js";
 
 export const addUser = async (req, res) => {
   try {
-    const { name, email, phone, password, address, exam, couponCode, otp } = req.body;
+    const { name, email, phone, password, address, exam, code, couponCode, otp } = req.body;
+    const rawCode = code || couponCode;
 
-    // 1. Validation — 🆕 ab "exam" ya "couponCode" mein se koi EK hona zaroori hai
     if (!name || !email || !phone || !password || !address || !otp) {
       return res.status(400).json({
         success: false,
         message: "Sabhi fields bharna zaroori hai!",
       });
     }
-    if (!exam && !couponCode) {
+    if (!exam && !rawCode) {
       return res.status(400).json({
         success: false,
-        message: "Exam chunein ya coupon code dalein!",
-      });
-    }
-    if (exam && couponCode) {
-      return res.status(400).json({
-        success: false,
-        message: "Exam aur coupon code dono ek saath nahi — koi ek chunein!",
+        message: "Exam chunein ya code dalein!",
       });
     }
 
@@ -49,7 +44,6 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 2. Duplicate check
     const existingUser = await User.findOne({
       $or: [{ email: normalizedEmail }, { phone: normalizedPhone }],
     });
@@ -60,44 +54,50 @@ export const addUser = async (req, res) => {
       });
     }
 
-    // 3. 🆕 Coupon code diya hai to usse hi exam derive karo (aur account ko
-    // seedha us batch mein enroll bhi kar do — alag se "redeem" karne ki
-    // zaroorat nahi padegi)
     let resolvedExam = exam;
     let coupon = null;
-    if (couponCode) {
-      coupon = await Coupon.findOne({ code: String(couponCode).trim().toUpperCase() });
-      if (!coupon) {
-        return res.status(404).json({
-          success: false,
-          message: "Ye coupon code nahi mila. Sahi code check karein.",
-        });
-      }
-      resolvedExam = coupon.exam;
+    let promoterDoc = null;
 
-      // 🆕 Invite-only batch check — signup se account create karne se
-      // PEHLE hi reject karo, taaki koi stray account na bane bina batch ke
-      const accessCheck = await checkAndMatchAllowedStudent(coupon._id, {
-        phone: normalizedPhone,
-        email: normalizedEmail,
-      });
-      if (!accessCheck.allowed) {
-        return res.status(403).json({
-          success: false,
-          message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
+    if (rawCode) {
+      const trimmedCode = String(rawCode).trim().toUpperCase();
+      coupon = await Coupon.findOne({ code: trimmedCode });
+
+      if (coupon) {
+        resolvedExam = coupon.exam;
+
+        const accessCheck = await checkAndMatchAllowedStudent(coupon._id, {
+          phone: normalizedPhone,
+          email: normalizedEmail,
         });
+        if (!accessCheck.allowed) {
+          return res.status(403).json({
+            success: false,
+            message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
+          });
+        }
+      } else {
+        promoterDoc = await Promoter.findOne({ code: trimmedCode, status: "active" });
+        if (!promoterDoc) {
+          return res.status(404).json({
+            success: false,
+            message: "Ye code sahi nahi hai. Sahi teacher ya promoter code check karein.",
+          });
+        }
+        if (!exam) {
+          return res.status(400).json({
+            success: false,
+            message: "Exam ka naam dalna zaroori hai!",
+          });
+        }
+        resolvedExam = exam;
       }
     }
 
-    // 4. OTP verify — email ke against verify hota hai
     await verifyOtpCode(normalizedEmail, "signup", otp);
 
-    // 5. Password hash
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
-    // 6. Save — 🆕 coupon wale case mein activeCoupon + couponHistory bhi
-    // yahin set ho jaata hai, seedha signup ke sath hi
     const newUser = new User({
       name: String(name).trim(),
       email: normalizedEmail,
@@ -109,15 +109,17 @@ export const addUser = async (req, res) => {
         activeCoupon: coupon._id,
         couponHistory: [{ coupon: coupon._id, examNameAtJoin: resolvedExam, joinedAt: new Date(), leftAt: null }],
       }),
+      ...(promoterDoc && { promoter: promoterDoc._id }),
     });
     await newUser.save();
 
-    // 🆕 Ab userId mil gaya — allowed-list entry par "matched" mark kar do
     if (coupon) {
       await checkAndMatchAllowedStudent(coupon._id, { phone: normalizedPhone, email: normalizedEmail }, newUser._id);
     }
+    if (promoterDoc) {
+      await Promoter.updateOne({ _id: promoterDoc._id }, { $inc: { totalStudents: 1 } });
+    }
 
-    // 7. JWT + cookie (auto-login)
     const token = jwt.sign(
       { userId: newUser._id },
       JWT_SECRET,

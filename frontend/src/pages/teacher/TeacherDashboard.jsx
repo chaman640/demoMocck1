@@ -145,6 +145,35 @@ const TeacherDashboard = () => {
                 </div>
               </div>
             )}
+
+            {dashboard.commission && (
+              <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4 space-y-3">
+                <h3 className="font-semibold text-sm">Your Commission</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Pending Questions</p>
+                    <p className="text-xl font-bold text-white">{dashboard.commission.pendingQuestionsCount}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-1">Total Questions (all time)</p>
+                    <p className="text-xl font-bold text-white">{dashboard.commission.totalQuestionsAllTime}</p>
+                  </div>
+                </div>
+                {dashboard.commission.paymentHistory?.length > 0 && (
+                  <div className="pt-2 border-t border-gray-800 space-y-2">
+                    <p className="text-[11px] text-gray-500 uppercase tracking-wide">Payment History</p>
+                    {[...dashboard.commission.paymentHistory].reverse().map((entry, idx) => (
+                      <div key={idx} className="flex items-center justify-between text-xs">
+                        <span className="text-gray-400">
+                          {new Date(entry.settledAt).toLocaleDateString()} &middot; {entry.questionsSettled} questions
+                        </span>
+                        <span className="font-semibold text-[#A78BFA]">₹{entry.amount}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
 

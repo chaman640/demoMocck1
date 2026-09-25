@@ -1,6 +1,8 @@
 // controllers/createCoupon.js
 // Sirf MAIN TEACHER naya coupon/group bana sakta hai.
 import Coupon from "../models/Coupon.js";
+import Promoter from "../models/Promoter.js";
+import Promoter from "../models/Promoter.js";
 
 // ─────────────────────────────────────────────
 // HELPER: Unique coupon code generate karo
@@ -49,8 +51,11 @@ export const createCoupon = async (req, res) => {
 
     while (!isUnique && attempts < 5) {
       code = generateCouponCode();
-      const existing = await Coupon.findOne({ code });
-      if (!existing) isUnique = true;
+      const [existing, existingPromoter] = await Promise.all([
+        Coupon.findOne({ code }),
+        Promoter.findOne({ code }),
+      ]);
+      if (!existing && !existingPromoter) isUnique = true;
       attempts++;
     }
 

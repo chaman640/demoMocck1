@@ -33,6 +33,8 @@ const TeacherCoupons = () => {
 
   const [switchingId, setSwitchingId] = useState(null);
   const [copiedCode, setCopiedCode] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(null);
+  const [copiedLink, setCopiedLink] = useState(null);
   const [deletingId, setDeletingId] = useState(null); // 🆕
   const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 🆕 — 2-step confirm
 
@@ -101,6 +103,20 @@ const TeacherCoupons = () => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 1500);
+  };
+
+  const copySignupLink = (code) => {
+    const link = `${window.location.origin}/#/Singup?ref=${code}&kind=teacher`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(code);
+    setTimeout(() => setCopiedLink(null), 1500);
+  };
+
+  const copySignupLink = (code) => {
+    const link = `${window.location.origin}/#/Singup?ref=${code}&kind=teacher`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(code);
+    setTimeout(() => setCopiedLink(null), 1500);
   };
 
   // 🆕 Batch delete — permanent hai, isliye pehle click sirf confirm-mode
@@ -257,11 +273,21 @@ const TeacherCoupons = () => {
 
                   <button
                     onClick={() => copyCode(c.code)}
-                    className="flex items-center gap-2 bg-[#0A0D14] border border-gray-700 rounded-lg px-3 py-2 mb-3 hover:border-gray-500 transition-colors"
+                    className="flex items-center gap-2 bg-[#0A0D14] border border-gray-700 rounded-lg px-3 py-2 mb-2 hover:border-gray-500 transition-colors"
                   >
                     <span className="font-mono text-sm tracking-wider text-gray-200">{c.code}</span>
                     <span className="text-[11px] text-gray-500 ml-auto">
                       {copiedCode === c.code ? "Copied ✓" : "Copy"}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => copySignupLink(c.code)}
+                    className="flex items-center gap-2 bg-[#0A0D14] border border-gray-700 rounded-lg px-3 py-2 mb-3 hover:border-gray-500 transition-colors w-full"
+                  >
+                    <span className="text-xs text-gray-400">Signup Link (bina code ke)</span>
+                    <span className="text-[11px] text-gray-500 ml-auto flex-shrink-0">
+                      {copiedLink === c.code ? "Copied ✓" : "Copy"}
                     </span>
                   </button>
 

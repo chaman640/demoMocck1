@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/api";
 
 // 👇 VERIFY: Routes.js mein addUser aur sendSignupOtp ke actual paths yahan match karo
@@ -25,6 +25,8 @@ const Singup = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [examList, setExamList] = useState([]);
   const [joinMode, setJoinMode] = useState("exam"); // 🆕 "exam" | "coupon" — toggle
+  const [refKind, setRefKind] = useState(null); // null | "promoter" | "teacher" | "unknown"
+  const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
 
@@ -41,6 +43,26 @@ const Singup = () => {
       .then((res) => setExamList(res.data.data || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      setJoinMode("coupon");
+      setFormData((prev) => ({ ...prev, couponCode: ref.toUpperCase() }));
+      const kind = searchParams.get("kind");
+      setRefKind(kind === "promoter" || kind === "teacher" ? kind : "unknown");
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
+    const ref = searchParams.get("ref");
+    if (ref) {
+      setJoinMode("coupon");
+      setFormData((prev) => ({ ...prev, couponCode: ref.toUpperCase() }));
+      const kind = searchParams.get("kind");
+      setRefKind(kind === "promoter" || kind === "teacher" ? kind : "unknown");
+    }
+  }, [searchParams]);
 
   // Resend-OTP cooldown countdown
   useEffect(() => {
@@ -83,7 +105,8 @@ const Singup = () => {
     if (!formData.address.trim()) errors.address = true;
     // 🆕 Dono mein se jo mode active hai, sirf uska field check hoga
     if (joinMode === "exam" && !formData.exam) errors.exam = true;
-    if (joinMode === "coupon" && !formData.couponCode.trim()) errors.couponCode = true;
+    if (joinMode === "coupon" && !refKind && !formData.couponCode.trim()) errors.couponCode = true;
+    if (joinMode === "coupon" && refKind === "promoter" && !formData.exam) errors.exam = true;
 
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -287,26 +310,32 @@ const Singup = () => {
               {/* 🆕 Exam ↔ Coupon toggle */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-[#475569]">Kaise Join Karna Hai?</label>
-                <div className="grid grid-cols-2 gap-2 mb-3">
-                  <button
-                    type="button"
-                    onClick={() => handleJoinModeChange("exam")}
-                    className={`py-2 rounded-lg text-sm font-medium border transition-all ${
-                      joinMode === "exam" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
-                    }`}
-                  >
-                    Choose Exam
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleJoinModeChange("coupon")}
-                    className={`py-2 rounded-lg text-sm font-medium border transition-all ${
-                      joinMode === "coupon" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
-                    }`}
-                  >
-                    I Have a Coupon Code
-                  </button>
-                </div>
+                {!refKind && (
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <button
+                      type="button"
+                      onClick={() => handleJoinModeChange("exam")}
+                      className={`py-2 rounded-lg text-sm font-medium border transition-all ${
+                        joinMode === "exam" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
+                      }`}
+                    >
+                      Choose Exam
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleJoinModeChange("coupon")}
+                      className={`py-2 rounded-lg text-sm font-medium border transition-all ${
+                        joinMode === "coupon" ? "bg-[#2563EB] text-white border-[#2563EB]" : "bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#94A3B8]"
+                      }`}
+                    >
+                      I Have a Code
+                    </button>
+                  </div>
+                )}
+
+                {refKind && (
+                  <p className="text-[11px] text-green-600 font-medium mb-2">✓ Referral code applied automatically</p>
+                )}
 
                 {joinMode === "exam" ? (
                   <div className="relative">
@@ -328,22 +357,44 @@ const Singup = () => {
                     </span>
                   </div>
                 ) : (
-                  <div className="relative">
-                    <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.couponCode ? 'text-red-400' : 'text-[#94A3B8]'}`}>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
-                    </span>
-                    <input
-                      type="text"
-                      name="couponCode"
-                      value={formData.couponCode}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
-                      placeholder="Code given by your teacher"
-                      className={getInputClass('couponCode')}
-                    />
+                  <div className="space-y-3">
+                    {!refKind && (
+                      <div className="relative">
+                        <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.couponCode ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                        </span>
+                        <input
+                          type="text"
+                          name="couponCode"
+                          value={formData.couponCode}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
+                          placeholder="Teacher ya Promoter ka code"
+                          className={getInputClass('couponCode')}
+                        />
+                      </div>
+                    )}
+                    {refKind !== "teacher" && (
+                      <div className="relative">
+                        <span className={`absolute inset-y-0 left-0 flex items-center pl-3 ${fieldErrors.exam ? 'text-red-400' : 'text-[#94A3B8]'}`}>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </span>
+                        <select name="exam" value={formData.exam} onChange={handleChange} className={`${getInputClass('exam')} appearance-none cursor-pointer`}>
+                          <option value="" disabled={refKind === "promoter"}>
+                            {refKind === "promoter" ? "Select Exam" : "Exam (sirf Promoter code ke liye zaroori)"}
+                          </option>
+                          {examList.map((examName, index) => (
+                            <option key={index} value={examName}>{examName}</option>
+                          ))}
+                        </select>
+                        <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-[#94A3B8]">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"></path></svg>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
-                {joinMode === "coupon" && (
-                  <p className="text-[11px] text-[#64748B] mt-1.5">Coupon code se aapka exam automatically set ho jayega aur aap seedhe batch mein enroll ho jayenge.</p>
+                {joinMode === "coupon" && !refKind && (
+                  <p className="text-[11px] text-[#64748B] mt-1.5">Teacher/batch ka code ho to exam automatically set ho jayega. Promoter ka code ho to upar exam bhi select karein.</p>
                 )}
               </div>
 
