@@ -80,11 +80,6 @@ import { promoterInfo } from "../middlewares/promoterInfo.js";
 import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetPromoterStatus } from "../controllers/adminManagePromoters.js";
 import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
 import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
-import { loginPromoter, logoutPromoter, changePromoterPassword } from "../controllers/promoterAuthentication.js";
-import { promoterInfo } from "../middlewares/promoterInfo.js";
-import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetPromoterStatus } from "../controllers/adminManagePromoters.js";
-import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
-import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { deleteCoupon } from "../controllers/deleteCoupon.js"; // 🆕

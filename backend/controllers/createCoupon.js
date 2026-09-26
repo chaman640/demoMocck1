@@ -2,7 +2,6 @@
 // Sirf MAIN TEACHER naya coupon/group bana sakta hai.
 import Coupon from "../models/Coupon.js";
 import Promoter from "../models/Promoter.js";
-import Promoter from "../models/Promoter.js";
 
 // ─────────────────────────────────────────────
 // HELPER: Unique coupon code generate karo

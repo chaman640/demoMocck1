@@ -34,7 +34,6 @@ const TeacherCoupons = () => {
   const [switchingId, setSwitchingId] = useState(null);
   const [copiedCode, setCopiedCode] = useState(null);
   const [copiedLink, setCopiedLink] = useState(null);
-  const [copiedLink, setCopiedLink] = useState(null);
   const [deletingId, setDeletingId] = useState(null); // 🆕
   const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 🆕 — 2-step confirm
 
@@ -103,13 +102,6 @@ const TeacherCoupons = () => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 1500);
-  };
-
-  const copySignupLink = (code) => {
-    const link = `${window.location.origin}/#/Singup?ref=${code}&kind=teacher`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(code);
-    setTimeout(() => setCopiedLink(null), 1500);
   };
 
   const copySignupLink = (code) => {

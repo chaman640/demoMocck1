@@ -1093,14 +1093,6 @@ const AdminPanel = () => {
           <p className="text-xs text-gray-500">Naya promoter banayein, students/questions dekhein, hisab settle karein</p>
         </button>
 
-        <button
-          onClick={() => navigate("/AdminPromoters")}
-          className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-5 sm:p-6 transition-colors"
-        >
-          <h3 className="font-semibold text-base mb-1">Promoters Manage Karein →</h3>
-          <p className="text-xs text-gray-500">Naya promoter banayein, students/questions dekhein, hisab settle karein</p>
-        </button>
-
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Content (Advanced)</p>
 

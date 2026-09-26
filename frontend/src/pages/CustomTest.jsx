@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
-import AdBanner from "../components/AdBanner";
 
 // ─────────────────────────────────────────────
 // Custom (batch) tests are practice tools set by a teacher — not exam

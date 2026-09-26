@@ -59,10 +59,6 @@ import PromoterLogin from './pages/PromoterLogin';
 import PromoterChangePassword from './pages/PromoterChangePassword';
 import PromoterDashboard from './pages/PromoterDashboard';
 import AdminPromoters from './pages/AdminPromoters';
-import PromoterLogin from './pages/PromoterLogin';
-import PromoterChangePassword from './pages/PromoterChangePassword';
-import PromoterDashboard from './pages/PromoterDashboard';
-import AdminPromoters from './pages/AdminPromoters';
 
 // 🆕 CHANGE — pehle staleTime sirf 30 second tha, matlab 30 second se
 // purana koi bhi page dobara khulte hi turant refetch ho jata tha (isliye
@@ -152,10 +148,6 @@ const App = () => {
             <Route path="/AdminLogin" element={<AdminLogin />} />
             <Route path="/AdminVerify" element={<AdminVerify />} />
             <Route path="/AdminPanel" element={<AdminPanel />} />
-            <Route path="/AdminPromoters" element={<AdminPromoters />} />
-            <Route path="/PromoterLogin" element={<PromoterLogin />} />
-            <Route path="/PromoterChangePassword" element={<PromoterChangePassword />} />
-            <Route path="/PromoterDashboard" element={<PromoterDashboard />} />
             <Route path="/AdminPromoters" element={<AdminPromoters />} />
             <Route path="/PromoterLogin" element={<PromoterLogin />} />
             <Route path="/PromoterChangePassword" element={<PromoterChangePassword />} />

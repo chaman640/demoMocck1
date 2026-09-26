@@ -5,7 +5,6 @@ import mongoose from "mongoose";
 import CustomTest from "../models/CustomTest.js";
 import CustomTestAttempt from "../models/CustomTestAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
-import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitCustomTest = async (req, res) => {
   try {

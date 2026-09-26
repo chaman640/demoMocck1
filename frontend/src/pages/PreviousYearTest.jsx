@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
-import AdBanner from "../components/AdBanner";
 
 const formatTime = (totalSeconds) => {
   const safe = Math.max(0, Math.floor(totalSeconds || 0));

@@ -54,16 +54,6 @@ const Singup = () => {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    const ref = searchParams.get("ref");
-    if (ref) {
-      setJoinMode("coupon");
-      setFormData((prev) => ({ ...prev, couponCode: ref.toUpperCase() }));
-      const kind = searchParams.get("kind");
-      setRefKind(kind === "promoter" || kind === "teacher" ? kind : "unknown");
-    }
-  }, [searchParams]);
-
   // Resend-OTP cooldown countdown
   useEffect(() => {
     if (resendCooldown <= 0) return;

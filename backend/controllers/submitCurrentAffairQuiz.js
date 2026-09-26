@@ -1,7 +1,6 @@
 import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
 import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
-import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitCurrentAffairQuiz = async (req, res) => {
   try {
