@@ -134,7 +134,7 @@ export const inviteSubTeacher = async (req, res) => {
     } else {
       teacher = new Teacher({
         name: "Pending Teacher",
-        email: `pending_${cleanPhone}@invite.batchmock.in`, // 🆕 rebrand
+        email: `pending_${cleanPhone}@invite.antimprayash.in`, // 🆕 rebrand
         phone: cleanPhone,
         role: "sub",
         status: "pending",

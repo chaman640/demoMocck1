@@ -36,8 +36,8 @@ const Landing = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans">
       <nav className="flex items-center justify-between px-4 sm:px-6 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-2">
-          <img src={LOGO_URL} alt="BatchMock.in" className="w-8 h-8 object-contain rounded" />
-          <span className="text-base sm:text-xl font-semibold tracking-wide">BatchMock.in</span>
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-8 h-8 object-contain rounded" />
+          <span className="text-base sm:text-xl font-semibold tracking-wide">AntimPrayash.in</span>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <button
@@ -103,7 +103,7 @@ const Landing = () => {
 
       <div className="border-t border-gray-800">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-gray-500">© {new Date().getFullYear()} BatchMock.in — All rights reserved</p>
+          <p className="text-xs text-gray-500">© {new Date().getFullYear()} AntimPrayash.in — All rights reserved</p>
           <Link to="/PrivacyPolicy" className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
             Privacy Policy
           </Link>

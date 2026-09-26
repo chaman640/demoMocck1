@@ -46,7 +46,7 @@ const TeacherLogin = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={LOGO_URL} alt="BatchMock.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">Teacher Login</h1>
           <p className="text-gray-400 text-sm mt-1">Log in to your teacher account</p>
         </div>

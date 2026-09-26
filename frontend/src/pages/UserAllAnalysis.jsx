@@ -425,8 +425,8 @@ const UserAllAnalysis = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans selection:bg-[#7C3AED] selection:text-white pb-20">
       <nav className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 max-w-5xl mx-auto border-b border-gray-800">
         <div onClick={() => navigate("/HomePage")} className="flex items-center gap-2 cursor-pointer">
-          <img src={LOGO_URL} alt="BatchMock.in" className="w-8 h-8 object-contain rounded flex-shrink-0" />
-          <span className="text-base sm:text-xl font-semibold tracking-wide">BatchMock.in</span>
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-8 h-8 object-contain rounded flex-shrink-0" />
+          <span className="text-base sm:text-xl font-semibold tracking-wide">AntimPrayash.in</span>
         </div>
         <button onClick={() => navigate("/HomePage")} className="text-xs sm:text-sm font-medium text-gray-400 hover:text-white transition-colors flex-shrink-0">&larr; Home</button>
       </nav>

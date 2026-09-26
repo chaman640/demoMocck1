@@ -230,8 +230,8 @@ const UserTopicAnalysis = () => {
           onClick={() => navigate("/HomePage")}
           className="flex items-center gap-2 cursor-pointer flex-shrink-0"
         >
-          <img src={LOGO_URL} alt="BatchMock.in" className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded" />
-          <span className="text-sm sm:text-xl font-semibold tracking-wide">BatchMock.in</span>
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-7 h-7 sm:w-8 sm:h-8 object-contain rounded" />
+          <span className="text-sm sm:text-xl font-semibold tracking-wide">AntimPrayash.in</span>
         </div>
         <button
           onClick={() =>

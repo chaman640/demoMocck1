@@ -23,7 +23,7 @@ const PrivacyPolicy = () => {
 
         <Section title="1. Introduction">
           <p>
-            BatchMock.in ("we", "our", "the platform") provides mock tests, previous year papers, and
+            AntimPrayash.in ("we", "our", "the platform") provides mock tests, previous year papers, and
             performance analysis for students preparing for government exams. This policy explains what
             information we collect, how we use it, and the choices you have.
           </p>

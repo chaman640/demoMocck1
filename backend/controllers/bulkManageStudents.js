@@ -129,7 +129,7 @@ export const bulkImportStudents = async (req, res) => {
           user = await User.create({
             name: name || `Student ${phone.slice(-4)}`,
             phone,
-            email: `${phone}@student.batchmock.in`,
+            email: `${phone}@student.antimprayash.in`,
             password: defaultPassword,
             exam: coupon.exam,
             activeCoupon: coupon._id,

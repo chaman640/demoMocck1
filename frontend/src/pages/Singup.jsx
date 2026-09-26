@@ -191,8 +191,8 @@ const Singup = () => {
       {/* LEFT — Branding panel (desktop only)          */}
       {/* ───────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] text-white flex-col justify-center px-16">
-        <img src="/logo.svg" alt="BatchMock.in" className="w-14 h-14 object-contain mb-6" />
-        <h1 className="text-3xl font-bold mb-3">BatchMock.in mein Swagat Hai</h1>
+        <img src="/logo.svg" alt="AntimPrayash.in" className="w-14 h-14 object-contain mb-6" />
+        <h1 className="text-3xl font-bold mb-3">AntimPrayash.in mein Swagat Hai</h1>
         <p className="text-blue-100 text-sm leading-relaxed max-w-md mb-8">
           The best mock tests, previous year papers, and detailed performance analysis for government exam preparation — all in one place.
         </p>

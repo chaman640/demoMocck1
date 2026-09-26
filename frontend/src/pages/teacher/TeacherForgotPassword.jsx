@@ -122,7 +122,7 @@ const TeacherForgotPassword = () => {
 
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src={LOGO_URL} alt="BatchMock.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">{step === "email" ? "Password Bhool Gaye?" : "Naya Password Set Karein"}</h1>
           <p className="text-gray-400 text-sm mt-1">
             {step === "email" ? "Enter your registered email, an OTP will be sent" : `Enter the OTP sent to ${email} and your new password`}
