@@ -2,7 +2,9 @@ import BookRedemption from "../models/BookRedemption.js";
 
 export const getMyRedemptions = async (req, res) => {
   try {
-    const redemptions = await BookRedemption.find({ user: req.user._id }).sort({ createdAt: -1 });
+    const redemptions = await BookRedemption.find({ user: req.user._id })
+      .populate("book", "digitalFileUrl")
+      .sort({ createdAt: -1 });
 
     const data = redemptions.map((r) => ({
       _id: r._id,
@@ -11,7 +13,8 @@ export const getMyRedemptions = async (req, res) => {
       coverImageUrl: r.bookSnapshot.coverImageUrl,
       coinsSpent: r.coinsSpent,
       status: r.status,
-      digitalFileUrl: r.bookSnapshot.type === "digital" ? r.digitalFileUrl : undefined,
+      digitalFileUrl:
+        r.bookSnapshot.type === "digital" ? r.book?.digitalFileUrl || r.digitalFileUrl || undefined : undefined,
       trackingInfo: r.trackingInfo || undefined,
       redeemedAt: r.createdAt,
     }));

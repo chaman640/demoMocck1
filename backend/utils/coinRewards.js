@@ -21,15 +21,13 @@ export const creditDailyCoinsIfEligible = async (user, { attempted, total }) => 
 
     const todayStr = getISTDateString();
 
-    const freshUser = await User.findById(user._id).select(
-      "activityDates coins longestStreak boostActiveUntil"
-    );
+    const freshUser = await User.findById(user._id).select("activityDates boostActiveUntil");
     if (!freshUser) return null;
 
-    if (freshUser.activityDates.includes(todayStr)) return null;
+    const existingDates = freshUser.activityDates || [];
+    if (existingDates.includes(todayStr)) return null;
 
-    const updatedDates = [...freshUser.activityDates, todayStr].sort();
-    const newStreak = computeStreakRun(updatedDates);
+    const newStreak = computeStreakRun([...existingDates, todayStr].sort());
 
     let coinsToAward = COIN_CONFIG.BASE_DAILY_COINS;
     let type = "test_completion";
@@ -44,27 +42,30 @@ export const creditDailyCoinsIfEligible = async (user, { attempted, total }) => 
       coinsToAward *= COIN_CONFIG.BOOST_MULTIPLIER;
     }
 
-    freshUser.activityDates = updatedDates;
-    freshUser.coins = (freshUser.coins || 0) + coinsToAward;
-    if (newStreak > (freshUser.longestStreak || 0)) {
-      freshUser.longestStreak = newStreak;
+    const updated = await User.findOneAndUpdate(
+      { _id: user._id, activityDates: { $ne: todayStr } },
+      {
+        $addToSet: { activityDates: todayStr },
+        $inc: { coins: coinsToAward },
+        $max: { longestStreak: newStreak },
+      },
+      { new: true, projection: { coins: 1 } }
+    );
+    if (!updated) return null;
+
+    try {
+      await CoinTransaction.create({
+        user: user._id,
+        type,
+        amount: coinsToAward,
+        balanceAfter: updated.coins,
+        note: isBoosted ? "2x Boost active" : isStreakBonus ? `${newStreak}-din streak bonus` : undefined,
+      });
+    } catch (ledgerError) {
+      console.error("CoinTransaction ledger write failed:", ledgerError.message);
     }
-    await freshUser.save();
 
-    await CoinTransaction.create({
-      user: freshUser._id,
-      type,
-      amount: coinsToAward,
-      balanceAfter: freshUser.coins,
-      note: isBoosted ? "2x Boost active" : isStreakBonus ? `${newStreak}-din streak bonus` : undefined,
-    });
-
-    return {
-      amount: coinsToAward,
-      isBoosted,
-      isStreakBonus,
-      newStreak,
-    };
+    return { amount: coinsToAward, isBoosted, isStreakBonus, newStreak };
   } catch (error) {
     console.error("creditDailyCoinsIfEligible error:", error.message);
     return null;

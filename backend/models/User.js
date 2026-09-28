@@ -73,6 +73,7 @@ const userSchema = new mongoose.Schema(
     boostActiveUntil: { type: Date, default: null },
     boostActivationsToday: { type: Number, default: 0 },
     boostActivationsDate: { type: String, default: null },
+    freePhysicalClaims: { type: Number, default: 0 },
   },
   {
     timestamps: true,

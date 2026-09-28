@@ -7,8 +7,8 @@ export const getStreakCalendar = async (req, res) => {
     const year = Number(req.query.year) || now.getFullYear();
     const month = Number(req.query.month) || now.getMonth() + 1;
 
-    if (month < 1 || month > 12) {
-      return res.status(400).json({ success: false, message: "Month 1 se 12 ke beech hona chahiye." });
+    if (month < 1 || month > 12 || year < 2000 || year > 2100) {
+      return res.status(400).json({ success: false, message: "Month 1 se 12 aur year 2000 se 2100 ke beech hona chahiye." });
     }
 
     const user = await User.findById(req.user._id).select("activityDates longestStreak");

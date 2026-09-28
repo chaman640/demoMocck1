@@ -9,7 +9,8 @@ export const listRedemptionOrders = async (req, res) => {
 
     const orders = await BookRedemption.find(filter)
       .populate("user", "name email phone")
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .limit(500);
 
     return res.status(200).json({ success: true, data: orders });
   } catch (error) {

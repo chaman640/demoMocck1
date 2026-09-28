@@ -59,7 +59,11 @@ export const processBookUploadMiddleware = (req, res, next) => {
       if (coverFile || digitalFile) ensureCloudinary();
 
       if (coverFile) {
-        const compressed = await sharp(coverFile.buffer).jpeg({ quality: 70 }).toBuffer();
+        const compressed = await sharp(coverFile.buffer)
+          .rotate()
+          .flatten({ background: "#ffffff" })
+          .jpeg({ quality: 70 })
+          .toBuffer();
         req.body.coverImageUrl = await uploadBufferToCloudinary(compressed, "book_covers", "image");
       }
 

@@ -87,6 +87,10 @@ export const updateBook = async (req, res) => {
       book.stockQuantity = parseNumberOrNull(stockQuantity);
     }
 
+    if (!book.isFree && !(book.coinCost > 0)) {
+      return res.status(400).json({ success: false, message: "Paid book ke liye coin cost 0 se zyada hona chahiye." });
+    }
+
     await book.save();
     return res.status(200).json({ success: true, message: "Book update ho gayi!", data: book });
   } catch (error) {

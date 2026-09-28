@@ -35,5 +35,8 @@ const bookRedemptionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+bookRedemptionSchema.index({ user: 1, book: 1 }, { unique: true });
+bookRedemptionSchema.index({ createdAt: -1 });
+
 const BookRedemption = rowQuestionConnection.model("BookRedemption", bookRedemptionSchema);
 export default BookRedemption;

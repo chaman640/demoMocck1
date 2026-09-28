@@ -1,19 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { vibrateReward } from "../utils/vibrate";
 
 const CoinRewardListener = () => {
+  const queryClient = useQueryClient();
   const [reward, setReward] = useState(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     const handler = (e) => {
-      setReward(e.detail);
+      setReward({ ...e.detail, id: Date.now() });
       vibrateReward();
-      const timer = setTimeout(() => setReward(null), 2600);
-      return () => clearTimeout(timer);
+      queryClient.invalidateQueries({ queryKey: ["rewards-summary"] });
+      clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setReward(null), 2600);
     };
     window.addEventListener("coin-earned", handler);
-    return () => window.removeEventListener("coin-earned", handler);
-  }, []);
+    return () => {
+      window.removeEventListener("coin-earned", handler);
+      clearTimeout(timerRef.current);
+    };
+  }, [queryClient]);
 
   if (!reward) return null;
 
@@ -45,10 +52,13 @@ const CoinRewardListener = () => {
       <div className="absolute inset-0 bg-black/40" />
 
       {reward.isBoosted && (
-        <div className="coin-flash absolute text-8xl select-none">⚡</div>
+        <div key={`flash-${reward.id}`} className="coin-flash absolute text-8xl select-none">⚡</div>
       )}
 
-      <div className="coin-card relative bg-gradient-to-br from-[#7C3AED] to-[#5B21B6] rounded-3xl px-8 py-7 shadow-2xl shadow-purple-900/50 text-center border border-white/10 mx-6">
+      <div
+        key={reward.id}
+        className="coin-card relative bg-gradient-to-br from-[#7C3AED] to-[#5B21B6] rounded-3xl px-8 py-7 shadow-2xl shadow-purple-900/50 text-center border border-white/10 mx-6"
+      >
         <div className="text-5xl mb-2">🪙</div>
         <p className="text-3xl font-extrabold text-white mb-1">+{reward.amount}</p>
         <p className="text-sm text-purple-200 font-medium">Coins mile!</p>
