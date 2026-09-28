@@ -1,6 +1,7 @@
 import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
 import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
 
 export const submitCurrentAffairQuiz = async (req, res) => {
   try {
@@ -81,10 +82,15 @@ export const submitCurrentAffairQuiz = async (req, res) => {
 
     await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
+    const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
+      attempted: correctCount + wrongCount,
+      total: correctCount + wrongCount + unattemptedCount,
+    });
+
     return res.status(201).json({
       success: true,
       message: "Quiz submit ho gaya!",
-      data: { totalScore, correctCount, wrongCount, unattemptedCount },
+      data: { totalScore, correctCount, wrongCount, unattemptedCount, coinsEarned },
     });
   } catch (error) {
     if (error.code === 11000) {

@@ -48,6 +48,7 @@ const ProfilePage = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
+  const [rewardsSummary, setRewardsSummary] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +81,13 @@ const ProfilePage = () => {
     load();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    api
+      .get("/rewards/summary")
+      .then((res) => setRewardsSummary(res.data.data))
+      .catch(() => {});
   }, []);
 
   const startEdit = () => {
@@ -239,6 +247,34 @@ const ProfilePage = () => {
                 </div>
               ))}
             </div>
+
+            {/* 🆕 Streak & Coins */}
+            {rewardsSummary && (
+              <button
+                onClick={() => navigate("/StreakCalendar")}
+                className="w-full bg-[#111827] border border-gray-800 rounded-2xl p-4 mb-3 flex items-center justify-between hover:border-gray-600 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">🔥</span>
+                  <div className="text-left">
+                    <p className="text-lg font-bold text-orange-400 leading-tight">{rewardsSummary.currentStreak} din</p>
+                    <p className="text-[11px] text-gray-500">Current Streak &middot; Calendar dekhein →</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 rounded-full px-3 py-1.5">
+                  <span className="text-sm">🪙</span>
+                  <span className="text-sm font-bold text-amber-300">{rewardsSummary.coins}</span>
+                </div>
+              </button>
+            )}
+
+            {/* My Orders button */}
+            <button
+              onClick={() => navigate("/MyRedemptions")}
+              className="w-full py-3 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800/50 font-medium mb-3 transition-colors"
+            >
+              My Book Orders
+            </button>
 
             {/* My Batch button */}
             <button

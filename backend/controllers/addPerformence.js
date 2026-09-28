@@ -3,6 +3,7 @@ import Performance from "../models/Performance.js";
 import Blueprint from "../models/bluePrint.js";
 import { Question } from "../models/rowQuestionSchema.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
 
 export const addPerformence = async (req, res) => {
   try {
@@ -195,12 +196,18 @@ export const addPerformence = async (req, res) => {
 
     await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
+    const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
+      attempted: correctCount + wrongCount,
+      total: correctCount + wrongCount + unattemptedCount,
+    });
+
     // 9. Response
     return res.status(201).json({
       success: true,
       message: "User Performance Successfully Save Ho Gayi.",
       data: {
         performanceId: newPerformance._id,
+        coinsEarned,
         scoreDetails: {
           totalQuestions: blueprint.totalQuestions,
           correct: correctCount,

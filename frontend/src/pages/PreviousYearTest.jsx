@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
+import { emitCoinEarned } from "../utils/rewardEvents";
+import { vibrateShort } from "../utils/vibrate";
 
 const formatTime = (totalSeconds) => {
   const safe = Math.max(0, Math.floor(totalSeconds || 0));
@@ -301,6 +303,9 @@ const PreviousYearTest = () => {
       const res = await api.post(`/previous-year-test/${testId}/submit`, { attemptedQuestions });
 
       localStorage.removeItem(getStorageKey(userId, testId));
+
+      vibrateShort();
+      if (res.data.data?.coinsEarned) emitCoinEarned(res.data.data.coinsEarned);
 
       setResultData(res.data.data);
       setPhase("result");

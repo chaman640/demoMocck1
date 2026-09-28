@@ -66,6 +66,13 @@ const userSchema = new mongoose.Schema(
       ref: "Promoter",
       default: null,
     },
+
+    coins: { type: Number, default: 0 },
+    activityDates: { type: [String], default: [] },
+    longestStreak: { type: Number, default: 0 },
+    boostActiveUntil: { type: Date, default: null },
+    boostActivationsToday: { type: Number, default: 0 },
+    boostActivationsDate: { type: String, default: null },
   },
   {
     timestamps: true,

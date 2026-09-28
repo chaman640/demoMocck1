@@ -24,6 +24,8 @@ import CustomTests from './pages/CustomTests';
 import CustomTest from './pages/CustomTest';
 import ForgotPassword from './pages/ForgotPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import ManageBooks from './pages/ManageBooks';
+import ManageBookOrders from './pages/ManageBookOrders';
 
 // Teacher pages
 import TeacherLogin from './pages/teacher/TeacherLogin';
@@ -59,6 +61,10 @@ import PromoterLogin from './pages/PromoterLogin';
 import PromoterChangePassword from './pages/PromoterChangePassword';
 import PromoterDashboard from './pages/PromoterDashboard';
 import AdminPromoters from './pages/AdminPromoters';
+import RewardsStore from './pages/RewardsStore';
+import MyRedemptions from './pages/MyRedemptions';
+import StreakCalendar from './pages/StreakCalendar';
+import CoinRewardListener from './components/CoinRewardListener';
 
 // 🆕 CHANGE — pehle staleTime sirf 30 second tha, matlab 30 second se
 // purana koi bhi page dobara khulte hi turant refetch ho jata tha (isliye
@@ -124,6 +130,7 @@ const App = () => {
     <LanguageProvider>
       <QueryClientProvider client={queryClient}>
         <HashRouter>
+          <CoinRewardListener />
           <div>
             <Routes>
               {/* ── Student ── */}
@@ -143,6 +150,8 @@ const App = () => {
             <Route path="/ForgotPassword" element={<ForgotPassword />} />
             <Route path="/Landing" element={<Landing />} />
             <Route path="/PrivacyPolicy" element={<PrivacyPolicy />} />
+            <Route path="/ManageBooks" element={<ManageBooks />} />
+            <Route path="/ManageBookOrders" element={<ManageBookOrders />} />
 
             {/* 🆕 Admin — passwordless magic-link login */}
             <Route path="/AdminLogin" element={<AdminLogin />} />
@@ -152,6 +161,9 @@ const App = () => {
             <Route path="/PromoterLogin" element={<PromoterLogin />} />
             <Route path="/PromoterChangePassword" element={<PromoterChangePassword />} />
             <Route path="/PromoterDashboard" element={<PromoterDashboard />} />
+            <Route path="/RewardsStore" element={<RewardsStore />} />
+            <Route path="/MyRedemptions" element={<MyRedemptions />} />
+            <Route path="/StreakCalendar" element={<StreakCalendar />} />
 
             <Route path="/Challenge" element={<Challenge />} />
             <Route path="/Challenge/:code" element={<Challenge />} />

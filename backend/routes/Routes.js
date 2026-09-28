@@ -81,6 +81,18 @@ import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetP
 import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
 import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
 
+// 🆕 Coins / Streak / Books rewards system
+import { adminOrTeacher } from "../middlewares/adminOrTeacher.js";
+import { processBookUploadMiddleware } from "../middlewares/processBookUpload.js";
+import { getRewardsSummary } from "../controllers/getRewardsSummary.js";
+import { getStreakCalendar } from "../controllers/getStreakCalendar.js";
+import { getBooksForStudent } from "../controllers/getBooksForStudent.js";
+import { redeemBook } from "../controllers/redeemBook.js";
+import { getMyRedemptions } from "../controllers/getMyRedemptions.js";
+import { activateBoost } from "../controllers/activateBoost.js";
+import { createBook, listBooksForManage, updateBook, setBookStatus } from "../controllers/manageBooks.js";
+import { listRedemptionOrders, updateRedemptionStatus } from "../controllers/manageRedemptionOrders.js";
+
 import { createCoupon } from "../controllers/createCoupon.js";
 import { deleteCoupon } from "../controllers/deleteCoupon.js"; // 🆕
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
@@ -225,6 +237,26 @@ router.get("/promoter-me", promoterInfo, (req, res) => {
 });
 router.post("/promoter/change-password", promoterInfo, writeLimiter, changePromoterPassword);
 router.get("/promoter/dashboard", promoterInfo, getPromoterDashboard);
+
+// ═════════════════════════════════════════════
+// 🆕 REWARDS ROUTES (Student — coins, streak, books)
+// ═════════════════════════════════════════════
+router.get("/rewards/summary", userInfo, getRewardsSummary);
+router.get("/rewards/streak-calendar", userInfo, getStreakCalendar);
+router.get("/rewards/books", userInfo, getBooksForStudent);
+router.post("/rewards/books/:bookId/redeem", userInfo, writeLimiter, redeemBook);
+router.get("/rewards/my-redemptions", userInfo, getMyRedemptions);
+router.post("/rewards/watch-ad-boost", userInfo, writeLimiter, activateBoost);
+
+// ═════════════════════════════════════════════
+// 🆕 BOOK CATALOG MANAGEMENT (Admin + Main/Sub Teacher)
+// ═════════════════════════════════════════════
+router.post("/admin/books", adminLimiter, adminOrTeacher, processBookUploadMiddleware, sanitizeBody, createBook);
+router.get("/admin/books", adminOrTeacher, listBooksForManage);
+router.post("/admin/books/:bookId/update", adminLimiter, adminOrTeacher, processBookUploadMiddleware, sanitizeBody, updateBook);
+router.post("/admin/books/:bookId/status", adminLimiter, adminOrTeacher, setBookStatus);
+router.get("/admin/book-orders", adminOrTeacher, listRedemptionOrders);
+router.post("/admin/book-orders/:redemptionId/update", adminLimiter, adminOrTeacher, updateRedemptionStatus);
 
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)

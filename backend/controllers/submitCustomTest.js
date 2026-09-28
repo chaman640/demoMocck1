@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import CustomTest from "../models/CustomTest.js";
 import CustomTestAttempt from "../models/CustomTestAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
 
 export const submitCustomTest = async (req, res) => {
   try {
@@ -106,11 +107,17 @@ export const submitCustomTest = async (req, res) => {
 
     await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
+    const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
+      attempted: correctCount + wrongCount,
+      total: correctCount + wrongCount + unattemptedCount,
+    });
+
     return res.status(201).json({
       success: true,
       message: "Custom Test submit ho gaya!",
       data: {
         attemptId: newAttempt._id,
+        coinsEarned,
         testId: test._id,
         testName: test.testName,
         totalScore,

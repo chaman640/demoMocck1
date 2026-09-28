@@ -129,6 +129,17 @@ const HomePage = () => {
   const averageScoreOutOf = overview?.averageScoreOutOf ?? null; // 👈 NAYA
   const totalTests = overview?.totalTestsGiven ?? 0;
 
+  // 🆕 Coins + streak badge (header)
+  const { data: rewardsSummary } = useQuery({
+    queryKey: ["rewards-summary"],
+    queryFn: async () => {
+      const res = await api.get("/rewards/summary");
+      return res.data.data;
+    },
+    staleTime: 30 * 1000,
+    retry: false,
+  });
+
   // Rank predictor
   const { data: rankPredictor, isLoading: rankLoading } = useQuery({
     queryKey: ["rank-predictor-data", examName],
@@ -218,6 +229,14 @@ const HomePage = () => {
       primary: false,
       onClick: () => navigate("/Challenge"),
     },
+    {
+      icon: "🎁",
+      title: "Rewards Store",
+      desc: "Coins se books lein",
+      primary: false,
+      wide: true,
+      onClick: () => navigate("/RewardsStore"),
+    },
   ];
 
   // 👇 UPDATED: spinner ki jagah ab skeleton layout dikhega
@@ -228,9 +247,22 @@ const HomePage = () => {
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white font-sans pb-16">
       {/* Header */}
-      <header className="flex items-center px-4 py-3.5 border-b border-gray-800">
-        <img src={LOGO_URL} alt="AntimPrayash.in" className="w-8 h-8 object-contain rounded-lg" />
-        <span className="ml-2.5 text-base font-bold tracking-tight">AntimPrayash.in</span>
+      <header className="flex items-center justify-between px-4 py-3.5 border-b border-gray-800">
+        <div className="flex items-center">
+          <img src={LOGO_URL} alt="AntimPrayash.in" className="w-8 h-8 object-contain rounded-lg" />
+          <span className="ml-2.5 text-base font-bold tracking-tight">AntimPrayash.in</span>
+        </div>
+        <button onClick={() => navigate("/RewardsStore")} className="flex items-center gap-2">
+          {rewardsSummary?.currentStreak > 0 && (
+            <span className="flex items-center gap-0.5 text-xs font-bold text-orange-400">
+              🔥{rewardsSummary.currentStreak}
+            </span>
+          )}
+          <span className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 rounded-full px-2.5 py-1">
+            <span className="text-xs">🪙</span>
+            <span className="text-xs font-bold text-amber-300">{rewardsSummary?.coins ?? 0}</span>
+          </span>
+        </button>
       </header>
 
       <main className="px-4 py-5 max-w-lg mx-auto">
@@ -302,17 +334,26 @@ const HomePage = () => {
               <button
                 key={action.title}
                 onClick={action.onClick}
-                className={`text-left p-4 rounded-2xl border transition-all active:scale-[0.97] ${
-                  action.primary
+                className={`text-left p-4 rounded-2xl border transition-all active:scale-[0.97] ${action.wide ? "col-span-2 flex items-center gap-3" : ""} ${
+                  action.wide
+                    ? "bg-gradient-to-r from-amber-500/20 to-amber-600/10 border-amber-500/30 text-white"
+                    : action.primary
                     ? "bg-gradient-to-br from-[#7C3AED] to-[#6D28D9] border-transparent text-white shadow-lg shadow-purple-900/20"
                     : "bg-[#111827] border-gray-800 text-gray-300 hover:border-gray-600"
                 }`}
               >
-                <span className="text-2xl mb-1.5 block">{action.icon}</span>
-                <span className="text-sm font-bold text-white block mb-0.5">{action.title}</span>
-                <span className={`text-[11px] block ${action.primary ? "text-purple-200" : "text-gray-500"}`}>
-                  {action.desc}
-                </span>
+                <span className={action.wide ? "text-3xl" : "text-2xl mb-1.5 block"}>{action.icon}</span>
+                <div className={action.wide ? "flex-1" : ""}>
+                  <span className="text-sm font-bold text-white block mb-0.5">{action.title}</span>
+                  <span className={`text-[11px] block ${action.wide ? "text-amber-200" : action.primary ? "text-purple-200" : "text-gray-500"}`}>
+                    {action.desc}
+                  </span>
+                </div>
+                {action.wide && rewardsSummary?.coins !== undefined && (
+                  <span className="text-xs font-bold text-amber-300 bg-amber-500/20 rounded-full px-2.5 py-1 flex-shrink-0">
+                    🪙 {rewardsSummary.coins}
+                  </span>
+                )}
               </button>
             ))}
           </div>

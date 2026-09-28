@@ -1093,6 +1093,25 @@ const AdminPanel = () => {
           <p className="text-xs text-gray-500">Naya promoter banayein, students/questions dekhein, hisab settle karein</p>
         </button>
 
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate("/ManageBooks")}
+            className="text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📚</span>
+            <h3 className="font-semibold text-sm">Books Manage Karein</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">Add, price, stock</p>
+          </button>
+          <button
+            onClick={() => navigate("/ManageBookOrders")}
+            className="text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📦</span>
+            <h3 className="font-semibold text-sm">Book Orders</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">Ship / deliver karein</p>
+          </button>
+        </div>
+
         <div className="space-y-3">
           <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Content (Advanced)</p>
 

@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import PreviousYearTest from "../models/PreviousYearTest.js";
 import PreviousYearAttempt from "../models/PreviousYearAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
 
 export const submitPreviousYearTest = async (req, res) => {
   try {
@@ -132,11 +133,17 @@ export const submitPreviousYearTest = async (req, res) => {
 
     await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
+    const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
+      attempted: correctCount + wrongCount,
+      total: correctCount + wrongCount + unattemptedCount,
+    });
+
     return res.status(201).json({
       success: true,
       message: "Previous Year Test submit ho gaya!",
       data: {
         attemptId: newAttempt._id,
+        coinsEarned,
         testId: test._id,
         testName: test.testName,
         totalScore,

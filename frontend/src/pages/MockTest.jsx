@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
 import AdBanner from "../components/AdBanner";
+import { emitCoinEarned } from "../utils/rewardEvents";
+import { vibrateShort } from "../utils/vibrate";
 
 const STATUS = {
   NOT_VISITED: "not-visited",
@@ -442,6 +444,9 @@ const MockTest = () => {
 
       // Submit successful hone ke baad saved in-progress test hata do
       localStorage.removeItem(getStorageKey(userId));
+
+      vibrateShort();
+      if (res.data.data?.coinsEarned) emitCoinEarned(res.data.data.coinsEarned);
 
       setResultData(res.data.data);
       setPhase("results");

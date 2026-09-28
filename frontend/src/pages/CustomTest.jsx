@@ -3,6 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
+import { emitCoinEarned } from "../utils/rewardEvents";
+import { vibrateShort } from "../utils/vibrate";
 
 // ─────────────────────────────────────────────
 // Custom (batch) tests are practice tools set by a teacher — not exam
@@ -314,6 +316,9 @@ const CustomTest = () => {
       const res = await api.post(`/custom-test/${testId}/submit`, { attemptedQuestions });
 
       localStorage.removeItem(getStorageKey(userId, testId));
+
+      vibrateShort();
+      if (res.data.data?.coinsEarned) emitCoinEarned(res.data.data.coinsEarned);
 
       setResultData(res.data.data);
       setPhase("result");

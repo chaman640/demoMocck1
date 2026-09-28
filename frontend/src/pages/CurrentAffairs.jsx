@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
+import { emitCoinEarned } from "../utils/rewardEvents";
+import { vibrateShort } from "../utils/vibrate";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -145,6 +147,8 @@ const CurrentAffairs = () => {
         `/current-affair-quiz/${encodeURIComponent(examName)}/${affair.date}/submit`,
         { attemptedQuestions }
       );
+      vibrateShort();
+      if (res.data.data?.coinsEarned) emitCoinEarned(res.data.data.coinsEarned);
       setResultData(res.data.data);
       // 🐛 BUG FIX: submit ke baad local state update karna zaroori tha.
       // Pehle review se "wapas" aane par dobara "Quiz Shuru Karein" dikhta tha,

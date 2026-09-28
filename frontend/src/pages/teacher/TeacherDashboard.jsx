@@ -105,6 +105,25 @@ const TeacherDashboard = () => {
         {/* Active Batch switcher — 🆕 batch badalne par refetch() se turant naya data aata hai */}
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={refetch} />
 
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => navigate("/ManageBooks")}
+            className="text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📚</span>
+            <p className="font-semibold text-sm">Rewards Books</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Add & manage</p>
+          </button>
+          <button
+            onClick={() => navigate("/ManageBookOrders")}
+            className="text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📦</span>
+            <p className="font-semibold text-sm">Book Orders</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Ship & track</p>
+          </button>
+        </div>
+
         {/* ── MAIN TEACHER VIEW ── */}
         {isMain && (
           <>
