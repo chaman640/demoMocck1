@@ -1,6 +1,7 @@
 // controllers/submitChallenge.js
 import Challenge from "../models/Challenge.js";
 import ChallengeAttempt from "../models/ChallengeAttempt.js";
+import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 
 export const submitChallenge = async (req, res) => {
   try {
@@ -157,6 +158,8 @@ export const submitChallenge = async (req, res) => {
     });
 
     await newAttempt.save();
+
+    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     // ─────────────────────────────────────────────
     // STEP 7: Response — score ke sath-sath current rank bhi bhej do

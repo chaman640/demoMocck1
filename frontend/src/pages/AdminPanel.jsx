@@ -1093,6 +1093,14 @@ const AdminPanel = () => {
           <p className="text-xs text-gray-500">Naya promoter banayein, students/questions dekhein, hisab settle karein</p>
         </button>
 
+        <button
+          onClick={() => navigate("/AdminTeacherCommissions")}
+          className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-5 sm:p-6 transition-colors"
+        >
+          <h3 className="font-semibold text-base mb-1">Teacher Commission →</h3>
+          <p className="text-xs text-gray-500">Main teachers ka question count dekhein aur hisab settle karein</p>
+        </button>
+
         <div className="grid grid-cols-2 gap-3">
           <button
             onClick={() => navigate("/ManageBooks")}

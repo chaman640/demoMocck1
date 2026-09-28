@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "../api/api";
 import { vibrateShort } from "../utils/vibrate";
+import { emitBoostActivated } from "../utils/rewardEvents";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -229,7 +230,7 @@ const RewardsStore = () => {
     try {
       const res = await api.post("/rewards/watch-ad-boost");
       setMessage(res.data.message);
-      vibrateShort();
+      emitBoostActivated(Math.round((res.data.data?.boostRemainingSeconds || 2700) / 60));
       await refreshEverywhere();
     } catch (err) {
       setMessage(err.response?.data?.message || "Boost activate nahi ho paya.");

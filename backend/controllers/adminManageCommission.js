@@ -1,5 +1,7 @@
 import Promoter from "../models/Promoter.js";
 import Teacher from "../models/Teacher.js";
+import Coupon from "../models/Coupon.js";
+import User from "../models/User.js";
 
 export const adminSettlePromoterCommission = async (req, res) => {
   try {
@@ -84,5 +86,55 @@ export const adminSettleTeacherCommission = async (req, res) => {
   } catch (error) {
     console.error("adminSettleTeacherCommission error:", error);
     return res.status(500).json({ success: false, message: "Hisab settle karte waqt error aaya." });
+  }
+};
+
+export const adminListTeacherCommissions = async (req, res) => {
+  try {
+    const teachers = await Teacher.find({ role: "main", status: { $ne: "pending" } })
+      .select("name email phone status pendingQuestionsCount totalQuestionsAllTime paymentHistory")
+      .sort({ name: 1 });
+
+    const teacherIds = teachers.map((t) => t._id);
+    const coupons = teacherIds.length
+      ? await Coupon.find({ mainTeacher: { $in: teacherIds } }).select("_id mainTeacher")
+      : [];
+
+    const couponOwner = new Map(coupons.map((c) => [String(c._id), String(c.mainTeacher)]));
+    const counts = coupons.length
+      ? await User.aggregate([
+          { $match: { activeCoupon: { $in: coupons.map((c) => c._id) } } },
+          { $group: { _id: "$activeCoupon", n: { $sum: 1 } } },
+        ])
+      : [];
+
+    const studentsByTeacher = new Map();
+    for (const row of counts) {
+      const owner = couponOwner.get(String(row._id));
+      if (owner) studentsByTeacher.set(owner, (studentsByTeacher.get(owner) || 0) + row.n);
+    }
+    const batchesByTeacher = new Map();
+    for (const c of coupons) {
+      const owner = String(c.mainTeacher);
+      batchesByTeacher.set(owner, (batchesByTeacher.get(owner) || 0) + 1);
+    }
+
+    const data = teachers.map((t) => ({
+      _id: t._id,
+      name: t.name,
+      email: t.email,
+      phone: t.phone,
+      status: t.status,
+      totalBatches: batchesByTeacher.get(String(t._id)) || 0,
+      totalStudents: studentsByTeacher.get(String(t._id)) || 0,
+      pendingQuestionsCount: t.pendingQuestionsCount || 0,
+      totalQuestionsAllTime: t.totalQuestionsAllTime || 0,
+      paymentHistory: t.paymentHistory || [],
+    }));
+
+    return res.status(200).json({ success: true, data });
+  } catch (error) {
+    console.error("adminListTeacherCommissions error:", error);
+    return res.status(500).json({ success: false, message: "Teachers list karte waqt error aaya." });
   }
 };

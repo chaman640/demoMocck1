@@ -26,6 +26,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import ManageBooks from './pages/ManageBooks';
 import ManageBookOrders from './pages/ManageBookOrders';
+import AdminTeacherCommissions from './pages/AdminTeacherCommissions';
 
 // Teacher pages
 import TeacherLogin from './pages/teacher/TeacherLogin';
@@ -152,6 +153,7 @@ const App = () => {
             <Route path="/PrivacyPolicy" element={<PrivacyPolicy />} />
             <Route path="/ManageBooks" element={<ManageBooks />} />
             <Route path="/ManageBookOrders" element={<ManageBookOrders />} />
+            <Route path="/AdminTeacherCommissions" element={<AdminTeacherCommissions />} />
 
             {/* 🆕 Admin — passwordless magic-link login */}
             <Route path="/AdminLogin" element={<AdminLogin />} />

@@ -39,10 +39,10 @@ export const getStreakStatus = (activityDates, referenceDateStr) => {
   return { currentStreak, lastActive };
 };
 
-export const buildStreakCalendar = (activityDates, year, month) => {
+export const buildStreakCalendar = (activityDates, year, month, todayOverride) => {
   const activitySet = new Set(activityDates || []);
   const sorted = [...(activityDates || [])].sort();
-  const todayStr = getISTDateString();
+  const todayStr = todayOverride || getISTDateString();
 
   const freezeSet = new Set();
   for (let i = 1; i < sorted.length; i++) {
@@ -50,6 +50,18 @@ export const buildStreakCalendar = (activityDates, year, month) => {
     if (gap > 1 && gap <= GRACE_DAYS + 1) {
       let cursor = addDays(sorted[i - 1], 1);
       for (let k = 0; k < gap - 1; k++) {
+        freezeSet.add(cursor);
+        cursor = addDays(cursor, 1);
+      }
+    }
+  }
+
+  if (sorted.length > 0) {
+    const lastActive = sorted[sorted.length - 1];
+    const gapToToday = diffDays(lastActive, todayStr);
+    if (gapToToday > 1 && gapToToday <= GRACE_DAYS + 1) {
+      let cursor = addDays(lastActive, 1);
+      for (let k = 0; k < gapToToday - 1; k++) {
         freezeSet.add(cursor);
         cursor = addDays(cursor, 1);
       }

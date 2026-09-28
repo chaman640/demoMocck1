@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
+import AdBanner from "../components/AdBanner";
+import { vibrateShort } from "../utils/vibrate";
 
 const formatTime = (totalSeconds) => {
   const safe = Math.max(0, Math.floor(totalSeconds || 0));
@@ -151,6 +153,7 @@ const Challenge = () => {
   const [challengeMeta, setChallengeMeta] = useState(null);
   const [activeSubjectIdx, setActiveSubjectIdx] = useState(0);
   const [activeQIdx, setActiveQIdx] = useState(0);
+  const [adRefreshCount, setAdRefreshCount] = useState(0);
   const [answers, setAnswers] = useState({});
   const [timeSpent, setTimeSpent] = useState({});
   const [remainingSeconds, setRemainingSeconds] = useState(0);
@@ -372,8 +375,10 @@ const Challenge = () => {
   const goNext = () => {
     const subj = challengeMeta.subjects[activeSubjectIdx];
     if (activeQIdx < subj.questions.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx, activeQIdx + 1);
     } else if (activeSubjectIdx < challengeMeta.subjects.length - 1) {
+      setAdRefreshCount((c) => c + 1);
       goToQuestion(activeSubjectIdx + 1, 0);
     }
   };
@@ -413,6 +418,7 @@ const Challenge = () => {
       );
 
       const res = await api.post(`/challenge/${effectiveCode}/submit`, { attemptedQuestions });
+      vibrateShort();
       setResultData(res.data.data);
 
       // 👇 NAYA: attempt submit ho gaya — in-progress attempt data hata do
@@ -745,6 +751,9 @@ const Challenge = () => {
                 Submit Karo
               </button>
             </div>
+          </div>
+          <div className="max-w-2xl mx-auto mt-4">
+            <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} />
           </div>
         </div>
       </div>

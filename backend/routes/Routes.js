@@ -78,7 +78,7 @@ import { listExamNamesAdmin, addExamName, deleteExamName } from "../controllers/
 import { loginPromoter, logoutPromoter, changePromoterPassword } from "../controllers/promoterAuthentication.js";
 import { promoterInfo } from "../middlewares/promoterInfo.js";
 import { adminCreatePromoter, adminListPromoters, adminUpdatePromoter, adminSetPromoterStatus } from "../controllers/adminManagePromoters.js";
-import { adminSettlePromoterCommission, adminSettleTeacherCommission } from "../controllers/adminManageCommission.js";
+import { adminSettlePromoterCommission, adminSettleTeacherCommission, adminListTeacherCommissions } from "../controllers/adminManageCommission.js";
 import { getPromoterDashboard } from "../controllers/getPromoterDashboard.js";
 
 // 🆕 Coins / Streak / Books rewards system
@@ -220,6 +220,7 @@ router.post("/admin/promoters/:promoterId/update", adminLimiter, adminOnly, admi
 router.post("/admin/promoters/:promoterId/status", adminLimiter, adminOnly, adminSetPromoterStatus);
 router.post("/admin/promoters/:promoterId/settle", adminLimiter, adminOnly, adminSettlePromoterCommission);
 router.post("/admin/teachers/:teacherId/settle-commission", adminLimiter, adminOnly, adminSettleTeacherCommission);
+router.get("/admin/teacher-commissions", adminOnly, adminListTeacherCommissions);
 
 // 🆕 Exam names — Admin Panel se manage (add/delete). Public dropdown
 // abhi bhi "/allExamName" (upar) hai, wo yahi collection padhta hai.
