@@ -122,6 +122,14 @@ const TeacherDashboard = () => {
             <p className="font-semibold text-sm">Book Orders</p>
             <p className="text-[11px] text-gray-500 mt-0.5">Ship & track</p>
           </button>
+          <button
+            onClick={() => navigate("/ManageNotes")}
+            className="col-span-2 text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📝</span>
+            <p className="font-semibold text-sm">Study Notes</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Apne batch ke liye PDF notes upload karein</p>
+          </button>
         </div>
 
         {/* ── MAIN TEACHER VIEW ── */}

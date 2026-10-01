@@ -1118,6 +1118,14 @@ const AdminPanel = () => {
             <h3 className="font-semibold text-sm">Book Orders</h3>
             <p className="text-[11px] text-gray-500 mt-0.5">Ship / deliver karein</p>
           </button>
+          <button
+            onClick={() => navigate("/ManageNotes")}
+            className="col-span-2 text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
+          >
+            <span className="text-2xl block mb-1">📝</span>
+            <h3 className="font-semibold text-sm">Study Notes</h3>
+            <p className="text-[11px] text-gray-500 mt-0.5">Exam-wise PDF notes upload karein</p>
+          </button>
         </div>
 
         <div className="space-y-3">

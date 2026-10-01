@@ -122,6 +122,16 @@ app.use(
       return callback(null, false);
     },
     credentials: true,
+    // Offline reader ki key/license response headers mein aati hai
+    exposedHeaders: [
+      "X-Offline-License",
+      "X-Offline-Key",
+      "X-Offline-Iv",
+      "X-Offline-Expires",
+      "X-Offline-Title",
+      "X-Offline-Subtitle",
+      "X-Offline-Watermark",
+    ],
   })
 );
 

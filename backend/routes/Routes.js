@@ -58,6 +58,7 @@ import {
   signupIpLimiter,
   adminLimiter,
   writeLimiter,
+  offlineDownloadLimiter,
 } from "../middlewares/rateLimiters.js";
 
 // multipart (image wale) requests ke liye — multer ke BAAD dobara sanitize.
@@ -153,6 +154,8 @@ import { requestResetOtp } from "../controllers/requestResetOtp.js";
 import { resetPassword } from "../controllers/resetPassword.js";
 import { addStudentNote, getStudentNotes, deleteStudentNote } from "../controllers/manageStudentNotes.js";
 import { getMockLeaderboardBlueprints, getMockLeaderboard } from "../controllers/getMockLeaderboard.js";
+import { downloadOfflineItem, syncOfflineLicenses, listOfflineDevices, removeOfflineDevice, listNotesForStudent } from "../controllers/offlineReading.js";
+import { uploadNotePdfMiddleware, getNoteUploadOptions, createNote, listManagedNotes, setNoteStatus, deleteNote } from "../controllers/manageNotes.js";
 import { bulkImportStudents, getBatchRoster, getMyManagedCoupons, bulkMoveStudents, bulkRemoveStudents, uploadStudentFileMiddleware, parseStudentFile } from "../controllers/bulkManageStudents.js";
 
 const router = express.Router();
@@ -262,6 +265,19 @@ router.post("/admin/book-orders/:redemptionId/update", adminLimiter, adminOrTeac
 // ═════════════════════════════════════════════
 // STUDENT ROUTES (login zaroori)
 // ═════════════════════════════════════════════
+// 📚 Notes + offline reading (books & notes sirf app ke reader mein, 15 din offline)
+router.get("/notes", userInfo, listNotesForStudent);
+router.post("/offline/sync", userInfo, writeLimiter, syncOfflineLicenses);
+router.get("/offline/devices", userInfo, listOfflineDevices);
+router.post("/offline/devices/:deviceId/remove", userInfo, writeLimiter, removeOfflineDevice);
+router.post("/offline/:itemType/:itemId", userInfo, offlineDownloadLimiter, downloadOfflineItem);
+
+router.get("/manage/notes/options", adminOrTeacher, getNoteUploadOptions);
+router.get("/manage/notes", adminOrTeacher, listManagedNotes);
+router.post("/manage/notes", adminLimiter, adminOrTeacher, uploadNotePdfMiddleware, sanitizeBody, createNote);
+router.post("/manage/notes/:noteId/status", adminLimiter, adminOrTeacher, setNoteStatus);
+router.delete("/manage/notes/:noteId", adminLimiter, adminOrTeacher, deleteNote);
+
 router.get("/me", userInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.user });
 });

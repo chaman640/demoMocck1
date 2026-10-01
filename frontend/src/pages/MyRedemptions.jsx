@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/api";
 
 const SkeletonBlock = ({ className = "" }) => (
@@ -39,15 +39,13 @@ const OrderCard = ({ order }) => (
         </span>
         {order.trackingInfo && <span className="text-[11px] text-gray-500">{order.trackingInfo}</span>}
       </div>
-      {order.type === "digital" && order.digitalFileUrl && (
-        <a
-          href={order.digitalFileUrl}
-          target="_blank"
-          rel="noreferrer"
+      {order.readInApp && order.bookId && (
+        <Link
+          to={`/Reader/book/${order.bookId}`}
           className="inline-block mt-2 text-xs font-semibold text-[#A78BFA] hover:underline"
         >
-          Download karein →
-        </a>
+          App mein padhein (offline bhi) →
+        </Link>
       )}
     </div>
   </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { clearAllOffline } from "../offline/offlineStore";
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
 
@@ -159,6 +160,7 @@ const ProfilePage = () => {
 
   const handleLogout = async () => {
     try { await api.post("/logout"); } catch {}
+    await clearAllOffline(); // is phone se offline books/notes bhi hata do
     navigate("/Login");
   };
 
@@ -274,6 +276,13 @@ const ProfilePage = () => {
               className="w-full py-3 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800/50 font-medium mb-3 transition-colors"
             >
               My Book Orders
+            </button>
+
+            <button
+              onClick={() => navigate("/MyDownloads")}
+              className="w-full py-3 rounded-xl border border-gray-700 text-gray-300 hover:bg-gray-800/50 font-medium mb-3 transition-colors"
+            >
+              My Downloads (Offline)
             </button>
 
             {/* My Batch button */}

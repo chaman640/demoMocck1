@@ -266,3 +266,13 @@ export const writeLimiter = rateLimit({
   keyGenerator: userOrIp,
   handler: jsonMessage("Thoda dheere! Ek minute me itni requests allowed nahi hain."),
 });
+
+// Offline books/notes download — har download par server PDF watermark +
+// encrypt karta hai (CPU/RAM bhari kaam), isliye per-student limit.
+export const offlineDownloadLimiter = rateLimit({
+  ...base,
+  windowMs: 60 * MIN,
+  limit: num("OFFLINE_DOWNLOAD_LIMIT", 30),
+  keyGenerator: userOrIp,
+  handler: jsonMessage("Ek ghante mein bahut zyada downloads. Thodi der baad try karein."),
+});

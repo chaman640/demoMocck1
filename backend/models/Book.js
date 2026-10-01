@@ -12,6 +12,8 @@ const bookSchema = new mongoose.Schema(
     coinCost: { type: Number, default: 0, min: 0 },
 
     digitalFileUrl: { type: String, default: "" },
+    // Nayi digital books private file hoti hain (sirf app ke reader mein khulti hain)
+    digitalFilePublicId: { type: String, default: "" },
 
     stockQuantity: { type: Number, default: null },
 

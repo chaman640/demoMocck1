@@ -207,10 +207,10 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
         {form.type === "digital" && (
           <FilePicker
             label="Book File"
-            hint="PDF/ePub, 25 MB tak"
-            accept=".pdf,.epub,application/pdf"
+            hint="Sirf PDF, 25 MB tak — students app ke andar hi padh payenge"
+            accept=".pdf,application/pdf"
             file={digitalFile}
-            existingUrl={initial?.digitalFileUrl}
+            existingUrl={initial?.digitalFilePublicId || initial?.digitalFileUrl}
             onPick={(f) => pickFile(setDigitalFile, f, "file")}
           />
         )}

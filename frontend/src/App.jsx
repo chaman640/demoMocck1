@@ -1,4 +1,5 @@
 // App.jsx
+import { lazy, Suspense } from 'react';
 import { HashRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { LanguageProvider } from './context/LanguageContext'; // 🆕
@@ -66,6 +67,14 @@ import RewardsStore from './pages/RewardsStore';
 import MyRedemptions from './pages/MyRedemptions';
 import StreakCalendar from './pages/StreakCalendar';
 import CoinRewardListener from './components/CoinRewardListener';
+import Notes from './pages/Notes';
+import MyDownloads from './pages/MyDownloads';
+import ManageNotes from './pages/ManageNotes';
+import OfflineSync from './components/OfflineSync';
+
+// PDF reader (PDF.js) bhari hai — sirf reader khulne par load hota hai
+const Reader = lazy(() => import('./pages/Reader'));
+const ReaderFallback = () => <div className="min-h-screen bg-[#0A0D14]" />;
 
 // 🆕 CHANGE — pehle staleTime sirf 30 second tha, matlab 30 second se
 // purana koi bhi page dobara khulte hi turant refetch ho jata tha (isliye
@@ -132,6 +141,7 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <HashRouter>
           <CoinRewardListener />
+          <OfflineSync />
           <div>
             <Routes>
               {/* ── Student ── */}
@@ -166,6 +176,17 @@ const App = () => {
             <Route path="/RewardsStore" element={<RewardsStore />} />
             <Route path="/MyRedemptions" element={<MyRedemptions />} />
             <Route path="/StreakCalendar" element={<StreakCalendar />} />
+            <Route path="/Notes" element={<Notes />} />
+            <Route path="/MyDownloads" element={<MyDownloads />} />
+            <Route path="/ManageNotes" element={<ManageNotes />} />
+            <Route
+              path="/Reader/:type/:id"
+              element={
+                <Suspense fallback={<ReaderFallback />}>
+                  <Reader />
+                </Suspense>
+              }
+            />
 
             <Route path="/Challenge" element={<Challenge />} />
             <Route path="/Challenge/:code" element={<Challenge />} />

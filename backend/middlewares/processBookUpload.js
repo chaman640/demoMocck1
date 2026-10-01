@@ -2,6 +2,7 @@ import "dotenv/config";
 import multer from "multer";
 import cloudinaryPackage from "cloudinary";
 import sharp from "sharp";
+import { isPdfBuffer, uploadPrivatePdf } from "../utils/privateFiles.js";
 
 const cloudinary = cloudinaryPackage.v2;
 
@@ -43,6 +44,9 @@ const uploadBufferToCloudinary = (buffer, folder, resourceType) =>
   });
 
 export const processBookUploadMiddleware = (req, res, next) => {
+  // File ID sirf asli upload se aaye — client body mein kisi doosri private
+  // file ka ID bhej kar use book na bana sake
+  if (req.body) delete req.body.digitalFilePublicId;
   if (!req.is("multipart/form-data")) {
     return next();
   }
@@ -53,6 +57,7 @@ export const processBookUploadMiddleware = (req, res, next) => {
     }
 
     try {
+      delete req.body.digitalFilePublicId;
       const coverFile = req.files?.coverImage?.[0];
       const digitalFile = req.files?.digitalFile?.[0];
 
@@ -67,8 +72,14 @@ export const processBookUploadMiddleware = (req, res, next) => {
         req.body.coverImageUrl = await uploadBufferToCloudinary(compressed, "book_covers", "image");
       }
 
+      // Digital book ab PRIVATE file hai — student ko public link nahi milta,
+      // wo sirf app ke reader mein (watermark ke saath) padh sakta hai.
       if (digitalFile) {
-        req.body.digitalFileUrl = await uploadBufferToCloudinary(digitalFile.buffer, "book_digital_files", "raw");
+        if (!isPdfBuffer(digitalFile.buffer)) {
+          return res.status(400).json({ success: false, message: "Digital book sirf PDF ho sakti hai." });
+        }
+        const uploaded = await uploadPrivatePdf(digitalFile.buffer, "book_digital_files");
+        req.body.digitalFilePublicId = uploaded.publicId;
       }
 
       next();

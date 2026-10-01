@@ -104,7 +104,6 @@ export const redeemBook = async (req, res) => {
       coinsSpent: cost,
       status: book.type === "digital" ? "delivered" : "pending",
       shippingAddress: address || undefined,
-      digitalFileUrl: book.type === "digital" ? book.digitalFileUrl : "",
     });
 
     try {
@@ -135,7 +134,8 @@ export const redeemBook = async (req, res) => {
         _id: redemption._id,
         status: redemption.status,
         title: book.title,
-        digitalFileUrl: redemption.digitalFileUrl || undefined,
+        bookId: book._id,
+        readInApp: book.type === "digital",
       },
     });
   } catch (error) {

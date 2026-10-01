@@ -9,7 +9,7 @@ const parseNumberOrNull = (v) => {
 
 export const createBook = async (req, res) => {
   try {
-    const { title, description, type, isFree, coinCost, stockQuantity, coverImageUrl, digitalFileUrl } = req.body;
+    const { title, description, type, isFree, coinCost, stockQuantity, coverImageUrl, digitalFilePublicId } = req.body;
 
     if (!title || !type) {
       return res.status(400).json({ success: false, message: "Title aur type zaroori hain!" });
@@ -24,7 +24,7 @@ export const createBook = async (req, res) => {
       return res.status(400).json({ success: false, message: "Paid book ke liye coin cost 0 se zyada hona chahiye." });
     }
 
-    if (type === "digital" && !digitalFileUrl) {
+    if (type === "digital" && !digitalFilePublicId) {
       return res.status(400).json({ success: false, message: "Digital book ke liye file upload karna zaroori hai." });
     }
 
@@ -35,7 +35,7 @@ export const createBook = async (req, res) => {
       type,
       isFree: free,
       coinCost: cost,
-      digitalFileUrl: type === "digital" ? digitalFileUrl : "",
+      digitalFilePublicId: type === "digital" ? digitalFilePublicId : "",
       stockQuantity: type === "physical" ? parseNumberOrNull(stockQuantity) : null,
       createdBy: {
         actorType: req.actor?.type || "admin",
@@ -64,7 +64,7 @@ export const listBooksForManage = async (req, res) => {
 export const updateBook = async (req, res) => {
   try {
     const { bookId } = req.params;
-    const { title, description, isFree, coinCost, stockQuantity, coverImageUrl, digitalFileUrl } = req.body;
+    const { title, description, isFree, coinCost, stockQuantity, coverImageUrl, digitalFilePublicId } = req.body;
 
     const book = await Book.findById(bookId);
     if (!book) {
@@ -74,7 +74,10 @@ export const updateBook = async (req, res) => {
     if (title) book.title = String(title).trim();
     if (description !== undefined) book.description = String(description).trim();
     if (coverImageUrl) book.coverImageUrl = coverImageUrl;
-    if (digitalFileUrl && book.type === "digital") book.digitalFileUrl = digitalFileUrl;
+    if (digitalFilePublicId && book.type === "digital") {
+      book.digitalFilePublicId = digitalFilePublicId;
+      book.digitalFileUrl = ""; // purana public link band
+    }
 
     if (isFree !== undefined) {
       book.isFree = parseBoolean(isFree);

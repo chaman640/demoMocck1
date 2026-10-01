@@ -171,6 +171,12 @@ const HomePage = () => {
   // Quick actions — swipe row mein dikhne wale
   const quickActions = [
     {
+      icon: "📝",
+      label: "Study Notes",
+      sub: "Offline bhi padhein",
+      onClick: () => navigate("/Notes"),
+    },
+    {
       icon: "📰",
       label: "Current Affairs",
       sub: "Daily updates",

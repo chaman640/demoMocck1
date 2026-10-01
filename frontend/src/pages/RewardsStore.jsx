@@ -193,9 +193,9 @@ const RewardsStore = () => {
       setPendingBook(null);
       setConfirmBook(null);
       vibrateShort();
-      if (res.data.data?.digitalFileUrl) {
+      if (res.data.data?.readInApp) {
         setMessage("");
-        setDownload({ title: res.data.data.title || book.title, url: res.data.data.digitalFileUrl });
+        setDownload({ title: res.data.data.title || book.title, bookId: res.data.data.bookId || book._id });
       } else {
         setDownload(null);
         setMessage(res.data.message || "Order place ho gaya!");
@@ -297,14 +297,12 @@ const RewardsStore = () => {
               <p className="text-sm font-semibold text-green-400">✅ Unlock ho gayi!</p>
               <p className="text-xs text-gray-400 truncate">{download.title} — My Orders mein bhi milegi</p>
             </div>
-            <a
-              href={download.url}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={() => navigate(`/Reader/book/${download.bookId}`)}
               className="flex-shrink-0 px-4 py-2 rounded-xl bg-green-500 text-black text-xs font-bold"
             >
-              Download
-            </a>
+              Padhein
+            </button>
           </div>
         )}
 
