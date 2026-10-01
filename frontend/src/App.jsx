@@ -215,12 +215,13 @@ const App = () => {
             <Route path="/TeacherCoupons" element={<TeacherCoupons />} />
             <Route path="/TeacherBatchStudents/:couponId" element={<TeacherBatchStudents />} /> {/* 🆕 */}
 
+            <Route path="/TeacherMockLeaderboard" element={<TeacherMockLeaderboard />} />
+            <Route path="/TeacherStudentReportPrint" element={<TeacherStudentReportPrint />} />
+            <Route path="/TeacherBulkStudents" element={<TeacherBulkStudents />} />
+
             {/* Galat URL par blank page ke bajaye ab helpful screen */}
             <Route path="*" element={<NotFound />} />
-                  <Route path="/TeacherMockLeaderboard" element={<TeacherMockLeaderboard />} />
-        <Route path="/TeacherStudentReportPrint" element={<TeacherStudentReportPrint />} />
-              <Route path="/TeacherBulkStudents" element={<TeacherBulkStudents />} />
-      </Routes>
+          </Routes>
         </div>
       </HashRouter>
       </QueryClientProvider>

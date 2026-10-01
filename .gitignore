@@ -1,0 +1,14 @@
+# Secrets — kabhi commit na karein
+.env
+.env.*
+!.env.example
+
+node_modules/
+*.log
+.DS_Store
+
+# Purane patch scripts / backups / repomix dump
+apply_*.py
+fix_*.py
+*.bak-*
+repomix-output*
