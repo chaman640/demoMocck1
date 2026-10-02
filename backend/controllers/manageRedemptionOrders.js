@@ -1,9 +1,19 @@
 import BookRedemption from "../models/BookRedemption.js";
+import Book from "../models/Book.js";
+import { bookScopeFor } from "./manageBooks.js";
+
+// Teacher sirf apni books ke orders dekhe/badle — doosre students ka
+// naam/phone/address har teacher ko nahi dikhna chahiye.
+const orderScopeFor = async (req) => {
+  if (req.actor?.type !== "teacher") return {};
+  const myBookIds = await Book.find(bookScopeFor(req)).distinct("_id");
+  return { book: { $in: myBookIds } };
+};
 
 export const listRedemptionOrders = async (req, res) => {
   try {
     const { status, type } = req.query;
-    const filter = {};
+    const filter = await orderScopeFor(req);
     if (status) filter.status = status;
     if (type) filter["bookSnapshot.type"] = type;
 
@@ -28,7 +38,7 @@ export const updateRedemptionStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "status galat hai." });
     }
 
-    const order = await BookRedemption.findById(redemptionId);
+    const order = await BookRedemption.findOne({ _id: redemptionId, ...(await orderScopeFor(req)) });
     if (!order) {
       return res.status(404).json({ success: false, message: "Order nahi mila!" });
     }

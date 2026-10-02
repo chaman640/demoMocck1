@@ -24,8 +24,15 @@ const hashToken = (raw) => crypto.createHash("sha256").update(raw).digest("hex")
 // request aayi hai wahi (browser ka "Origin" header) use hota hai — jo
 // hamesha sahi hota hai, kyunki request khud usi frontend se aa rahi hai
 // jise admin use kar raha hai.
+// Login link ka domain kabhi bhi request ke Origin header se nahi lena —
+// warna koi apni site ka Origin bhej kar admin ke email mein apni site ka
+// link (token ke saath) bhijwa sakta hai.
+const DEV_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173"];
 const resolveFrontendUrl = (req) => {
-  return process.env.FRONTEND_URL || req.headers.origin || "http://localhost:5173";
+  if (process.env.FRONTEND_URL) return process.env.FRONTEND_URL.replace(/\/+$/, "");
+  const origin = req.headers.origin;
+  if (process.env.NODE_ENV !== "production" && DEV_ORIGINS.includes(origin)) return origin;
+  return "https://mocktest1.onrender.com";
 };
 
 const adminCookieOptions = () => ({

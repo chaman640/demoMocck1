@@ -99,7 +99,7 @@ const AddStudentsPanel = ({ onImported }) => {
     <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
         <h3 className="font-semibold text-base sm:text-lg">Add Students to This Batch</h3>
-        <p className="text-xs text-gray-500 mt-1">New phone numbers create fresh accounts (default password = their phone number). Existing students get moved into this batch.</p>
+        <p className="text-xs text-gray-500 mt-1">New phone numbers create fresh accounts with a random password — download the logins file after import and share it with your students. Existing students get moved into this batch.</p>
       </div>
 
       <div className="p-4 space-y-4">

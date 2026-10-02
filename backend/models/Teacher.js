@@ -8,6 +8,8 @@ const teacherSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     phone: { type: String, required: true, unique: true, trim: true },
     password: { type: String },
+    // Password badalne ka waqt — isse pehle bane login tokens reject hote hain
+    passwordChangedAt: { type: Date, default: null },
 
     role: { type: String, enum: ["main", "sub"], required: true },
     examName: [{ type: String }], // teacher jis exam(o) ke liye kaam karta hai

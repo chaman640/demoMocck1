@@ -205,7 +205,8 @@ export const adminUpdatePromoter = async (req, res) => {
         return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
       }
       const salt = await bcrypt.genSalt(10);
-      promoter.password = await bcrypt.hash(newPassword, salt);
+      promoter.password = await bcrypt.hash(String(newPassword), salt);
+      promoter.passwordChangedAt = new Date();
       promoter.mustChangePassword = true;
     }
 

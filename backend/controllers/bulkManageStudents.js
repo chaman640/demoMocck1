@@ -1,4 +1,6 @@
 import mongoose from "mongoose";
+import bcrypt from "bcrypt";
+import crypto from "crypto";
 import multer from "multer";
 import XLSX from "xlsx";
 import { createRequire } from "module";
@@ -94,6 +96,11 @@ export const parseStudentFile = async (req, res) => {
   }
 };
 
+// 8 akshar, galti se mil-jul jaane wale (0/O, 1/l) hata kar
+const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+const randomPassword = () =>
+  Array.from({ length: 8 }, () => PASSWORD_CHARS[crypto.randomInt(PASSWORD_CHARS.length)]).join("");
+
 export const bulkImportStudents = async (req, res) => {
   try {
     if (!req.teacher.activeCoupon) {
@@ -125,14 +132,20 @@ export const bulkImportStudents = async (req, res) => {
         let user = await User.findOne({ phone });
 
         if (!user) {
-          const defaultPassword = phone;
+          // Pehle: password = phone number, woh bhi bina hash ke save hota tha
+          // (login kabhi chalta hi nahi tha, aur phone jaanne wala koi bhi
+          // login kar sakta tha). Address required hai, isliye har naya
+          // student validation mein fail ho jaata tha.
+          const defaultPassword = randomPassword();
           user = await User.create({
             name: name || `Student ${phone.slice(-4)}`,
             phone,
             email: `${phone}@student.antimprayash.in`,
-            password: defaultPassword,
+            password: await bcrypt.hash(defaultPassword, 10),
+            address: "Not provided",
             exam: coupon.exam,
             activeCoupon: coupon._id,
+            couponHistory: [{ coupon: coupon._id, examNameAtJoin: coupon.exam, joinedAt: new Date(), leftAt: null }],
           });
           results.created.push({ name: user.name, phone, defaultPassword });
         } else if (user.activeCoupon?.toString() === coupon._id.toString()) {

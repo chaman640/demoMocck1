@@ -7,6 +7,8 @@ const promoterSchema = new mongoose.Schema(
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     phone: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true },
+    // Password badalne ka waqt — isse pehle bane login tokens reject hote hain
+    passwordChangedAt: { type: Date, default: null },
 
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
 

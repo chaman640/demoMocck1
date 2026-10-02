@@ -2,6 +2,10 @@ import jwt from "jsonwebtoken";
 import Promoter from "../models/Promoter.js";
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 
+// Password badalne se pehle bana token ab nahi chalega
+const issuedBeforePasswordChange = (decoded, account) =>
+  Boolean(account?.passwordChangedAt) && decoded.iat * 1000 < account.passwordChangedAt.getTime() - 1000;
+
 export const promoterInfo = async (req, res, next) => {
   try {
     const token = req.cookies?.promoterToken;
@@ -28,6 +32,14 @@ export const promoterInfo = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: "Ye account abhi active nahi hai. Admin se sampark karein.",
+      });
+    }
+
+    if (issuedBeforePasswordChange(decoded, promoter)) {
+      return res.status(401).json({
+        success: false,
+        message: "Password badal diya gaya hai. Kripya naye password se login karein.",
+        code: "TOKEN_EXPIRED",
       });
     }
 

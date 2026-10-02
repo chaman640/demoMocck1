@@ -12,7 +12,7 @@ export const resetPassword = async (req, res) => {
         if (!email || !otp || !newPassword) {
             return res.status(400).json({ success: false, message: "Sabhi fields zaroori hain!" });
         }
-        if (newPassword.length < 6) {
+        if (String(newPassword).length < 6) {
             return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
         }
 
@@ -27,7 +27,8 @@ export const resetPassword = async (req, res) => {
         await verifyOtpCode(normalizedEmail, "reset", otp);
 
         const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(newPassword, salt);
+        user.password = await bcrypt.hash(String(newPassword), salt);
+        user.passwordChangedAt = new Date(); // purane sabhi login sessions band
         await user.save();
 
         return res.status(200).json({ success: true, message: "Password successfully reset ho gaya! Ab login karein." });

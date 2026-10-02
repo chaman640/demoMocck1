@@ -1,5 +1,11 @@
 import Book from "../models/Book.js";
 
+// Admin saari books manage karta hai; teacher sirf apni banayi hui.
+export const bookScopeFor = (req) =>
+  req.actor?.type === "teacher"
+    ? { "createdBy.actorType": "teacher", "createdBy.actorId": req.actor.teacherId }
+    : {};
+
 const parseBoolean = (v) => v === true || v === "true";
 const parseNumberOrNull = (v) => {
   if (v === undefined || v === null || v === "") return null;
@@ -53,7 +59,7 @@ export const createBook = async (req, res) => {
 
 export const listBooksForManage = async (req, res) => {
   try {
-    const books = await Book.find().sort({ createdAt: -1 });
+    const books = await Book.find(bookScopeFor(req)).sort({ createdAt: -1 });
     return res.status(200).json({ success: true, data: books });
   } catch (error) {
     console.error("listBooksForManage error:", error);
@@ -66,7 +72,7 @@ export const updateBook = async (req, res) => {
     const { bookId } = req.params;
     const { title, description, isFree, coinCost, stockQuantity, coverImageUrl, digitalFilePublicId } = req.body;
 
-    const book = await Book.findById(bookId);
+    const book = await Book.findOne({ _id: bookId, ...bookScopeFor(req) });
     if (!book) {
       return res.status(404).json({ success: false, message: "Book nahi mili!" });
     }
@@ -111,7 +117,7 @@ export const setBookStatus = async (req, res) => {
       return res.status(400).json({ success: false, message: "status 'active' ya 'hidden' hona chahiye." });
     }
 
-    const book = await Book.findByIdAndUpdate(bookId, { status }, { new: true });
+    const book = await Book.findOneAndUpdate({ _id: bookId, ...bookScopeFor(req) }, { status }, { new: true });
     if (!book) {
       return res.status(404).json({ success: false, message: "Book nahi mili!" });
     }

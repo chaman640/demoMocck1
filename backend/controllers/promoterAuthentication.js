@@ -107,11 +107,14 @@ export const changePromoterPassword = async (req, res) => {
     }
 
     const salt = await bcrypt.genSalt(10);
-    promoter.password = await bcrypt.hash(newPassword, salt);
+    promoter.password = await bcrypt.hash(String(newPassword), salt);
     promoter.mustChangePassword = false;
+    promoter.passwordChangedAt = new Date(Date.now() - 1000);
     await promoter.save();
 
-    return res.status(200).json({
+    // Doosre devices ke sessions band ho gaye; is device ko naya token
+    const token = jwt.sign({ promoterId: promoter._id }, JWT_SECRET, { expiresIn: "7d" });
+    return res.status(200).cookie("promoterToken", token, authCookieOptions()).json({
       success: true,
       message: "Password badal diya gaya hai!",
     });

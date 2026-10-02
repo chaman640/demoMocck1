@@ -1,3 +1,4 @@
+import crypto from "crypto";
 // backend/utils/otpService.js
 // Reusable OTP infrastructure — signup-verification, student forgot-password,
 // aur teacher forgot-password — teenon isi service ko use karte hain. OTP
@@ -15,7 +16,8 @@ const OTP_EXPIRY_MINUTES = 5;
 const RESEND_COOLDOWN_SECONDS = 60;
 const MAX_VERIFY_ATTEMPTS = 5;
 
-const generateOtpCode = () => String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+// crypto.randomInt — Math.random() ka output andaza lagaya ja sakta hai
+const generateOtpCode = () => String(crypto.randomInt(100000, 1000000)); // 6-digit
 
 // ─────────────────────────────────────────────
 // OTP generate → hash karke DB mein save → email bhejo

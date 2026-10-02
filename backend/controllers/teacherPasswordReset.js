@@ -59,7 +59,8 @@ export const resetTeacherPassword = async (req, res) => {
     await verifyOtpCode(normalizedEmail, "teacher_reset", otp);
 
     const salt = await bcrypt.genSalt(10);
-    teacher.password = await bcrypt.hash(newPassword, salt);
+    teacher.password = await bcrypt.hash(String(newPassword), salt);
+    teacher.passwordChangedAt = new Date(); // purane sabhi login sessions band
     await teacher.save();
 
     return res.status(200).json({ success: true, message: "Password successfully reset ho gaya! Ab login karein." });

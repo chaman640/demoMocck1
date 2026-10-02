@@ -27,6 +27,8 @@ const userSchema = new mongoose.Schema(
       required: [true, "Password zaroori hai"],
       minlength: [6, "Password kam se kam 6 characters ka hona chahiye"],
     },
+    // Password badalne ka waqt — isse pehle bane login tokens reject hote hain
+    passwordChangedAt: { type: Date, default: null },
     address: {
       type: String,
       required: [true, "Address zaroori hai"],

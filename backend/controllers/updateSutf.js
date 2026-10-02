@@ -9,15 +9,27 @@ export const updateUserInfo = async (req, res) => {
 
         // 2. Frontend se wo data nikalna jo user update karna chahta hai
         // (Password ko update karne ka route alag banate hain security ke liye)
-        const { name, email, phone, address, exam } = req.body;
+        const { name, address, exam } = req.body;
 
-        // 3. Duplicate check (Agar user apna email ya phone badal raha hai)
-        if (email || phone) {
+        // Email/phone ko signup jaisa hi normalize + validate karo — warna
+        // "A@x.com" / " 98..." jaise duplicate ban jaate the aur login/reset toot jaata tha
+        const email = req.body.email ? String(req.body.email).toLowerCase().trim() : "";
+        const phone = req.body.phone ? String(req.body.phone).trim() : "";
+        if (email && !/^\S+@\S+\.\S+$/.test(email)) {
+            return res.status(400).json({ success: false, message: "Sahi email address dalein!" });
+        }
+        if (phone && !/^\d{10}$/.test(phone)) {
+            return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+        }
+
+        const taken = [];
+        if (email) taken.push({ email });
+        if (phone) taken.push({ phone });
+        if (taken.length) {
             const existingUser = await User.findOne({
-                $or: [{ email }, { phone }],
+                $or: taken,
                 _id: { $ne: userId } // Khud ki ID ko chhodkar kisi aur ka check karega
             });
-
             if (existingUser) {
                 return res.status(400).json({
                     success: false,
@@ -26,18 +38,16 @@ export const updateUserInfo = async (req, res) => {
             }
         }
 
-        // 4. User data ko update karna
-        // findByIdAndUpdate(ID, updateData, options)
         const updatedUser = await User.findByIdAndUpdate(
             userId,
             {
                 // Jo field aayegi wahi update hogi, jo nahi aayegi wo purani hi rahegi
                 $set: {
-                    name: name || req.user.name,
+                    name: name ? String(name).trim() : req.user.name,
                     email: email || req.user.email,
                     phone: phone || req.user.phone,
-                    address: address || req.user.address,
-                    exam: exam || req.user.exam
+                    address: address ? String(address).trim() : req.user.address,
+                    exam: exam ? String(exam).trim() : req.user.exam
                 }
             },
             { 

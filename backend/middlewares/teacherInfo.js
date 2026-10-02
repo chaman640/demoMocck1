@@ -4,6 +4,10 @@ import Teacher from "../models/Teacher.js";
 // 🔒 Round 1: leaked fallback secret hataya — utils/jwtSecret.js dekhein
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 
+// Password badalne se pehle bana token ab nahi chalega
+const issuedBeforePasswordChange = (decoded, account) =>
+  Boolean(account?.passwordChangedAt) && decoded.iat * 1000 < account.passwordChangedAt.getTime() - 1000;
+
 export const teacherInfo = async (req, res, next) => {
   try {
     // 1. Cookie se token — ⚠️ naam "teacherToken" hai, "token" NAHI
@@ -35,6 +39,14 @@ export const teacherInfo = async (req, res, next) => {
       return res.status(403).json({
         success: false,
         message: "Ye account abhi active nahi hai.",
+      });
+    }
+
+    if (issuedBeforePasswordChange(decoded, teacher)) {
+      return res.status(401).json({
+        success: false,
+        message: "Password badal diya gaya hai. Kripya naye password se login karein.",
+        code: "TOKEN_EXPIRED",
       });
     }
 

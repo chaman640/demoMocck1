@@ -7,6 +7,10 @@ import User from "../models/User.js";
 // Poori kahani utils/jwtSecret.js mein likhi hai.
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 
+// Password badalne se pehle bana token ab nahi chalega
+const issuedBeforePasswordChange = (decoded, account) =>
+  Boolean(account?.passwordChangedAt) && decoded.iat * 1000 < account.passwordChangedAt.getTime() - 1000;
+
 export const userInfo = async (req, res, next) => {
   try {
     // 1. Browser ki cookie se token nikalna (cookie-parser server.js mein laga hai)
@@ -29,6 +33,14 @@ export const userInfo = async (req, res, next) => {
       return res.status(404).json({
         success: false,
         message: "Account nahi mila ya delete ho chuka hai!",
+      });
+    }
+
+    if (issuedBeforePasswordChange(decoded, user)) {
+      return res.status(401).json({
+        success: false,
+        message: "Password badal diya gaya hai. Kripya naye password se login karein.",
+        code: "TOKEN_EXPIRED",
       });
     }
 
