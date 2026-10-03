@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
@@ -685,6 +686,13 @@ const CustomTest = () => {
           </div>
 
           <div className="space-y-3">
+            <ShareResultButton
+              title={resultData.testName}
+              score={resultData.totalScore}
+              correct={resultData.correctCount}
+              wrong={resultData.wrongCount}
+              unattempted={resultData.unattemptedCount}
+            />
             <button
               onClick={() => setPhase("review")}
               className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"

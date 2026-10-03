@@ -11,6 +11,44 @@ export const COIN_CONFIG = {
   BOOST_DURATION_MINUTES: 45,
   MAX_BOOST_ACTIVATIONS_PER_DAY: 3,
   FREE_PHYSICAL_BOOK_LIMIT: 1,
+  // Dost ko bulane par — jab dost apna pehla test poora kare tab milte hain
+  // (sirf signup par dete to nakli accounts bana-bana kar coins kamaye ja sakte the)
+  REFERRAL_BONUS_COINS: 50,
+};
+
+/** Is student ko kisi ne refer kiya tha aur abhi tak inaam nahi mila → bulane wale ko 50 coins (ek hi baar, atomic) */
+export const rewardReferrerIfDue = async (userId) => {
+  try {
+    const referee = await User.findOneAndUpdate(
+      { _id: userId, referredBy: { $ne: null }, referralRewarded: { $ne: true } },
+      { $set: { referralRewarded: true } },
+      { new: true, projection: { referredBy: 1, name: 1 } }
+    );
+    if (!referee) return null;
+
+    const referrer = await User.findOneAndUpdate(
+      { _id: referee.referredBy },
+      { $inc: { coins: COIN_CONFIG.REFERRAL_BONUS_COINS } },
+      { new: true, projection: { coins: 1 } }
+    );
+    if (!referrer) return null;
+
+    try {
+      await CoinTransaction.create({
+        user: referrer._id,
+        type: "referral_bonus",
+        amount: COIN_CONFIG.REFERRAL_BONUS_COINS,
+        balanceAfter: referrer.coins,
+        note: `Dost ne join kiya: ${referee.name || "student"}`,
+      });
+    } catch (ledgerError) {
+      console.error("referral ledger write failed:", ledgerError.message);
+    }
+    return { referrerId: referrer._id, amount: COIN_CONFIG.REFERRAL_BONUS_COINS };
+  } catch (error) {
+    console.error("rewardReferrerIfDue error:", error.message);
+    return null;
+  }
 };
 
 export const creditDailyCoinsIfEligible = async (user, { attempted, total }) => {
@@ -52,6 +90,9 @@ export const creditDailyCoinsIfEligible = async (user, { attempted, total }) => 
       { new: true, projection: { coins: 1 } }
     );
     if (!updated) return null;
+
+    // Pehla poora test → jisne bulaya tha use referral coins
+    await rewardReferrerIfDue(user._id);
 
     try {
       await CoinTransaction.create({

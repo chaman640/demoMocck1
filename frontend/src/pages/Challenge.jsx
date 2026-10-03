@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
 import AdBanner from "../components/AdBanner";
@@ -809,6 +810,14 @@ const Challenge = () => {
           </div>
 
           <div className="space-y-3">
+            <ShareResultButton
+              title={`Challenge ${effectiveCode}`}
+              score={resultData.totalScore}
+              correct={resultData.correctCount}
+              wrong={resultData.wrongCount}
+              unattempted={resultData.unattemptedCount}
+              extraLine={`🏆 Rank #${resultData.currentRank} / ${resultData.totalParticipants}`}
+            />
             <button
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
               className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"

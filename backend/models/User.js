@@ -76,6 +76,11 @@ const userSchema = new mongoose.Schema(
     boostActivationsToday: { type: Number, default: 0 },
     boostActivationsDate: { type: String, default: null },
     freePhysicalClaims: { type: Number, default: 0 },
+    // Student referral — "dost ko bulao": apna code, kisne bulaya, aur
+    // bulane wale ko 50 coins mil chuke ya nahi (utils/coinRewards.js)
+    referralCode: { type: String, uppercase: true, trim: true, unique: true, sparse: true },
+    referredBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
+    referralRewarded: { type: Boolean, default: false },
     // Commission ki daily limit ke liye (utils/commissionTracking.js)
     commissionDay: { type: String, default: null },
     commissionCountToday: { type: Number, default: 0 },

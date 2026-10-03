@@ -157,6 +157,9 @@ import { addStudentNote, getStudentNotes, deleteStudentNote } from "../controlle
 import { getMockLeaderboardBlueprints, getMockLeaderboard } from "../controllers/getMockLeaderboard.js";
 import { downloadOfflineItem, syncOfflineLicenses, listOfflineDevices, removeOfflineDevice, listNotesForStudent } from "../controllers/offlineReading.js";
 import { uploadNotePdfMiddleware, getNoteUploadOptions, createNote, listManagedNotes, setNoteStatus, deleteNote } from "../controllers/manageNotes.js";
+import { anyStaff } from "../middlewares/anyStaff.js";
+import { getMyReferral } from "../controllers/referral.js";
+import { checkCodeAvailability, changePromoterCode } from "../controllers/codeAvailability.js";
 import { bulkImportStudents, getBatchRoster, getMyManagedCoupons, bulkMoveStudents, bulkRemoveStudents, uploadStudentFileMiddleware, parseStudentFile } from "../controllers/bulkManageStudents.js";
 
 const router = express.Router();
@@ -241,12 +244,16 @@ router.get("/promoter-me", promoterInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.promoter });
 });
 router.post("/promoter/change-password", promoterInfo, writeLimiter, changePromoterPassword);
+router.post("/promoter/change-code", promoterInfo, writeLimiter, changePromoterCode);
+// Batch / promoter code available hai ya nahi (+ suggestions)
+router.get("/codes/check", anyStaff, writeLimiter, checkCodeAvailability);
 router.get("/promoter/dashboard", promoterInfo, getPromoterDashboard);
 
 // ═════════════════════════════════════════════
 // 🆕 REWARDS ROUTES (Student — coins, streak, books)
 // ═════════════════════════════════════════════
 router.get("/rewards/summary", userInfo, getRewardsSummary);
+router.get("/referral/me", userInfo, getMyReferral);
 router.get("/rewards/streak-calendar", userInfo, getStreakCalendar);
 router.get("/rewards/books", userInfo, getBooksForStudent);
 router.post("/rewards/books/:bookId/redeem", userInfo, writeLimiter, redeemBook);

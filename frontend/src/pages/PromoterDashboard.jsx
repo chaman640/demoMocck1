@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import api from "../api/api";
+import CodePicker from "../components/CodePicker";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
@@ -13,6 +14,70 @@ const StatCard = ({ label, value }) => (
     <p className="text-2xl font-bold text-white">{value}</p>
   </div>
 );
+
+// Promoter apna code khud chune — available ho to mil jaaye, warna sujhav
+const ChangeCodeCard = ({ currentCode, onChanged }) => {
+  const [open, setOpen] = useState(false);
+  const [code, setCode] = useState("");
+  const [status, setStatus] = useState("idle");
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const save = async () => {
+    if (!code || status !== "available" || code === currentCode) return;
+    setSaving(true);
+    setMsg("");
+    try {
+      const res = await api.post("/promoter/change-code", { code });
+      setMsg("✅ " + res.data.message);
+      setCode("");
+      setOpen(false);
+      onChanged();
+    } catch (err) {
+      const sugg = err.response?.data?.suggestions;
+      setMsg((err.response?.data?.message || "Code badal nahi paya.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="font-semibold text-sm">Apna code chunein</h3>
+          <p className="text-[11px] text-gray-500">Abhi: <span className="font-mono text-gray-300">{currentCode}</span></p>
+        </div>
+        {!open && (
+          <button onClick={() => setOpen(true)} className="px-3 py-2 rounded-xl border border-gray-700 text-xs font-semibold text-gray-200">
+            Badlein
+          </button>
+        )}
+      </div>
+      {msg && <p className={`text-xs mt-3 ${msg.startsWith("✅") ? "text-green-400" : "text-red-400"}`}>{msg}</p>}
+      {open && (
+        <div className="mt-4 space-y-3">
+          <CodePicker label="Naya code" optional={false} value={code} onChange={setCode} onStatusChange={setStatus} currentCode={currentCode} />
+          <p className="text-[11px] text-amber-300/90">
+            Dhyan dein: code badalne par purana link kaam nahi karega. Jo students pehle jud chuke hain wo aapke hi rahenge.
+          </p>
+          <div className="flex gap-2">
+            <button onClick={() => { setOpen(false); setCode(""); }} className="flex-1 py-2.5 rounded-xl border border-gray-700 text-xs text-gray-300">
+              Cancel
+            </button>
+            <button
+              onClick={save}
+              disabled={saving || status !== "available" || code === currentCode}
+              className="flex-1 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-50"
+            >
+              {saving ? "Save ho raha hai..." : "Ye code lein"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const PromoterDashboard = () => {
   const navigate = useNavigate();
@@ -115,6 +180,8 @@ const PromoterDashboard = () => {
             </button>
           </div>
         </div>
+
+        <ChangeCodeCard currentCode={data.code} onChanged={refetch} />
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-800">

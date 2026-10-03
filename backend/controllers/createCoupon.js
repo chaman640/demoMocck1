@@ -1,21 +1,7 @@
 // controllers/createCoupon.js
 // Sirf MAIN TEACHER naya coupon/group bana sakta hai.
 import Coupon from "../models/Coupon.js";
-import Promoter from "../models/Promoter.js";
-
-// ─────────────────────────────────────────────
-// HELPER: Unique coupon code generate karo
-// createChallenge.js ke generateChallengeCode() jaisa hi pattern —
-// confusing chars (0,O,1,I) hataye taaki student aasaani se type kar sake
-// ─────────────────────────────────────────────
-const generateCouponCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return code;
-};
+import { checkRequestedCode, generateUniqueCode } from "../utils/codeRegistry.js";
 
 export const createCoupon = async (req, res) => {
   try {
@@ -44,30 +30,25 @@ export const createCoupon = async (req, res) => {
     // ─────────────────────────────────────────────
     // STEP 2: Unique code generate karo (collision-safe retry loop)
     // ─────────────────────────────────────────────
+    // Teacher apna code khud chun sakta hai (jaise "RAHULSSC"). Na chune to
+    // random. Code coupon, promoter aur student referral — teeno mein unique.
     let code;
-    let isUnique = false;
-    let attempts = 0;
-
-    while (!isUnique && attempts < 5) {
-      code = generateCouponCode();
-      const [existing, existingPromoter] = await Promise.all([
-        Coupon.findOne({ code }),
-        Promoter.findOne({ code }),
-      ]);
-      if (!existing && !existingPromoter) isUnique = true;
-      attempts++;
+    if (req.body.code && String(req.body.code).trim()) {
+      const result = await checkRequestedCode(req.body.code, { exam });
+      if (!result.ok) {
+        return res.status(409).json({ success: false, message: result.message, suggestions: result.suggestions || [] });
+      }
+      code = result.code;
+    } else {
+      code = await generateUniqueCode("", 8);
     }
-
-    if (!isUnique) {
+    if (!code) {
       return res.status(500).json({
         success: false,
         message: "Coupon code generate karne mein dikkat aa rahi hai, dobara try karein.",
       });
     }
 
-    // ─────────────────────────────────────────────
-    // STEP 3: Coupon save karo — mainTeacher hamesha logged-in teacher hi hoga
-    // ─────────────────────────────────────────────
     const newCoupon = new Coupon({
       code,
       name: name.trim(),

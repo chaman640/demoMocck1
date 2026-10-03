@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
@@ -607,6 +608,11 @@ const MockTest = () => {
     return (
       <ResultsScreen
         resultData={resultData}
+        shareTitle={[examName, selectedBlueprint?.blueprintName].filter(Boolean).join(" · ")}
+        maxScore={(() => {
+          const max = Number(mockData?.totalQuestionsActual) * Number(mockData?.marksPerQuestion);
+          return Number.isFinite(max) && max > 0 ? Number(max.toFixed(2)) : undefined;
+        })()}
         onHome={() => navigate("/HomePage")}
         onAnalysis={() => navigate("/UserAllAnalysis")}
         onOpenReview={openReview}
@@ -949,7 +955,7 @@ const TestScreen = ({
 };
 
 // Results screen — categories aur "Deep Analysis" clickable hain
-const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
+const ResultsScreen = ({ resultData, shareTitle, maxScore, onHome, onAnalysis, onOpenReview }) => {
   const { scoreDetails, subjectAnalysis } = resultData;
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
@@ -1008,6 +1014,16 @@ const ResultsScreen = ({ resultData, onHome, onAnalysis, onOpenReview }) => {
             </div>
           ))}
         </div>
+
+        <ShareResultButton
+          className="mb-3"
+          title={shareTitle}
+          score={scoreDetails.totalScore}
+          maxScore={maxScore}
+          correct={scoreDetails.correct}
+          wrong={scoreDetails.wrong}
+          unattempted={scoreDetails.unattempted}
+        />
 
         <div className="flex gap-3">
           <button

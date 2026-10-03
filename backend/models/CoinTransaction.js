@@ -6,7 +6,7 @@ const coinTransactionSchema = new mongoose.Schema(
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
     type: {
       type: String,
-      enum: ["test_completion", "streak_bonus", "redeem_book", "admin_adjustment"],
+      enum: ["test_completion", "streak_bonus", "redeem_book", "admin_adjustment", "referral_bonus"],
       required: true,
     },
     amount: { type: Number, required: true },

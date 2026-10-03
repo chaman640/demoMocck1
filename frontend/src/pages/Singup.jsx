@@ -27,7 +27,7 @@ const Singup = () => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [examList, setExamList] = useState([]);
   const [joinMode, setJoinMode] = useState("exam"); // 🆕 "exam" | "coupon" — toggle
-  const [refKind, setRefKind] = useState(null); // null | "promoter" | "teacher" | "unknown"
+  const [refKind, setRefKind] = useState(null); // null | "promoter" | "teacher" | "student" | "unknown"
   const [searchParams] = useSearchParams();
   const [showPassword, setShowPassword] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
@@ -52,7 +52,7 @@ const Singup = () => {
       setJoinMode("coupon");
       setFormData((prev) => ({ ...prev, couponCode: ref.toUpperCase() }));
       const kind = searchParams.get("kind");
-      setRefKind(kind === "promoter" || kind === "teacher" ? kind : "unknown");
+      setRefKind(kind === "promoter" || kind === "teacher" || kind === "student" ? kind : "unknown");
     }
   }, [searchParams]);
 
@@ -98,7 +98,8 @@ const Singup = () => {
     // 🆕 Dono mein se jo mode active hai, sirf uska field check hoga
     if (joinMode === "exam" && !formData.exam) errors.exam = true;
     if (joinMode === "coupon" && !refKind && !formData.couponCode.trim()) errors.couponCode = true;
-    if (joinMode === "coupon" && refKind === "promoter" && !formData.exam) errors.exam = true;
+    // Promoter / dost ke code se batch nahi milta, isliye exam khud chunna hoga
+    if (joinMode === "coupon" && (refKind === "promoter" || refKind === "student") && !formData.exam) errors.exam = true;
 
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -327,7 +328,11 @@ const Singup = () => {
                 )}
 
                 {refKind && (
-                  <p className="text-[11px] text-green-600 font-medium mb-2">✓ Referral code applied automatically</p>
+                  <p className="text-[11px] text-green-600 font-medium mb-2">
+                    {refKind === "student"
+                      ? "✓ Dost ka referral code laga diya gaya — apna exam chunein"
+                      : "✓ Referral code applied automatically"}
+                  </p>
                 )}
 
                 {joinMode === "exam" ? (
@@ -361,7 +366,7 @@ const Singup = () => {
                           name="couponCode"
                           value={formData.couponCode}
                           onChange={(e) => setFormData((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
-                          placeholder="Teacher ya Promoter ka code"
+                          placeholder="Teacher, Promoter ya dost ka code"
                           className={getInputClass('couponCode')}
                         />
                       </div>
@@ -372,8 +377,8 @@ const Singup = () => {
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </span>
                         <select name="exam" value={formData.exam} onChange={handleChange} className={`${getInputClass('exam')} appearance-none cursor-pointer`}>
-                          <option value="" disabled={refKind === "promoter"}>
-                            {refKind === "promoter" ? "Select Exam" : "Exam (sirf Promoter code ke liye zaroori)"}
+                          <option value="" disabled={refKind === "promoter" || refKind === "student"}>
+                            {refKind === "promoter" || refKind === "student" ? "Select Exam" : "Exam (Promoter ya dost ke code ke liye zaroori)"}
                           </option>
                           {examList.map((examName, index) => (
                             <option key={index} value={examName}>{examName}</option>
@@ -387,7 +392,7 @@ const Singup = () => {
                   </div>
                 )}
                 {joinMode === "coupon" && !refKind && (
-                  <p className="text-[11px] text-[#64748B] mt-1.5">Teacher/batch ka code ho to exam automatically set ho jayega. Promoter ka code ho to upar exam bhi select karein.</p>
+                  <p className="text-[11px] text-[#64748B] mt-1.5">Teacher/batch ka code ho to exam automatically set ho jayega. Promoter ya dost ka code ho to upar exam bhi select karein.</p>
                 )}
               </div>
 

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { clearAllOffline } from "../offline/offlineStore";
 import api from "../api/api";
 import BottomNav from "../components/BottomNav";
+import ReferralCard from "../components/ReferralCard";
 
 
 
@@ -272,6 +273,9 @@ const ProfilePage = () => {
                 </div>
               </button>
             )}
+
+            {/* 🆕 Dost ko bulao — referral */}
+            <ReferralCard />
 
             {/* My Orders button */}
             <button

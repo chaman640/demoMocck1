@@ -1,34 +1,42 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
+import CodePicker from "../components/CodePicker";
+import { codeStatusBlocksSubmit } from "../utils/codeStatus";
 
 const SkeletonBlock = ({ className = "" }) => (
   <div className={`bg-gray-800/70 rounded animate-pulse ${className}`} />
 );
 
 const CreatePromoterCard = ({ onCreated }) => {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "" });
+  const [form, setForm] = useState({ name: "", email: "", phone: "", password: "", code: "" });
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
+  const [codeStatus, setCodeStatus] = useState("idle");
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (codeStatusBlocksSubmit(form.code, codeStatus)) {
+      setMessage("Ye code available nahi hai — koi suggestion chunein ya khaali chhod dein.");
+      return;
+    }
     setStatus("submitting");
     setMessage("");
     try {
-      const res = await api.post("/admin/create-promoter", form);
+      const res = await api.post("/admin/create-promoter", { ...form, code: form.code || undefined });
       const d = res.data.data;
       setMessage(
         d.emailSent
           ? "✅ Promoter ban gaya aur credentials email bhej diye gaye hain!"
           : `✅ Promoter ban gaya (code: ${d.code}), lekin email bhejne mein dikkat aayi — khud bata dein.`
       );
-      setForm({ name: "", email: "", phone: "", password: "" });
+      setForm({ name: "", email: "", phone: "", password: "", code: "" });
       onCreated?.();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      const sugg = err.response?.data?.suggestions;
+      setMessage((err.response?.data?.message || "Error aaya.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
     } finally {
       setStatus("idle");
     }
@@ -52,6 +60,12 @@ const CreatePromoterCard = ({ onCreated }) => {
         <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="email@example.com" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="phone" value={form.phone} onChange={handleChange} placeholder="10-digit phone" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="password" type="text" value={form.password} onChange={handleChange} placeholder="Password (kam se kam 6 characters)" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
+        <CodePicker
+          label="Promoter code (optional) — students signup mein yahi daalenge"
+          value={form.code}
+          onChange={(code) => setForm((prev) => ({ ...prev, code }))}
+          onStatusChange={setCodeStatus}
+        />
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm transition-colors disabled:opacity-50">
           {status === "submitting" ? "Ban raha hai..." : "Promoter Banayein"}
         </button>

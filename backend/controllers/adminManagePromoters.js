@@ -1,35 +1,7 @@
 import bcrypt from "bcrypt";
 import Promoter from "../models/Promoter.js";
-import Coupon from "../models/Coupon.js";
+import { checkRequestedCode, generateUniqueCode } from "../utils/codeRegistry.js";
 import { sendPromoterCredentialsEmail } from "../utils/mailer.js";
-
-const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-
-const generatePromoterCode = () => {
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
-  }
-  return code;
-};
-
-const generateUniquePromoterCode = async () => {
-  let code;
-  let isUnique = false;
-  let attempts = 0;
-
-  while (!isUnique && attempts < 5) {
-    code = generatePromoterCode();
-    const [existingPromoter, existingCoupon] = await Promise.all([
-      Promoter.findOne({ code }),
-      Coupon.findOne({ code }),
-    ]);
-    if (!existingPromoter && !existingCoupon) isUnique = true;
-    attempts++;
-  }
-
-  return isUnique ? code : null;
-};
 
 const buildReferralLink = (req, code) => {
   const frontendUrl = process.env.FRONTEND_URL || req.headers.origin || "http://localhost:5173";
@@ -43,7 +15,7 @@ const buildLoginLink = (req) => {
 
 export const adminCreatePromoter = async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, code: wantedCode } = req.body;
 
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
@@ -75,7 +47,16 @@ export const adminCreatePromoter = async (req, res) => {
       });
     }
 
-    const code = await generateUniquePromoterCode();
+    let code;
+    if (wantedCode && String(wantedCode).trim()) {
+      const result = await checkRequestedCode(wantedCode);
+      if (!result.ok) {
+        return res.status(409).json({ success: false, message: result.message, suggestions: result.suggestions || [] });
+      }
+      code = result.code;
+    } else {
+      code = await generateUniqueCode("", 8);
+    }
     if (!code) {
       return res.status(500).json({
         success: false,

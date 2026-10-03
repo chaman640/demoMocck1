@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
+import CodePicker from "../../components/CodePicker";
+import { codeStatusBlocksSubmit } from "../../utils/codeStatus";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
@@ -27,7 +29,8 @@ const TeacherCoupons = () => {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: "", exam: "" });
+  const [formData, setFormData] = useState({ name: "", exam: "", code: "" });
+  const [codeStatus, setCodeStatus] = useState("idle");
   const [formError, setFormError] = useState("");
   const [creating, setCreating] = useState(false);
 
@@ -73,14 +76,21 @@ const TeacherCoupons = () => {
       setFormError("Batch name and exam are both required!");
       return;
     }
+    if (codeStatusBlocksSubmit(formData.code, codeStatus)) {
+      setFormError("Ye code available nahi hai — koi suggestion chunein ya code khaali chhod dein.");
+      return;
+    }
     setCreating(true);
     try {
-      await api.post("/create-coupon", { name: formData.name.trim(), exam: formData.exam });
-      setFormData({ name: "", exam: "" });
+      await api.post("/create-coupon", { name: formData.name.trim(), exam: formData.exam, code: formData.code || undefined });
+      setFormData({ name: "", exam: "", code: "" });
       setShowForm(false);
       await load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Could not create the batch.");
+      const sugg = err.response?.data?.suggestions;
+      setFormError(
+        (err.response?.data?.message || "Could not create the batch.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : "")
+      );
     } finally {
       setCreating(false);
     }
@@ -219,6 +229,13 @@ const TeacherCoupons = () => {
                   ))}
                 </select>
               </div>
+              <CodePicker
+                label="Batch code (optional) — students isi code se join karenge"
+                value={formData.code}
+                onChange={(code) => setFormData((p) => ({ ...p, code }))}
+                exam={formData.exam}
+                onStatusChange={setCodeStatus}
+              />
               <button
                 type="submit"
                 disabled={creating}

@@ -57,6 +57,7 @@ export const addUser = async (req, res) => {
     let resolvedExam = exam;
     let coupon = null;
     let promoterDoc = null;
+    let referrerDoc = null;
 
     if (rawCode) {
       const trimmedCode = String(rawCode).trim().toUpperCase();
@@ -77,10 +78,14 @@ export const addUser = async (req, res) => {
         }
       } else {
         promoterDoc = await Promoter.findOne({ code: trimmedCode, status: "active" });
+        // Na batch, na promoter → kisi student ka referral code ho sakta hai
         if (!promoterDoc) {
+          referrerDoc = await User.findOne({ referralCode: trimmedCode }).select("_id");
+        }
+        if (!promoterDoc && !referrerDoc) {
           return res.status(404).json({
             success: false,
-            message: "Ye code sahi nahi hai. Sahi teacher ya promoter code check karein.",
+            message: "Ye code sahi nahi hai. Sahi teacher, promoter ya dost ka referral code check karein.",
           });
         }
         if (!exam) {
@@ -110,6 +115,7 @@ export const addUser = async (req, res) => {
         couponHistory: [{ coupon: coupon._id, examNameAtJoin: resolvedExam, joinedAt: new Date(), leftAt: null }],
       }),
       ...(promoterDoc && { promoter: promoterDoc._id }),
+      ...(referrerDoc && { referredBy: referrerDoc._id }),
     });
     await newUser.save();
 
