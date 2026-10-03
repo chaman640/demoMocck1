@@ -29,6 +29,7 @@ const TeacherBatchStudents = () => {
   const [phase, setPhase] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [students, setStudents] = useState([]);
+  const [visibility, setVisibility] = useState(null); // "public" | "private"
 
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
@@ -39,6 +40,7 @@ const TeacherBatchStudents = () => {
     try {
       const res = await api.get(`/teacher/batch-students/${couponId}`);
       setStudents(res.data.data || []);
+      setVisibility(res.data.visibility || null);
       setPhase("view");
     } catch (err) {
       if (err.response?.status === 401) {
@@ -114,9 +116,10 @@ const TeacherBatchStudents = () => {
           <h1 className="text-2xl font-bold mb-1">Students Manage Karein</h1>
           <p className="text-gray-400 text-sm">
             {batchName ? `'${batchName}' ` : "Is batch "}
-            {students.length > 0
-              ? "only the students listed here can join now."
-              : "is currently open — anyone with a valid coupon code can join. It will become invite-only as soon as you add the first student below."}
+            {visibility === "public"
+              ? "is Public — anyone with the coupon code can join. Students listed here are marked as joined when they sign up."
+              : "is Private — only the students listed here can join."}
+            {" "}Public/Private can be changed from the Batches page.
           </p>
         </div>
 

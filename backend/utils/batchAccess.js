@@ -1,43 +1,48 @@
 // backend/utils/batchAccess.js
 //
-// 🆕 NAYA — reusable check jo redeemCoupon.js aur addUser.js (coupon-signup
-// wala path) dono use karte hain. Ek hi jagah logic rakhne se dono jagah
-// consistent rehta hai.
+// Batch (coupon) me kaun jud sakta hai — redeemCoupon.js aur addUser.js
+// (coupon-signup wala path) dono yahi use karte hain, taaki niyam ek jagah rahe.
 import AllowedStudent from "../models/AllowedStudent.js";
+import Coupon from "../models/Coupon.js";
+
+/**
+ * Batch public hai ya private.
+ * Teacher ne chuna ho to wahi. Purane batch (jab ye option nahi tha) pehle
+ * jaise chalte hain: list khaali = sabke liye khula, list hai = invite-only.
+ */
+export const effectiveVisibility = (coupon, listCount) =>
+  coupon?.visibility || (listCount > 0 ? "private" : "public");
 
 /**
  * @param {ObjectId} couponId
  * @param {{ phone?: string, email?: string }} identifiers - joining student ka phone/email
- * @param {ObjectId|null} userId - agar student ka account already ban chuka hai (matched record par likhne ke liye)
+ * @param {ObjectId|null} userId - account ban chuka ho to list wali entry pe naam likh dete hain
  * @returns {{ allowed: boolean, restricted: boolean }}
- *   restricted=false  → is batch mein koi list hi nahi hai, sabke liye khula hai
- *   restricted=true, allowed=true  → list hai aur ye student usme match ho gaya
- *   restricted=true, allowed=false → list hai aur ye student usme nahi hai
+ *   restricted=false → public batch, code wala koi bhi jud sakta hai
+ *   restricted=true  → private batch, sirf list wale (allowed batata hai match hua ya nahi)
  */
 export const checkAndMatchAllowedStudent = async (couponId, { phone, email } = {}, userId = null) => {
-  const totalEntries = await AllowedStudent.countDocuments({ coupon: couponId });
-  if (totalEntries === 0) {
-    return { allowed: true, restricted: false };
-  }
+  const [coupon, totalEntries] = await Promise.all([
+    Coupon.findById(couponId).select("visibility").lean(),
+    AllowedStudent.countDocuments({ coupon: couponId }),
+  ]);
+  const isPublic = effectiveVisibility(coupon, totalEntries) === "public";
 
   const orConditions = [];
   if (phone) orConditions.push({ phone: String(phone).trim() });
   if (email) orConditions.push({ email: String(email).toLowerCase().trim() });
 
-  if (orConditions.length === 0) {
-    return { allowed: false, restricted: true };
-  }
+  // Public batch me bhi list wala student mile to "joined" dikhe
+  const match = totalEntries > 0 && orConditions.length
+    ? await AllowedStudent.findOne({ coupon: couponId, $or: orConditions })
+    : null;
 
-  const match = await AllowedStudent.findOne({ coupon: couponId, $or: orConditions });
-  if (!match) {
-    return { allowed: false, restricted: true };
-  }
-
-  if (userId && !match.matchedUser) {
+  if (match && userId && !match.matchedUser) {
     match.matchedUser = userId;
     match.matchedAt = new Date();
     await match.save();
   }
 
-  return { allowed: true, restricted: true };
+  if (isPublic) return { allowed: true, restricted: false };
+  return { allowed: !!match, restricted: true };
 };

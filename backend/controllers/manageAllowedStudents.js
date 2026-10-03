@@ -1,11 +1,13 @@
 // backend/controllers/manageAllowedStudents.js
 //
 // 🆕 NAYA — Main Teacher apne batch ke liye students pehle se add kar
-// sakta hai (naam optional, phone/email mein se ek zaroori). Jaise hi
-// pehla student add hota hai, batch "invite-only" ban jaata hai.
+// sakta hai (naam optional, phone/email mein se ek zaroori). Private batch
+// me sirf yahi list wale judte hain; Public batch me code wala koi bhi.
+// (Purane batch jinka Public/Private chuna nahi gaya: list bante hi invite-only.)
 import mongoose from "mongoose";
 import Coupon from "../models/Coupon.js";
 import AllowedStudent from "../models/AllowedStudent.js";
+import { effectiveVisibility } from "../utils/batchAccess.js";
 
 // Sirf Main Teacher, aur sirf apne khud ke coupon ke liye
 const verifyCouponOwnership = async (teacher, couponId) => {
@@ -75,9 +77,11 @@ export const listAllowedStudents = async (req, res) => {
     if (!check.allowed) return res.status(check.status).json({ success: false, message: check.message });
 
     const students = await AllowedStudent.find({ coupon: couponId }).sort({ createdAt: -1 });
+    const coupon = await Coupon.findById(couponId).select("visibility").lean();
 
     return res.status(200).json({
       success: true,
+      visibility: effectiveVisibility(coupon, students.length),
       data: students.map((s) => ({
         _id: s._id,
         name: s.name,

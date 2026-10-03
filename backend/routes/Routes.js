@@ -96,6 +96,7 @@ import { listRedemptionOrders, updateRedemptionStatus } from "../controllers/man
 
 import { createCoupon } from "../controllers/createCoupon.js";
 import { deleteCoupon } from "../controllers/deleteCoupon.js"; // 🆕
+import { updateCouponVisibility } from "../controllers/updateCouponVisibility.js";
 import { getMyCoupons } from "../controllers/getMyCoupons.js";
 import { addAllowedStudent, listAllowedStudents, deleteAllowedStudent } from "../controllers/manageAllowedStudents.js"; // 🆕
 
@@ -395,6 +396,8 @@ router.get("/teacher/dashboard", teacherInfo, getTeacherDashboard);
 // ── Coupons / group ──
 router.post("/create-coupon", teacherInfo, writeLimiter, createCoupon);
 router.delete("/delete-coupon/:couponId", teacherInfo, writeLimiter, deleteCoupon); // 🆕
+// Batch Public/Private — baad me badalne ke liye (sirf Main Teacher)
+router.patch("/teacher/coupon-visibility/:couponId", teacherInfo, writeLimiter, updateCouponVisibility);
 router.get("/my-coupons", teacherInfo, getMyCoupons);
 // 🆕 Batch ke liye pre-approved students manage karna (sirf Main Teacher)
 router.post("/teacher/batch-students", teacherInfo, writeLimiter, addAllowedStudent);

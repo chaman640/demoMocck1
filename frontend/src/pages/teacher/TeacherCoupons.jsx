@@ -19,6 +19,35 @@ const CouponsSkeleton = () => (
   </div>
 );
 
+// Batch kaun join kar sakta hai — banate waqt chunte hain, baad me card se badal sakte hain
+const VISIBILITY_OPTIONS = [
+  { value: "public", title: "🌐 Public", hint: "Code wala koi bhi student jud sakta hai — YouTube / open batch ke liye" },
+  { value: "private", title: "🔒 Private", hint: "Sirf wahi students judenge jinhe aap list me add karenge" },
+];
+
+const VisibilityPicker = ({ value, onChange }) => (
+  <div>
+    <p className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Kaun jud sakta hai</p>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup">
+      {VISIBILITY_OPTIONS.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          role="radio"
+          aria-checked={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={`text-left px-4 py-3 rounded-xl border transition-colors ${
+            value === o.value ? "border-[#7C3AED] bg-[#7C3AED]/10" : "border-gray-700 bg-[#0A0D14] hover:border-gray-500"
+          }`}
+        >
+          <span className="block text-sm font-semibold">{o.title}</span>
+          <span className="block text-xs text-gray-400 mt-0.5">{o.hint}</span>
+        </button>
+      ))}
+    </div>
+  </div>
+);
+
 const TeacherCoupons = () => {
   const navigate = useNavigate();
   const [phase, setPhase] = useState("loading");
@@ -29,7 +58,7 @@ const TeacherCoupons = () => {
   const [errorMsg, setErrorMsg] = useState("");
 
   const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({ name: "", exam: "", code: "" });
+  const [formData, setFormData] = useState({ name: "", exam: "", code: "", visibility: "public" });
   const [codeStatus, setCodeStatus] = useState("idle");
   const [formError, setFormError] = useState("");
   const [creating, setCreating] = useState(false);
@@ -39,6 +68,7 @@ const TeacherCoupons = () => {
   const [copiedLink, setCopiedLink] = useState(null);
   const [deletingId, setDeletingId] = useState(null); // 🆕
   const [confirmDeleteId, setConfirmDeleteId] = useState(null); // 🆕 — 2-step confirm
+  const [visibilityId, setVisibilityId] = useState(null); // Public/Private badal raha hai
 
   const load = useCallback(async () => {
     setPhase("loading");
@@ -82,8 +112,10 @@ const TeacherCoupons = () => {
     }
     setCreating(true);
     try {
-      await api.post("/create-coupon", { name: formData.name.trim(), exam: formData.exam, code: formData.code || undefined });
-      setFormData({ name: "", exam: "", code: "" });
+      await api.post("/create-coupon", {
+        name: formData.name.trim(), exam: formData.exam, code: formData.code || undefined, visibility: formData.visibility,
+      });
+      setFormData({ name: "", exam: "", code: "", visibility: "public" });
       setShowForm(false);
       await load();
     } catch (err) {
@@ -119,6 +151,24 @@ const TeacherCoupons = () => {
     navigator.clipboard.writeText(link);
     setCopiedLink(code);
     setTimeout(() => setCopiedLink(null), 1500);
+  };
+
+  // Batch ko baad me Public ⇄ Private karna
+  const handleVisibility = async (coupon) => {
+    const next = coupon.visibility === "public" ? "private" : "public";
+    if (next === "private" && !coupon.studentCount
+      && !window.confirm("Is batch ki student list abhi khaali hai — Private karne ke baad naya koi tab tak nahi jud payega jab tak aap students add na karein. Private karein?")) {
+      return;
+    }
+    setVisibilityId(coupon._id);
+    try {
+      const res = await api.patch(`/teacher/coupon-visibility/${coupon._id}`, { visibility: next });
+      setCoupons((list) => list.map((c) => (c._id === coupon._id ? { ...c, visibility: res.data.data.visibility } : c)));
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not change the batch setting.");
+    } finally {
+      setVisibilityId(null);
+    }
   };
 
   // 🆕 Batch delete — permanent hai, isliye pehle click sirf confirm-mode
@@ -236,6 +286,10 @@ const TeacherCoupons = () => {
                 exam={formData.exam}
                 onStatusChange={setCodeStatus}
               />
+              <VisibilityPicker
+                value={formData.visibility}
+                onChange={(visibility) => setFormData((p) => ({ ...p, visibility }))}
+              />
               <button
                 type="submit"
                 disabled={creating}
@@ -273,6 +327,13 @@ const TeacherCoupons = () => {
                         {isActive && (
                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#7C3AED]/20 text-[#A78BFA] flex-shrink-0">
                             Active
+                          </span>
+                        )}
+                        {isMain && c.visibility && (
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${
+                            c.visibility === "public" ? "bg-emerald-500/15 text-emerald-400" : "bg-amber-500/15 text-amber-400"
+                          }`}>
+                            {c.visibility === "public" ? "🌐 Public" : "🔒 Private"}
                           </span>
                         )}
                       </div>
@@ -314,6 +375,24 @@ const TeacherCoupons = () => {
                     >
                       {switchingId === c._id ? "Switching..." : "Ise Active Batch Banayein"}
                     </button>
+                  )}
+
+                  {/* Public/Private — baad me bhi badal sakte hain */}
+                  {isMain && (
+                    <div className="flex items-center gap-3 mt-2 px-3 py-2 rounded-lg bg-[#0A0D14] border border-gray-800">
+                      <p className="text-xs text-gray-400 flex-1">
+                        {c.visibility === "public"
+                          ? "Code wala koi bhi student jud sakta hai"
+                          : `Sirf aapki list wale students (${c.studentCount || 0}) jud sakte hain`}
+                      </p>
+                      <button
+                        onClick={() => handleVisibility(c)}
+                        disabled={visibilityId === c._id}
+                        className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-[#7C3AED]/60 font-medium disabled:opacity-50 flex-shrink-0"
+                      >
+                        {visibilityId === c._id ? "..." : c.visibility === "public" ? "🔒 Private karein" : "🌐 Public karein"}
+                      </button>
+                    </div>
                   )}
 
                   {/* 🆕 Sirf Main Teacher — is batch ke allowed students manage karo */}

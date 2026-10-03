@@ -10,6 +10,10 @@ const couponSchema = new mongoose.Schema(
 
     mainTeacher: { type: mongoose.Schema.Types.ObjectId, ref: "Teacher", required: true },
     isDefault: { type: Boolean, default: false },
+    // Public = koi bhi code se jud sakta hai (YouTube wale teacher). Private =
+    // sirf teacher ki list wale. Purane batch me khaali — unka niyam
+    // utils/batchAccess.js ka effectiveVisibility batata hai.
+    visibility: { type: String, enum: ["public", "private"] },
   },
   { timestamps: true }
 );

@@ -5,6 +5,8 @@
 // (spec point 2A — "sub-teacher ki dropdown sirf authorized coupons dikhayegi").
 import Coupon from "../models/Coupon.js";
 import CouponAccess from "../models/CouponAccess.js";
+import AllowedStudent from "../models/AllowedStudent.js";
+import { effectiveVisibility } from "../utils/batchAccess.js";
 
 export const getMyCoupons = async (req, res) => {
   try {
@@ -14,13 +16,24 @@ export const getMyCoupons = async (req, res) => {
     // CASE 1: Main Teacher — koi restriction nahi, wo coupon ka owner hai
     // ─────────────────────────────────────────────
     if (teacher.role === "main") {
-      const coupons = await Coupon.find({ mainTeacher: teacher._id }).sort({ createdAt: -1 });
+      const coupons = await Coupon.find({ mainTeacher: teacher._id }).sort({ createdAt: -1 }).lean();
+
+      // Har batch ki list kitni badi hai — Public/Private badge aur purane batch ka niyam isi se
+      const counts = await AllowedStudent.aggregate([
+        { $match: { coupon: { $in: coupons.map((c) => c._id) } } },
+        { $group: { _id: "$coupon", n: { $sum: 1 } } },
+      ]);
+      const countOf = new Map(counts.map((c) => [String(c._id), c.n]));
+      const data = coupons.map((c) => {
+        const studentCount = countOf.get(String(c._id)) || 0;
+        return { ...c, studentCount, visibility: effectiveVisibility(c, studentCount) };
+      });
 
       return res.status(200).json({
         success: true,
         role: "main",
-        totalCoupons: coupons.length,
-        data: coupons,
+        totalCoupons: data.length,
+        data,
       });
     }
 
