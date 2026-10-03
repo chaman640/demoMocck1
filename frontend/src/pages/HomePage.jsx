@@ -90,7 +90,14 @@ const HomePage = () => {
   // sirf 401 (matlab sach mein session expire/invalid) milne par hi
   // Signup/Login page par bhejte hain — kisi bhi doosri temporary
   // error par nahi.
-  const { data: user, isLoading: userLoading, error: userError } = useQuery({
+  const {
+    data: user,
+    isLoading: userLoading,
+    error: userError,
+    failureCount: userFailureCount,
+    refetch: refetchUser,
+    isFetching: userFetching,
+  } = useQuery({
     queryKey: ["me"],
     queryFn: async () => {
       const res = await api.get("/me");
@@ -246,8 +253,51 @@ const HomePage = () => {
   ];
 
   // 👇 UPDATED: spinner ki jagah ab skeleton layout dikhega
+  // Pehle retry ke dauraan (Render free plan ka server 30-50 sec mein jaagta
+  // hai) sirf khaali skeleton dikhta tha — ab batate hain ki kya ho raha hai
   if (isLoading) {
-    return <HomePageSkeleton />;
+    return (
+      <>
+        {userFailureCount > 0 && (
+          <div className="fixed top-0 inset-x-0 z-40 px-4 py-2 bg-[#7C3AED] text-white text-xs text-center">
+            Server se connect ho raha hai, thoda ruk jaiye...
+          </div>
+        )}
+        <HomePageSkeleton />
+      </>
+    );
+  }
+
+  // Saare retry ke baad bhi /me na mile (401 ke alawa) — pehle yahan khaali
+  // page rehta tha, koi message ya button nahi
+  if (userError && userError.response?.status !== 401 && !user) {
+    return (
+      <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-16">
+        <div className="max-w-sm text-center space-y-4">
+          <div className="text-4xl">📡</div>
+          <p className="text-base font-semibold">Server se connect nahi ho paya</p>
+          <p className="text-sm text-gray-400">
+            {navigator.onLine
+              ? "Thodi der baad dobara try karein."
+              : "Aap offline hain. Internet on karke dobara try karein."}
+          </p>
+          <button
+            onClick={() => refetchUser()}
+            disabled={userFetching}
+            className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-60"
+          >
+            {userFetching ? "Try ho raha hai..." : "Dobara try karein"}
+          </button>
+          <button
+            onClick={() => navigate("/MyDownloads")}
+            className="w-full py-3 rounded-xl border border-gray-700 text-sm text-gray-300"
+          >
+            Saved books & notes padhein
+          </button>
+        </div>
+        <BottomNav />
+      </div>
+    );
   }
 
   return (

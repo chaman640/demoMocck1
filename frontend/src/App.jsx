@@ -71,6 +71,7 @@ import Notes from './pages/Notes';
 import MyDownloads from './pages/MyDownloads';
 import ManageNotes from './pages/ManageNotes';
 import OfflineSync from './components/OfflineSync';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // PDF reader (PDF.js) bhari hai — sirf reader khulne par load hota hai
 const Reader = lazy(() => import('./pages/Reader'));
@@ -135,6 +136,12 @@ const NotFound = () => {
   );
 };
 
+// Page badalne par error screen hat jaaye
+const RouteErrorBoundary = ({ children }) => {
+  const location = useLocation();
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
+};
+
 const App = () => {
   return (
     <LanguageProvider>
@@ -142,7 +149,7 @@ const App = () => {
         <HashRouter>
           <CoinRewardListener />
           <OfflineSync />
-          <div>
+          <RouteErrorBoundary>
             <Routes>
               {/* ── Student ── */}
               <Route path="/" element={<HomePage />} />
@@ -242,9 +249,9 @@ const App = () => {
 
             {/* Galat URL par blank page ke bajaye ab helpful screen */}
             <Route path="*" element={<NotFound />} />
-          </Routes>
-        </div>
-      </HashRouter>
+            </Routes>
+          </RouteErrorBoundary>
+        </HashRouter>
       </QueryClientProvider>
     </LanguageProvider>
   );
