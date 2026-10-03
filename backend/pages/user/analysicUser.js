@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import UnseenPassage from "../../models/UnseenPassage.js";
 import Performance from "../../models/Performance.js";
 import Blueprint from "../../models/bluePrint.js";
 import { Question as RowQuestion } from "../../models/rowQuestionSchema.js";
@@ -256,14 +257,38 @@ export const getPerformanceAnalysis = async (req, res) => {
     const maxPossibleScore = totalQuestions * blueprint.marksPerQuestion;
     const scoreIfLeftBlankInsteadOfWrong = Number((correct * blueprint.marksPerQuestion).toFixed(2));
 
+    // Unseen passage ke sawaal Question collection mein nahi hote, isliye
+    // populate unhe null bana deta hai — unke asli ID lekar passage se bharo
+    const passageQuestionById = {};
+    const passageByIndex = [];
+    if (performance.attemptedQuestions.some((aq) => !aq.questionId)) {
+      const raw = await Performance.findById(performance._id).select("attemptedQuestions.questionId").lean();
+      const rawIds = raw.attemptedQuestions.map((aq) => String(aq.questionId));
+      const missing = rawIds.filter((_, i) => !performance.attemptedQuestions[i].questionId);
+      const passages = await UnseenPassage.find({ "questions._id": { $in: missing } }).lean();
+      for (const p of passages) {
+        for (const pq of p.questions) {
+          passageQuestionById[String(pq._id)] = {
+            ...pq,
+            subjectName: p.subjectName,
+            topicName: p.topicName,
+            passageText: p.passageText,
+          };
+        }
+      }
+      performance.attemptedQuestions.forEach((aq, i) => {
+        if (!aq.questionId) passageByIndex[i] = passageQuestionById[rawIds[i]] || null;
+      });
+    }
+
     const questionIds = performance.attemptedQuestions
       .map((aq) => (aq.questionId ? aq.questionId._id?.toString() || aq.questionId.toString() : null))
       .filter(Boolean);
 
     const batchTimeMap = await getBatchAverageTimePerQuestion(performance.examName, questionIds);
 
-    const questionBreakdown = performance.attemptedQuestions.map((aq) => {
-      const q = aq.questionId;
+    const questionBreakdown = performance.attemptedQuestions.map((aq, i) => {
+      const q = aq.questionId || passageByIndex[i];
       const qId = q ? (q._id ? q._id.toString() : q.toString()) : null;
       const batchTime = qId ? batchTimeMap[qId] : null;
       return {
@@ -280,6 +305,7 @@ export const getPerformanceAnalysis = async (req, res) => {
         askedIn: q ? q.askedIn : null,
         topicName: q ? q.topicName : null,
         subjectName: q ? q.subjectName : null,
+        passageText: q?.passageText || null,
         timeTakenInSeconds: aq.timeTakenInSeconds,
         batchAverageTimeSeconds: batchTime?.averageTimeSeconds ?? null,
         batchTimeSampleSize: batchTime?.sampleSize ?? 0,

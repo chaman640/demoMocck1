@@ -6,12 +6,16 @@ import PreviousYearTest from "../models/PreviousYearTest.js";
 import PreviousYearAttempt from "../models/PreviousYearAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
+import { dedupeAttemptedQuestions } from "../utils/attemptHelpers.js";
 
 export const submitPreviousYearTest = async (req, res) => {
   try {
     const userId = req.user._id;
     const { testId } = req.params;
-    const { attemptedQuestions } = req.body;
+    // Ek question sirf ek baar gina jaaye (duplicate bhej kar score badhana band)
+    const attemptedQuestions = Array.isArray(req.body.attemptedQuestions)
+      ? dedupeAttemptedQuestions(req.body.attemptedQuestions)
+      : req.body.attemptedQuestions;
 
     if (!mongoose.Types.ObjectId.isValid(testId)) {
       return res.status(400).json({ success: false, message: "Invalid Test ID" });

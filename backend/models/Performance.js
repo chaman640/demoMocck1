@@ -59,6 +59,9 @@ const performanceSchema = new mongoose.Schema(
     wrongCount:       { type: Number, default: 0 },
     unattemptedCount: { type: Number, default: 0 },
 
+    // attemptedQuestions ke IDs ka fingerprint — same mock dobara submit
+    // hone par duplicate record na bane (controllers/addPerformence.js)
+    questionSetHash: { type: String, default: null },
     subjectAnalysis: [
       {
         subjectName:    String,
@@ -81,6 +84,8 @@ const performanceSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+performanceSchema.index({ userId: 1, blueprintName: 1, questionSetHash: 1 });
 
 const Performance = rowQuestionConnection.model("Performance", performanceSchema);
 

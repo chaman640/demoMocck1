@@ -69,6 +69,11 @@ const CustomTest = () => {
   const [answers, setAnswers] = useState({});
   const [visited, setVisited] = useState(() => new Set());
   const [revealed, setRevealed] = useState(() => new Set()); // 🆕 questions already checked
+  // Sahi answer + explanation — server se "Check" karne par hi aata hai
+  // (test ke saath answers nahi bheje jaate)
+  const [solutions, setSolutions] = useState({});
+  const [checking, setChecking] = useState(false);
+  const [checkError, setCheckError] = useState("");
   const [timeSpent, setTimeSpent] = useState({});
   const [liveElapsed, setLiveElapsed] = useState(0); // 🆕 ticking seconds for the CURRENT unrevealed question
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -98,6 +103,7 @@ const CustomTest = () => {
               setAnswers(saved.answers || {});
               setVisited(new Set(saved.visited || []));
               setRevealed(new Set(saved.revealed || []));
+              setSolutions(saved.solutions || {});
               setTimeSpent(saved.timeSpent || {});
               setActiveSubjectIdx(saved.activeSubjectIdx || 0);
               setActiveQIdx(saved.activeQIdx || 0);
@@ -152,6 +158,7 @@ const CustomTest = () => {
     setAnswers({});
     setVisited(new Set());
     setRevealed(new Set());
+    setSolutions({});
     setTimeSpent({});
     setActiveSubjectIdx(0);
     setActiveQIdx(0);
@@ -220,11 +227,56 @@ const CustomTest = () => {
 
   // 🆕 Core of the new flow — locks the answer in and reveals whether it
   // was correct, right here on the same question (no navigation yet).
-  const checkAnswer = () => {
-    if (!currentQuestion || isCurrentRevealed) return;
-    freezeTime(currentQuestion._id);
-    setRevealed((prev) => new Set(prev).add(currentQuestion._id));
+  const fetchSolution = async (qId, userAnswer) => {
+    const res = await api.post(`/custom-test/${testId}/check`, { questionId: qId, userAnswer: userAnswer ?? null });
+    return res.data.data;
   };
+
+  const checkAnswer = async () => {
+    if (!currentQuestion || isCurrentRevealed || checking) return;
+    const qId = currentQuestion._id;
+    setChecking(true);
+    setCheckError("");
+    try {
+      const solution = await fetchSolution(qId, answers[qId]);
+      freezeTime(qId);
+      setSolutions((prev) => ({ ...prev, [qId]: solution }));
+      // Server par jo answer lock hua wahi dikhaao
+      setAnswers((prev) => {
+        const next = { ...prev };
+        if (solution.lockedAnswer) next[qId] = solution.lockedAnswer;
+        else delete next[qId];
+        return next;
+      });
+      setRevealed((prev) => new Set(prev).add(qId));
+    } catch (err) {
+      setCheckError(err.response?.data?.message || "Answer check nahi ho paya. Internet check karke dobara try karein.");
+    } finally {
+      setChecking(false);
+    }
+  };
+
+  // Purane saved attempt mein revealed sawaalon ke answers nahi the — laa do
+  useEffect(() => {
+    if (phase !== "test") return;
+    const missing = [...revealed].filter((qId) => !solutions[qId]);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    Promise.all(missing.map((qId) => fetchSolution(qId, answers[qId]).catch(() => null))).then((list) => {
+      if (cancelled) return;
+      setSolutions((prev) => {
+        const next = { ...prev };
+        list.forEach((sol, i) => {
+          if (sol) next[missing[i]] = sol;
+        });
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, revealed]);
 
   const isLastQuestion =
     testData &&
@@ -253,10 +305,10 @@ const CustomTest = () => {
     }
   };
 
-  const getStatus = (qId, correctOption) => {
+  const getStatus = (qId) => {
     if (revealed.has(qId)) {
       if (answers[qId] === undefined) return STATUS.SKIPPED;
-      return Number(answers[qId]) === correctOption ? STATUS.CORRECT : STATUS.WRONG;
+      return Number(answers[qId]) === solutions[qId]?.correctOption ? STATUS.CORRECT : STATUS.WRONG;
     }
     if (answers[qId] !== undefined) return STATUS.UNCHECKED;
     return STATUS.NOT_VISITED;
@@ -268,7 +320,7 @@ const CustomTest = () => {
     testData.subjects.forEach((subj) => {
       subj.questions.forEach((q) => {
         total++;
-        const st = getStatus(q._id, q.correctOption);
+        const st = getStatus(q._id);
         if (st === STATUS.CORRECT) { checked++; correct++; }
         else if (st === STATUS.WRONG) { checked++; wrong++; }
         else if (st === STATUS.SKIPPED) { checked++; skipped++; }
@@ -276,7 +328,7 @@ const CustomTest = () => {
     });
     return { total, checked, correct, wrong, skipped, remaining: total - checked };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [answers, revealed, testData]);
+  }, [answers, revealed, solutions, testData]);
 
   // ── localStorage checkpoint ──
   useEffect(() => {
@@ -289,6 +341,7 @@ const CustomTest = () => {
           answers,
           visited: [...visited],
           revealed: [...revealed],
+          solutions,
           timeSpent,
           activeSubjectIdx,
           activeQIdx,
@@ -297,7 +350,7 @@ const CustomTest = () => {
     } catch (err) {
       console.error("Could not save custom test progress:", err);
     }
-  }, [phase, testData, answers, visited, revealed, timeSpent, activeSubjectIdx, activeQIdx, userId, testId]);
+  }, [phase, testData, answers, visited, revealed, solutions, timeSpent, activeSubjectIdx, activeQIdx, userId, testId]);
 
   const handleSubmit = async () => {
     if (!testData || submittingRef.current) return;
@@ -369,7 +422,8 @@ const CustomTest = () => {
 
   if (phase === "test" && testData && currentQuestion) {
     const selected = answers[currentQuestion._id];
-    const isCorrectSelected = isCurrentRevealed && Number(selected) === currentQuestion.correctOption;
+    const solution = solutions[currentQuestion._id];
+    const isCorrectSelected = isCurrentRevealed && Number(selected) === solution?.correctOption;
 
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex flex-col">
@@ -431,7 +485,7 @@ const CustomTest = () => {
               {[1, 2, 3, 4].map((n) => {
                 const optText = currentQuestion[`option${n}`];
                 const isSelected = selected === String(n);
-                const isCorrectOpt = currentQuestion.correctOption === n;
+                const isCorrectOpt = solution?.correctOption === n;
 
                 // 🆕 Once revealed: correct option always green; a wrong
                 // pick is shown in red; everything else stays neutral.
@@ -476,14 +530,14 @@ const CustomTest = () => {
                 <p className={`text-sm font-semibold mb-2 ${isCorrectSelected ? "text-green-400" : selected ? "text-red-400" : "text-gray-400"}`}>
                   {isCorrectSelected ? "✅ Correct!" : selected ? "❌ Incorrect" : "⚠️ You skipped this question"}
                 </p>
-                {currentQuestion.answerExplain && (
+                {solution?.answerExplain && (
                   <>
                     <p className="text-xs font-semibold tracking-wider text-purple-400 uppercase mb-1.5">Explanation</p>
-                    <p className="text-sm text-gray-300 leading-relaxed">{currentQuestion.answerExplain}</p>
+                    <p className="text-sm text-gray-300 leading-relaxed">{solution.answerExplain}</p>
                   </>
                 )}
-                {currentQuestion.answerExplainWithPhoto && (
-                  <img src={currentQuestion.answerExplainWithPhoto} alt="Explanation" className="mt-3 max-w-full rounded-lg border border-gray-700" />
+                {solution?.answerExplainWithPhoto && (
+                  <img src={solution.answerExplainWithPhoto} alt="Explanation" className="mt-3 max-w-full rounded-lg border border-gray-700" />
                 )}
                 {currentQuestion.askedIn && (
                   <span className="inline-block mt-3 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/25">
@@ -492,6 +546,8 @@ const CustomTest = () => {
                 )}
               </div>
             )}
+
+            {checkError && <p className="text-xs text-red-400 mb-3">{checkError}</p>}
 
             <div className="mt-auto flex flex-wrap gap-3">
               <button
@@ -513,9 +569,10 @@ const CustomTest = () => {
               {!isCurrentRevealed ? (
                 <button
                   onClick={checkAnswer}
-                  className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
+                  disabled={checking}
+                  className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium disabled:opacity-60"
                 >
-                  Save &amp; Next
+                  {checking ? "Checking..." : "Save & Next"}
                 </button>
               ) : (
                 <button
@@ -552,7 +609,7 @@ const CustomTest = () => {
                   className={`w-9 h-9 rounded-lg border text-xs font-medium flex items-center justify-center transition-all ${
                     statusStyles[
                       visited.has(q._id) || answers[q._id] !== undefined || revealed.has(q._id)
-                        ? getStatus(q._id, q.correctOption)
+                        ? getStatus(q._id)
                         : STATUS.NOT_VISITED
                     ]
                   } ${i === activeQIdx ? "ring-2 ring-white/70" : ""}`}

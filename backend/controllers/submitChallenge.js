@@ -2,6 +2,7 @@
 import Challenge from "../models/Challenge.js";
 import ChallengeAttempt from "../models/ChallengeAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
+import { dedupeAttemptedQuestions } from "../utils/attemptHelpers.js";
 
 export const submitChallenge = async (req, res) => {
   try {
@@ -12,7 +13,10 @@ export const submitChallenge = async (req, res) => {
     const userId = req.user._id;
     const userName = req.user.name;
     const { challengeCode } = req.params;
-    const { attemptedQuestions } = req.body;
+    // Ek question sirf ek baar gina jaaye (duplicate bhej kar score badhana band)
+    const attemptedQuestions = Array.isArray(req.body.attemptedQuestions)
+      ? dedupeAttemptedQuestions(req.body.attemptedQuestions)
+      : req.body.attemptedQuestions;
 
     if (!challengeCode) {
       return res.status(400).json({

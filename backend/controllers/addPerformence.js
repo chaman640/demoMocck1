@@ -1,13 +1,24 @@
+import mongoose from "mongoose";
 // controllers/addPerformence.js
 import Performance from "../models/Performance.js";
 import Blueprint from "../models/bluePrint.js";
 import { Question } from "../models/rowQuestionSchema.js";
+import UnseenPassage from "../models/UnseenPassage.js";
+import { dedupeAttemptedQuestions, questionSetHash } from "../utils/attemptHelpers.js";
+
+// Same mock (same questions) itne ghante ke andar dobara submit ho to naya
+// record nahi banta — pehla result hi lautaya jaata hai (double-tap / retry
+// se coins aur teacher commission do baar na judein)
+const RESUBMIT_WINDOW_HOURS = 6;
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
 
 export const addPerformence = async (req, res) => {
   try {
-    const { examName, blueprintName, attemptedQuestions } = req.body;
+    const { examName, blueprintName } = req.body;
+    const attemptedQuestions = Array.isArray(req.body.attemptedQuestions)
+      ? dedupeAttemptedQuestions(req.body.attemptedQuestions)
+      : req.body.attemptedQuestions;
 
     // ─────────────────────────────────────────────
     // 🔒 SECURITY FIX: userId ab request body se NAHI aata.
@@ -71,15 +82,77 @@ export const addPerformence = async (req, res) => {
     }
 
     // 4. Sare questions ka REAL correctOption + subjectName DB se
-    const questionIds = attemptedQuestions.map((q) => q.questionId).filter(Boolean);
+    // Blueprint ke topics ka jod — totalQuestions galat bhara ho tab bhi
+    // asli mock reject na ho
+    const topicSum = (blueprint.subjects || []).reduce(
+      (sum, s) => sum + (s.topics || []).reduce((t, tp) => t + (Number(tp.questionCount) || 0), 0),
+      0
+    );
+    const maxQuestions = Math.max(Number(blueprint.totalQuestions) || 0, topicSum);
+    if (attemptedQuestions.length > maxQuestions) {
+      return res.status(400).json({
+        success: false,
+        message: "Is mock mein itne questions nahi ho sakte.",
+      });
+    }
 
-    const questionDocs = await Question.find({ _id: { $in: questionIds } }).select(
+    const questionIds = attemptedQuestions
+      .map((q) => String(q.questionId))
+      .filter((id) => mongoose.Types.ObjectId.isValid(id));
+
+    const setHash = questionSetHash(questionIds);
+    const duplicate = await Performance.findOne({
+      userId,
+      blueprintName,
+      questionSetHash: setHash,
+      createdAt: { $gte: new Date(Date.now() - RESUBMIT_WINDOW_HOURS * 60 * 60 * 1000) },
+    });
+    if (duplicate) {
+      return res.status(200).json({
+        success: true,
+        message: "Ye mock pehle hi submit ho chuka hai.",
+        data: {
+          performanceId: duplicate._id,
+          coinsEarned: 0,
+          scoreDetails: {
+            totalQuestions: blueprint.totalQuestions,
+            correct: duplicate.correctCount,
+            wrong: duplicate.wrongCount,
+            unattempted: duplicate.unattemptedCount,
+            totalScore: duplicate.totalScore,
+          },
+          subjectAnalysis: duplicate.subjectAnalysis,
+        },
+      });
+    }
+
+    // Sirf isi exam ke question bank ke sawaal score honge
+    const questionDocs = await Question.find({ _id: { $in: questionIds }, examName }).select(
       "_id subjectName correctOption"
     );
 
     const questionMap = {};
     for (const doc of questionDocs) {
       questionMap[doc._id.toString()] = doc;
+    }
+
+    // Unseen passage ke sawaal alag collection mein rehte hain — pehle ye
+    // chupchaap skip ho jaate the aur unke marks kabhi nahi judte the
+    const missingIds = questionIds.filter((id) => !questionMap[id]);
+    if (missingIds.length > 0) {
+      const passages = await UnseenPassage.find({
+        examName,
+        "questions._id": { $in: missingIds },
+      }).select("subjectName questions._id questions.correctOption");
+      const wanted = new Set(missingIds);
+      for (const passage of passages) {
+        for (const pq of passage.questions) {
+          const id = pq._id.toString();
+          if (wanted.has(id)) {
+            questionMap[id] = { _id: pq._id, subjectName: passage.subjectName, correctOption: pq.correctOption };
+          }
+        }
+      }
     }
 
     // 5. isCorrect SERVER-SIDE calculate + subject grouping
@@ -190,6 +263,7 @@ export const addPerformence = async (req, res) => {
       wrongCount,
       unattemptedCount,
       subjectAnalysis,
+      questionSetHash: setHash,
     });
 
     await newPerformance.save();

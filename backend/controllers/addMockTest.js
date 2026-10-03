@@ -40,7 +40,10 @@ async function selectQuestionsForTopic({ examName, subjectName, topicName, quest
 
   const projection = {
     _id: 1, question: 1, option1: 1, option2: 1, option3: 1, option4: 1,
-    correctOption: 1, topicName: 1, subjectName: 1, questionNumber: 1,
+    // correctOption yahan NAHI — sahi answer test ke dauraan client ko nahi jaana
+    // chahiye (DevTools se dekh kar 100% marks mil jaate the). Score backend
+    // addPerformence mein DB se check karta hai.
+    topicName: 1, subjectName: 1, questionNumber: 1,
     askedIn: 1,
   };
 

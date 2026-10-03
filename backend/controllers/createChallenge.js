@@ -76,9 +76,12 @@ export const createChallenge = async (req, res) => {
       // Is subject ke saare questions DB se lao
       // 👇 NAYA: answerExplain bhi select kar rahe hain — taaki baad mein
       // "Detailed Analysis" screen pe user ko explanation dikhaya ja sake
+      // Sirf global question bank — teachers ke batch-only (coupon wale)
+      // sawaal challenge ke zariye kisi ko bhi dikh jaate the
       const allQuestions = await Question.find({
         examName: { $in: [examName] },
         subjectName: subjectName,
+        coupon: null,
       }).select(
         "_id question option1 option2 option3 option4 correctOption answerExplain topicName subjectName questionNumber"
       );

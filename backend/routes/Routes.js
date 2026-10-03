@@ -135,6 +135,7 @@ import { deleteCustomTest } from "../controllers/deleteCustomTest.js"; // 🆕
 import { getAllCustomTests } from "../controllers/getAllCustomTests.js";
 import { getCustomTest } from "../controllers/getCustomTest.js";
 import { submitCustomTest } from "../controllers/submitCustomTest.js";
+import { checkCustomTestAnswer } from "../controllers/checkCustomTestAnswer.js";
 import { getCustomTestAttemptDetail } from "../controllers/getCustomTestAttemptDetail.js";
 import { searchStudentByPhone } from "../controllers/searchStudentByPhone.js";
 import { getStudentOverview, getStudentMockDetail, getStudentSubjectAnalysis, getStudentTopicAnalysis, getStudentPYQAttemptDetail, getStudentCustomTestAttemptDetail } from "../pages/teacher/analysisTeacher.js";
@@ -344,6 +345,7 @@ router.get("/previous-year-test/:testId", userInfo, getPreviousYearTest);
 router.get("/custom-test-attempt/:attemptId", userInfo, getCustomTestAttemptDetail);
 router.get("/custom-tests/:examName", userInfo, getAllCustomTests);
 router.post("/custom-test/:testId/submit", userInfo, writeLimiter, submitCustomTest);
+router.post("/custom-test/:testId/check", userInfo, writeLimiter, checkCustomTestAnswer);
 router.get("/custom-test/:testId", userInfo, getCustomTest);
 
 // ── Current Affairs ──

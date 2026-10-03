@@ -6,12 +6,17 @@ import CustomTest from "../models/CustomTest.js";
 import CustomTestAttempt from "../models/CustomTestAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
+import { dedupeAttemptedQuestions } from "../utils/attemptHelpers.js";
+import CustomTestReveal from "../models/CustomTestReveal.js";
 
 export const submitCustomTest = async (req, res) => {
   try {
     const userId = req.user._id;
     const { testId } = req.params;
-    const { attemptedQuestions } = req.body;
+    // Ek question sirf ek baar gina jaaye (duplicate bhej kar score badhana band)
+    const attemptedQuestions = Array.isArray(req.body.attemptedQuestions)
+      ? dedupeAttemptedQuestions(req.body.attemptedQuestions)
+      : req.body.attemptedQuestions;
 
     if (!mongoose.Types.ObjectId.isValid(testId)) {
       return res.status(400).json({ success: false, message: "Invalid Test ID" });
@@ -45,6 +50,11 @@ export const submitCustomTest = async (req, res) => {
       }
     }
 
+    // "Check Answer" se dekhe gaye sawaalon ka wahi answer gina jaayega jo
+    // check karte waqt lock hua tha
+    const reveals = await CustomTestReveal.find({ userId, testId: test._id });
+    const lockedAnswers = new Map(reveals.map((r) => [r.questionId.toString(), r.lockedAnswer]));
+
     let correctCount = 0, wrongCount = 0, unattemptedCount = 0, totalTimeTakenInSeconds = 0;
     const finalAttemptedQuestions = [];
 
@@ -53,8 +63,9 @@ export const submitCustomTest = async (req, res) => {
       const realQ = qId ? questionMap[qId] : null;
       if (!realQ) continue;
 
-      const userAnswer =
-        aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
+      const userAnswer = lockedAnswers.has(qId)
+        ? lockedAnswers.get(qId)
+        : aq.userAnswer !== undefined && aq.userAnswer !== null && aq.userAnswer !== ""
           ? String(aq.userAnswer)
           : null;
 
@@ -104,6 +115,7 @@ export const submitCustomTest = async (req, res) => {
     });
 
     await newAttempt.save();
+    await CustomTestReveal.deleteMany({ userId, testId: test._id }); // retake fresh shuru ho
 
     await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 

@@ -2,12 +2,16 @@ import CurrentAffairQuiz from "../models/CurrentAffairQuiz.js";
 import CurrentAffairAttempt from "../models/CurrentAffairAttempt.js";
 import { creditQuestionsToCommissionHolders } from "../utils/commissionTracking.js";
 import { creditDailyCoinsIfEligible } from "../utils/coinRewards.js";
+import { dedupeAttemptedQuestions } from "../utils/attemptHelpers.js";
 
 export const submitCurrentAffairQuiz = async (req, res) => {
   try {
     const userId = req.user._id;
     const { examName, date } = req.params;
-    const { attemptedQuestions } = req.body;
+    // Ek question sirf ek baar gina jaaye (duplicate bhej kar score badhana band)
+    const attemptedQuestions = Array.isArray(req.body.attemptedQuestions)
+      ? dedupeAttemptedQuestions(req.body.attemptedQuestions)
+      : req.body.attemptedQuestions;
 
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
