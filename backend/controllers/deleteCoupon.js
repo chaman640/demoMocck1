@@ -11,6 +11,10 @@ import User from "../models/User.js";
 import CustomTest from "../models/CustomTest.js";
 import AllowedStudent from "../models/AllowedStudent.js";
 import { Question } from "../models/rowQuestionSchema.js";
+import CouponAccess from "../models/CouponAccess.js";
+import PreviousYearTest from "../models/PreviousYearTest.js";
+import CurrentAffair from "../models/CurrentAffair.js";
+import Note from "../models/Note.js";
 
 export const deleteCoupon = async (req, res) => {
   try {
@@ -36,7 +40,19 @@ export const deleteCoupon = async (req, res) => {
 
     // Jin students ka activeCoupon isi batch pe tha, unhe clear karo
     // (unka account/history nahi delete hota, sirf batch-link hatta hai)
-    await User.updateMany({ activeCoupon: couponId }, { $set: { activeCoupon: null } });
+    // Batch ke baaki data bhi saaf — pehle sub-teachers ka access, batch ke
+    // PYQ papers aur current affairs database mein anath pade reh jaate the
+    await Promise.all([
+      CouponAccess.deleteMany({ coupon: couponId }),
+      PreviousYearTest.deleteMany({ couponId }),
+      CurrentAffair.deleteMany({ coupon: couponId }),
+      Note.updateMany({ coupons: couponId }, { $pull: { coupons: couponId } }),
+    ]);
+    await User.updateMany(
+      { activeCoupon: couponId },
+      { $set: { activeCoupon: null, "couponHistory.$[open].leftAt": new Date() } },
+      { arrayFilters: [{ "open.coupon": coupon._id, "open.leftAt": null }] }
+    );
 
     // Teacher (main + jitne sub-teachers ho) ke "coupons" array se bhi hataao
     await Teacher.updateMany({ coupons: couponId }, { $pull: { coupons: couponId } });

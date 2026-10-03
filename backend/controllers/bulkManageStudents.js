@@ -101,8 +101,30 @@ const PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789"
 const randomPassword = () =>
   Array.from({ length: 8 }, () => PASSWORD_CHARS[crypto.randomInt(PASSWORD_CHARS.length)]).join("");
 
+
+// Student ki batch history (couponHistory) sahi rakhne ke liye — pehle bulk
+// import/move/remove sirf activeCoupon badalte the, history adhuri reh jaati thi
+const closeOpenHistory = (user) => {
+  if (!user.activeCoupon) return;
+  const open = (user.couponHistory || []).find(
+    (h) => h.coupon?.toString() === user.activeCoupon.toString() && h.leftAt === null
+  );
+  if (open) open.leftAt = new Date();
+};
+
+const joinBatch = (user, coupon) => {
+  closeOpenHistory(user);
+  user.activeCoupon = coupon._id;
+  if (coupon.exam) user.exam = coupon.exam;
+  user.couponHistory = user.couponHistory || [];
+  user.couponHistory.push({ coupon: coupon._id, examNameAtJoin: user.exam, joinedAt: new Date(), leftAt: null });
+};
+
 export const bulkImportStudents = async (req, res) => {
   try {
+    if (req.teacher.role !== "main") {
+      return res.status(403).json({ success: false, message: "Only the main teacher can import students." });
+    }
     if (!req.teacher.activeCoupon) {
       return res.status(400).json({ success: false, message: "Please select your active batch first." });
     }
@@ -117,7 +139,7 @@ export const bulkImportStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: `Maximum ${MAX_BULK_SIZE} students per import — please split into smaller batches.` });
     }
 
-    const results = { created: [], movedExisting: [], alreadyInThisBatch: [], failed: [] };
+    const results = { created: [], movedExisting: [], alreadyInThisBatch: [], inOtherBatch: [], failed: [] };
 
     for (const raw of students) {
       const phone = String(raw.phone || "").replace(/\D/g, "").slice(-10);
@@ -150,9 +172,12 @@ export const bulkImportStudents = async (req, res) => {
           results.created.push({ name: user.name, phone, defaultPassword });
         } else if (user.activeCoupon?.toString() === coupon._id.toString()) {
           results.alreadyInThisBatch.push({ name: user.name, phone });
+        } else if (user.activeCoupon) {
+          // Kisi aur teacher ke batch ka student — bina uski marzi ke kheencha
+          // nahi ja sakta. Wo khud batch code se join kar sakta hai.
+          results.inOtherBatch.push({ name: user.name, phone, reason: "Already in another batch — ask the student to join with your batch code" });
         } else {
-          user.activeCoupon = coupon._id;
-          if (coupon.exam) user.exam = coupon.exam;
+          joinBatch(user, coupon);
           await user.save();
           results.movedExisting.push({ name: user.name, phone });
         }
@@ -163,7 +188,7 @@ export const bulkImportStudents = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `${results.created.length} new, ${results.movedExisting.length} moved here, ${results.alreadyInThisBatch.length} already in this batch, ${results.failed.length} failed.`,
+      message: `${results.created.length} new, ${results.movedExisting.length} added, ${results.alreadyInThisBatch.length} already in this batch, ${results.inOtherBatch.length} in another batch, ${results.failed.length} failed.`,
       data: results,
     });
   } catch (error) {
@@ -220,17 +245,26 @@ export const bulkMoveStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: "Select a valid target batch." });
     }
 
-    const targetCoupon = await Coupon.findById(targetCouponId).select("exam name");
+    // Target batch bhi isi teacher ka hona chahiye — pehle apne students kisi
+    // bhi doosre teacher ke batch mein daale ja sakte the
+    const targetCoupon = await Coupon.findOne({ _id: targetCouponId, mainTeacher: req.teacher._id }).select("exam name");
     if (!targetCoupon) return res.status(404).json({ success: false, message: "Target batch not found." });
+    if (!req.teacher.activeCoupon) {
+      return res.status(400).json({ success: false, message: "Please select your active batch first." });
+    }
 
-    const result = await User.updateMany(
-      { _id: { $in: studentIds }, activeCoupon: req.teacher.activeCoupon },
-      { $set: { activeCoupon: targetCoupon._id, exam: targetCoupon.exam } }
-    );
+    const students = await User.find({ _id: { $in: studentIds }, activeCoupon: req.teacher.activeCoupon });
+    let moved = 0;
+    for (const student of students) {
+      if (student.activeCoupon.toString() === targetCoupon._id.toString()) continue;
+      joinBatch(student, targetCoupon);
+      await student.save();
+      moved += 1;
+    }
 
     return res.status(200).json({
       success: true,
-      message: `${result.modifiedCount} student(s) moved to '${targetCoupon.name}'.`,
+      message: `${moved} student(s) moved to '${targetCoupon.name}'.`,
     });
   } catch (error) {
     console.error("bulkMoveStudents error:", error);
@@ -249,14 +283,19 @@ export const bulkRemoveStudents = async (req, res) => {
       return res.status(400).json({ success: false, message: "Select at least one student." });
     }
 
-    const result = await User.updateMany(
-      { _id: { $in: studentIds }, activeCoupon: req.teacher.activeCoupon },
-      { $set: { activeCoupon: null } }
-    );
+    if (!req.teacher.activeCoupon) {
+      return res.status(400).json({ success: false, message: "Please select your active batch first." });
+    }
+    const students = await User.find({ _id: { $in: studentIds }, activeCoupon: req.teacher.activeCoupon });
+    for (const student of students) {
+      closeOpenHistory(student);
+      student.activeCoupon = null;
+      await student.save();
+    }
 
     return res.status(200).json({
       success: true,
-      message: `${result.modifiedCount} student(s) removed from the batch.`,
+      message: `${students.length} student(s) removed from the batch.`,
     });
   } catch (error) {
     console.error("bulkRemoveStudents error:", error);

@@ -1,6 +1,8 @@
 // middlewares/teacherInfo.js — teacher ka login check
 import jwt from "jsonwebtoken";
 import Teacher from "../models/Teacher.js";
+import Coupon from "../models/Coupon.js";
+import CouponAccess from "../models/CouponAccess.js";
 // 🔒 Round 1: leaked fallback secret hataya — utils/jwtSecret.js dekhein
 import { JWT_SECRET } from "../utils/jwtSecret.js";
 
@@ -48,6 +50,20 @@ export const teacherInfo = async (req, res, next) => {
         message: "Password badal diya gaya hai. Kripya naye password se login karein.",
         code: "TOKEN_EXPIRED",
       });
+    }
+
+    // Active batch har request par dobara check — sub-teacher ka access hata
+    // diya jaaye (ya batch delete ho) to bhi purana activeCoupon pada rehta
+    // tha aur roster, analysis, bulk import sab chalte rehte the
+    if (teacher.activeCoupon) {
+      const stillAllowed =
+        teacher.role === "main"
+          ? await Coupon.exists({ _id: teacher.activeCoupon, mainTeacher: teacher._id })
+          : await CouponAccess.exists({ coupon: teacher.activeCoupon, subTeacher: teacher._id });
+      if (!stillAllowed) {
+        teacher.activeCoupon = null;
+        await Teacher.updateOne({ _id: teacher._id }, { $set: { activeCoupon: null } });
+      }
     }
 
     // 5. ⚠️ req.user mein NAHI daalna — student aur teacher context alag rahein

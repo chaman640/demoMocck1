@@ -8,7 +8,7 @@ export const redeemCoupon = async (req, res) => {
   try {
     const { code } = req.body;
 
-    if (!code || !code.trim()) {
+    if (typeof code !== "string" || !code.trim()) {
       return res.status(400).json({
         success: false,
         message: "Coupon code zaroori hai!",

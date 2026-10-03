@@ -101,6 +101,14 @@ export const inviteSubTeacher = async (req, res) => {
     let teacher = await Teacher.findOne({ phone: cleanPhone });
 
     if (teacher) {
+      // Admin ka banaya Main Teacher (invite accept karne se pehle "pending")
+      // kisi aur main teacher ka sub-teacher nahi banaya ja sakta
+      if (teacher.role === "main") {
+        return res.status(400).json({
+          success: false,
+          message: "Ye phone number ek Main Teacher account ka hai — use sub-teacher nahi banaya ja sakta.",
+        });
+      }
       if (teacher.status === "active") {
         return res.status(400).json({
           success: false,

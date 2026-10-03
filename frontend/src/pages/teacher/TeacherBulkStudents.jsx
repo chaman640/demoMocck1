@@ -99,7 +99,7 @@ const AddStudentsPanel = ({ onImported }) => {
     <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden shadow-lg">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-800 bg-[#1F2937]/30">
         <h3 className="font-semibold text-base sm:text-lg">Add Students to This Batch</h3>
-        <p className="text-xs text-gray-500 mt-1">New phone numbers create fresh accounts with a random password — download the logins file after import and share it with your students. Existing students get moved into this batch.</p>
+        <p className="text-xs text-gray-500 mt-1">New phone numbers create fresh accounts with a random password — download the logins file after import and share it with your students. Existing students without a batch are added here; students already in another batch must join themselves with your batch code.</p>
       </div>
 
       <div className="p-4 space-y-4">
@@ -182,10 +182,19 @@ const AddStudentsPanel = ({ onImported }) => {
             <p className="text-sm font-medium text-green-400">Import complete</p>
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">New accounts</p><p className="text-lg font-bold text-white">{resultSummary.created.length}</p></div>
-              <div className="bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">Moved into batch</p><p className="text-lg font-bold text-white">{resultSummary.movedExisting.length}</p></div>
+              <div className="bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">Existing accounts added</p><p className="text-lg font-bold text-white">{resultSummary.movedExisting.length}</p></div>
               <div className="bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">Already here</p><p className="text-lg font-bold text-white">{resultSummary.alreadyInThisBatch.length}</p></div>
               <div className="bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">Failed</p><p className="text-lg font-bold text-red-400">{resultSummary.failed.length}</p></div>
+              {(resultSummary.inOtherBatch?.length || 0) > 0 && (
+                <div className="col-span-2 bg-[#0A0D14] rounded-lg p-2"><p className="text-gray-500">In another teacher's batch (not moved)</p><p className="text-lg font-bold text-amber-400">{resultSummary.inOtherBatch.length}</p></div>
+              )}
             </div>
+
+            {(resultSummary.inOtherBatch?.length || 0) > 0 && (
+              <p className="text-xs text-amber-300/90">
+                These students already belong to another batch, so they were not moved. Share your batch code with them — they can join from My Batch.
+              </p>
+            )}
 
             {resultSummary.created.length > 0 && (
               <button
