@@ -62,12 +62,23 @@ export const adminCreateMainTeacher = async (req, res) => {
     const frontendUrl = process.env.FRONTEND_URL || req.headers.origin || "http://localhost:5173"; // 🆕 same fix
     const link = `${frontendUrl}/#/AcceptInvite/${inviteToken}`;
 
-    await sendTeacherInviteEmail(normalizedEmail, link, { role: "main", teacherName: name });
+    // Email fail ho to bhi teacher ban chuka hai — pehle yahan 500 aata tha,
+    // dobara try par "pehle se maujood" aata tha aur invite link kabhi nahi
+    // milta tha. Ab link hamesha lautate hain taaki admin khud bhej sake.
+    let emailSent = true;
+    try {
+      await sendTeacherInviteEmail(normalizedEmail, link, { role: "main", teacherName: name });
+    } catch (mailError) {
+      emailSent = false;
+      console.error("adminCreateMainTeacher email failed:", mailError.message);
+    }
 
     return res.status(201).json({
       success: true,
-      message: "Main Teacher invite email bhej diya gaya hai!",
-      data: { teacherId: newTeacher._id, email: normalizedEmail, inviteLink: link },
+      message: emailSent
+        ? "Main Teacher invite email bhej diya gaya hai!"
+        : "Teacher ban gaya, lekin email nahi ja paya — neeche diya invite link teacher ko khud bhej dein.",
+      data: { teacherId: newTeacher._id, email: normalizedEmail, inviteLink: link, emailSent },
     });
   } catch (error) {
     if (error.code === 11000) {

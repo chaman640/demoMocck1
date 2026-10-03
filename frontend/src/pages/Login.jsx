@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/api'; // 👈 Yahan apna api instance import karein
 
 const Login = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   
   const [formData, setFormData] = useState({
     phone: '',
@@ -59,6 +61,7 @@ const Login = () => {
       if (response.data.success) {
         setToastMsg("Login Successful! Redirecting...");
         setTimeout(() => {
+          queryClient.clear(); // kisi pichle account ka cache na dikhe
           navigate('/HomePage'); {/* 🆕 FIX — pehle '/' tha, jo pehle HomePage tha; ab '/' Landing page hai, isliye seedha /HomePage bhejna zaroori */}
         }, 1500);
       }

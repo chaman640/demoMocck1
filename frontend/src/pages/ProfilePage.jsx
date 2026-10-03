@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { clearAllOffline } from "../offline/offlineStore";
 import api from "../api/api";
@@ -41,6 +42,7 @@ const FIELD_CONFIG = [
 
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [phase, setPhase] = useState("loading");
   const [user, setUser] = useState(null);
@@ -161,6 +163,7 @@ const ProfilePage = () => {
   const handleLogout = async () => {
     try { await api.post("/logout"); } catch {}
     await clearAllOffline(); // is phone se offline books/notes bhi hata do
+    queryClient.clear(); // pichle student ka cached data agle login mein na dikhe
     navigate("/Login");
   };
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import TeacherBottomNav from "../../components/TeacherBottomNav";
@@ -28,6 +29,7 @@ const initials = (name) =>
 
 const TeacherProfile = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [phase, setPhase] = useState("loading");
   const [teacher, setTeacher] = useState(null);
   const [coupons, setCoupons] = useState([]);
@@ -76,6 +78,7 @@ const TeacherProfile = () => {
     } catch {
       // logout backend fail ho bhi jaaye, phir bhi login page par bhej dete hain
     } finally {
+      queryClient.clear(); // pichle teacher ka cached data agle login mein na dikhe
       navigate("/TeacherLogin");
     }
   };

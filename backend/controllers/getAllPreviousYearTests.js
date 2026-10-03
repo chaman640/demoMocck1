@@ -48,6 +48,7 @@ export const getAllPreviousYearTests = async (req, res) => {
     const globalTests = await PreviousYearTest.find({
       examName,
       couponId: null,
+      status: "complete", // adhura (draft) paper list mein dikhta tha par khulta nahi tha
       isActive: true,
     })
       .select("testName year description totalQuestions durationMinutes marksPerQuestion negativeMarking createdAt")

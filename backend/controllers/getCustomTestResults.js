@@ -29,10 +29,17 @@ export const getCustomTestLeaderboard = async (req, res) => {
 
     const batchStudents = await User.find({ activeCoupon: req.teacher.activeCoupon }).select("_id name phone");
 
-    const attempts = await CustomTestAttempt.find({ testId }).select(
-      "userId totalScore correctCount wrongCount unattemptedCount totalTimeTakenInSeconds createdAt"
-    );
-    const attemptMap = new Map(attempts.map((a) => [a.userId.toString(), a]));
+    // Har student ka PEHLA attempt — retake (jab answers pehle hi dekh liye
+    // hon) se leaderboard nahi badalna chahiye. Pehle Map mein aakhri attempt
+    // reh jaata tha.
+    const attempts = await CustomTestAttempt.find({ testId })
+      .select("userId totalScore correctCount wrongCount unattemptedCount totalTimeTakenInSeconds createdAt")
+      .sort({ createdAt: 1 });
+    const attemptMap = new Map();
+    for (const a of attempts) {
+      const key = a.userId.toString();
+      if (!attemptMap.has(key)) attemptMap.set(key, a);
+    }
 
     const maxScore = test.totalQuestions * test.marksPerQuestion;
 
@@ -90,7 +97,15 @@ export const getCustomTestQuestionAnalysis = async (req, res) => {
 
     const allowedSubjects = await getAllowedSubjectsForTeacher(req.teacher);
 
-    const attempts = await CustomTestAttempt.find({ testId }).select("attemptedQuestions");
+    // Sirf har student ka pehla attempt gino (retake answers dekh kar hote hain)
+    const allAttempts = await CustomTestAttempt.find({ testId }).select("userId attemptedQuestions").sort({ createdAt: 1 });
+    const seenStudents = new Set();
+    const attempts = allAttempts.filter((a) => {
+      const key = a.userId.toString();
+      if (seenStudents.has(key)) return false;
+      seenStudents.add(key);
+      return true;
+    });
 
     const counts = new Map();
     for (const attempt of attempts) {

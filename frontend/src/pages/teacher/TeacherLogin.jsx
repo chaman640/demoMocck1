@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import api from "../../api/api";
 
@@ -7,6 +8,7 @@ const LOGO_URL = "/logo.svg";
 
 const TeacherLogin = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [formData, setFormData] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,7 @@ const TeacherLogin = () => {
     setLoading(true);
     try {
       await api.post("/teacher-login", payload);
+      queryClient.clear(); // kisi pichle account ka cache na dikhe
       navigate("/TeacherDashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Login failed.");

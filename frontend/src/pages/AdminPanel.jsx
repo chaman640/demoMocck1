@@ -13,6 +13,7 @@ const CreateMainTeacherCard = () => {
   const [form, setForm] = useState({ name: "", email: "", phone: "", examName: "" });
   const [status, setStatus] = useState("idle");
   const [message, setMessage] = useState("");
+  const [manualLink, setManualLink] = useState("");
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
 
@@ -20,10 +21,18 @@ const CreateMainTeacherCard = () => {
     e.preventDefault();
     setStatus("submitting");
     setMessage("");
+    setManualLink("");
     try {
       const examList = form.examName.split(",").map((s) => s.trim()).filter(Boolean);
-      await api.post("/admin/create-main-teacher", { ...form, examName: examList });
-      setMessage("✅ Invite email bhej diya gaya hai!");
+      const res = await api.post("/admin/create-main-teacher", { ...form, examName: examList });
+      const { emailSent, inviteLink } = res.data.data || {};
+      // Email fail hua to link yahin dikhao — admin khud WhatsApp/SMS kar de
+      if (emailSent === false && inviteLink) {
+        setMessage("✅ Teacher ban gaya, lekin email nahi ja paya. Ye link teacher ko khud bhejein:");
+        setManualLink(inviteLink);
+      } else {
+        setMessage("✅ Invite email bhej diya gaya hai!");
+      }
       setForm({ name: "", email: "", phone: "", examName: "" });
       setStatus("idle");
     } catch (err) {
@@ -40,6 +49,14 @@ const CreateMainTeacherCard = () => {
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
           {message}
+          {manualLink && (
+            <input
+              readOnly
+              value={manualLink}
+              onFocus={(e) => e.target.select()}
+              className="mt-2 w-full px-3 py-2 rounded-lg bg-[#0A0D14] border border-gray-700 text-gray-200 text-[11px] font-mono"
+            />
+          )}
         </div>
       )}
 

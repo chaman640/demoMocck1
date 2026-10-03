@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/api";
 
@@ -19,6 +20,7 @@ const EMPTY_FORM = {
 
 const Singup = () => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [step, setStep] = useState("details"); // "details" | "otp"
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -149,6 +151,7 @@ const Singup = () => {
     setVerifying(true);
     try {
       await api.post(SIGNUP_ENDPOINT, { ...formData, otp: otp.trim() });
+      queryClient.clear(); // kisi pichle account ka cache na dikhe
       navigate("/HomePage");
     } catch (err) {
       showToast(err.response?.data?.message || "Signup failed.");
