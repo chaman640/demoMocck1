@@ -76,6 +76,9 @@ const userSchema = new mongoose.Schema(
     boostActivationsToday: { type: Number, default: 0 },
     boostActivationsDate: { type: String, default: null },
     freePhysicalClaims: { type: Number, default: 0 },
+    // Commission ki daily limit ke liye (utils/commissionTracking.js)
+    commissionDay: { type: String, default: null },
+    commissionCountToday: { type: Number, default: 0 },
   },
   {
     timestamps: true,

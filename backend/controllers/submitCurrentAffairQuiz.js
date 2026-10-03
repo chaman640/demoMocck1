@@ -88,7 +88,7 @@ export const submitCurrentAffairQuiz = async (req, res) => {
 
     const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
       attempted: correctCount + wrongCount,
-      total: correctCount + wrongCount + unattemptedCount,
+      total: Math.max(correctCount + wrongCount + unattemptedCount, quiz.questions.length),
     });
 
     return res.status(201).json({

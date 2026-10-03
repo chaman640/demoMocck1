@@ -18,14 +18,34 @@ export const adminSettlePromoterCommission = async (req, res) => {
       return res.status(404).json({ success: false, message: "Promoter nahi mila!" });
     }
 
-    promoter.paymentHistory.push({
-      amount: numericAmount,
-      questionsSettled: promoter.pendingQuestionsCount,
-      settledAt: new Date(),
-      note: note ? String(note).trim() : "",
+    // Atomic: sirf utne hi questions ghatao jitne settle hue — pehle poora
+    // count 0 kar diya jaata tha, isliye padhne aur save ke beech students ke
+    // attempt kiye questions mit jaate the (aur double-click par do payments
+    // ban jaati thi)
+    const settledCount = promoter.pendingQuestionsCount || 0;
+    const updated = await Promoter.findOneAndUpdate(
+      { _id: promoter._id, pendingQuestionsCount: { $gte: settledCount } },
+      {
+        $inc: { pendingQuestionsCount: -settledCount },
+        $push: {
+          paymentHistory: {
+            amount: numericAmount,
+            questionsSettled: settledCount,
+            settledAt: new Date(),
+            note: note ? String(note).trim() : "",
+          },
+        },
+      },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(409).json({ success: false, message: "Hisab abhi badla hai — page refresh karke dobara settle karein." });
+    }
+    Object.assign(promoter, {
+      pendingQuestionsCount: updated.pendingQuestionsCount,
+      totalQuestionsAllTime: updated.totalQuestionsAllTime,
+      paymentHistory: updated.paymentHistory,
     });
-    promoter.pendingQuestionsCount = 0;
-    await promoter.save();
 
     return res.status(200).json({
       success: true,
@@ -64,14 +84,34 @@ export const adminSettleTeacherCommission = async (req, res) => {
       });
     }
 
-    teacher.paymentHistory.push({
-      amount: numericAmount,
-      questionsSettled: teacher.pendingQuestionsCount,
-      settledAt: new Date(),
-      note: note ? String(note).trim() : "",
+    // Atomic: sirf utne hi questions ghatao jitne settle hue — pehle poora
+    // count 0 kar diya jaata tha, isliye padhne aur save ke beech students ke
+    // attempt kiye questions mit jaate the (aur double-click par do payments
+    // ban jaati thi)
+    const settledCount = teacher.pendingQuestionsCount || 0;
+    const updated = await Teacher.findOneAndUpdate(
+      { _id: teacher._id, pendingQuestionsCount: { $gte: settledCount } },
+      {
+        $inc: { pendingQuestionsCount: -settledCount },
+        $push: {
+          paymentHistory: {
+            amount: numericAmount,
+            questionsSettled: settledCount,
+            settledAt: new Date(),
+            note: note ? String(note).trim() : "",
+          },
+        },
+      },
+      { new: true }
+    );
+    if (!updated) {
+      return res.status(409).json({ success: false, message: "Hisab abhi badla hai — page refresh karke dobara settle karein." });
+    }
+    Object.assign(teacher, {
+      pendingQuestionsCount: updated.pendingQuestionsCount,
+      totalQuestionsAllTime: updated.totalQuestionsAllTime,
+      paymentHistory: updated.paymentHistory,
     });
-    teacher.pendingQuestionsCount = 0;
-    await teacher.save();
 
     return res.status(200).json({
       success: true,

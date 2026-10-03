@@ -28,9 +28,35 @@ export const activateBoost = async (req, res) => {
     const base = user.boostActiveUntil && new Date(user.boostActiveUntil) > now ? new Date(user.boostActiveUntil) : now;
     const newExpiry = new Date(base.getTime() + COIN_CONFIG.BOOST_DURATION_MINUTES * 60 * 1000);
 
-    user.boostActiveUntil = newExpiry;
-    user.boostActivationsToday += 1;
-    await user.save();
+    // Atomic — ek saath kai requests bhej kar daily limit paar na ho
+    const saved = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        $or: [
+          { boostActivationsDate: { $ne: todayStr } },
+          { boostActivationsToday: { $lt: COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY } },
+        ],
+      },
+      [
+        {
+          $set: {
+            boostActivationsToday: {
+              $cond: [{ $eq: ["$boostActivationsDate", todayStr] }, { $add: [{ $ifNull: ["$boostActivationsToday", 0] }, 1] }, 1],
+            },
+            boostActivationsDate: todayStr,
+            boostActiveUntil: newExpiry,
+          },
+        },
+      ],
+      { new: true, projection: { boostActivationsToday: 1 } }
+    );
+    if (!saved) {
+      return res.status(400).json({
+        success: false,
+        message: `Aaj ke liye Boost limit (${COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY}) khatam ho gayi hai. Kal phir try karein.`,
+      });
+    }
+    user.boostActivationsToday = saved.boostActivationsToday;
 
     return res.status(200).json({
       success: true,

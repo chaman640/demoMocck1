@@ -114,14 +114,18 @@ export const submitCustomTest = async (req, res) => {
       totalTimeTakenInSeconds,
     });
 
+    // Retake allowed hai, lekin commission sirf pehli baar — warna wahi paper
+    // baar-baar de kar teacher/promoter ka hisab badhaya ja sakta tha
+    const isFirstAttempt = !(await CustomTestAttempt.exists({ testId: test._id, userId }));
     await newAttempt.save();
     await CustomTestReveal.deleteMany({ userId, testId: test._id }); // retake fresh shuru ho
 
-    await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
+    if (isFirstAttempt) await creditQuestionsToCommissionHolders(req.user, correctCount + wrongCount);
 
     const coinsEarned = await creditDailyCoinsIfEligible(req.user, {
       attempted: correctCount + wrongCount,
-      total: correctCount + wrongCount + unattemptedCount,
+      // Paper ke asli total se — sirf 1 sawaal bhej kar "100 percent complete" na bane
+      total: Math.max(correctCount + wrongCount + unattemptedCount, test.totalQuestions || 0),
     });
 
     return res.status(201).json({
