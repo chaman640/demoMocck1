@@ -49,11 +49,16 @@ export const createCoupon = async (req, res) => {
       });
     }
 
+    // Public = koi bhi code se jud sake (YouTube/open batch), Private = sirf list wale.
+    // Na bheja to public — naya batch pehle bhi sabke liye khula hi banta tha.
+    const visibility = req.body.visibility === "private" ? "private" : "public";
+
     const newCoupon = new Coupon({
       code,
       name: name.trim(),
       exam: exam.trim(),
       mainTeacher: req.teacher._id,
+      visibility,
     });
 
     await newCoupon.save();
