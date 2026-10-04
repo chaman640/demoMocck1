@@ -21,13 +21,13 @@ const CouponsSkeleton = () => (
 
 // Batch kaun join kar sakta hai — banate waqt chunte hain, baad me card se badal sakte hain
 const VISIBILITY_OPTIONS = [
-  { value: "public", title: "🌐 Public", hint: "Code wala koi bhi student jud sakta hai — YouTube / open batch ke liye" },
-  { value: "private", title: "🔒 Private", hint: "Sirf wahi students judenge jinhe aap list me add karenge" },
+  { value: "public", title: "🌐 Public", hint: "Any student with the code can join — for YouTube / open batches" },
+  { value: "private", title: "🔒 Private", hint: "Only students you add to the list can join" },
 ];
 
 const VisibilityPicker = ({ value, onChange }) => (
   <div>
-    <p className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Kaun jud sakta hai</p>
+    <p className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Who can join</p>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2" role="radiogroup">
       {VISIBILITY_OPTIONS.map((o) => (
         <button
@@ -157,7 +157,7 @@ const TeacherCoupons = () => {
   const handleVisibility = async (coupon) => {
     const next = coupon.visibility === "public" ? "private" : "public";
     if (next === "private" && !coupon.studentCount
-      && !window.confirm("Is batch ki student list abhi khaali hai — Private karne ke baad naya koi tab tak nahi jud payega jab tak aap students add na karein. Private karein?")) {
+      && !window.confirm("This batch's student list is empty — after making it Private, nobody new can join until you add students. Make it Private?")) {
       return;
     }
     setVisibilityId(coupon._id);
@@ -382,15 +382,15 @@ const TeacherCoupons = () => {
                     <div className="flex items-center gap-3 mt-2 px-3 py-2 rounded-lg bg-[#0A0D14] border border-gray-800">
                       <p className="text-xs text-gray-400 flex-1">
                         {c.visibility === "public"
-                          ? "Code wala koi bhi student jud sakta hai"
-                          : `Sirf aapki list wale students (${c.studentCount || 0}) jud sakte hain`}
+                          ? "Any student with the code can join"
+                          : `Only students on your list (${c.studentCount || 0}) can join`}
                       </p>
                       <button
                         onClick={() => handleVisibility(c)}
                         disabled={visibilityId === c._id}
                         className="text-xs px-3 py-1.5 rounded-lg border border-gray-700 text-gray-300 hover:border-[#7C3AED]/60 font-medium disabled:opacity-50 flex-shrink-0"
                       >
-                        {visibilityId === c._id ? "..." : c.visibility === "public" ? "🔒 Private karein" : "🌐 Public karein"}
+                        {visibilityId === c._id ? "..." : c.visibility === "public" ? "🔒 Make Private" : "🌐 Make Public"}
                       </button>
                     </div>
                   )}
