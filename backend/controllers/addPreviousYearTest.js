@@ -20,14 +20,14 @@ export const addPreviousYearTest = async (req, res) => {
     if (!examName || !testName || !year || !durationMinutes || !subjects) {
       return res.status(400).json({
         success: false,
-        message: "examName, testName, year, durationMinutes aur subjects bharna zaroori hai!",
+        message: "examName, testName, year, durationMinutes and subjects are required!",
       });
     }
 
     if (!Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "subjects mein kam se kam ek subject ka data hona chahiye!",
+        message: "subjects must contain data for at least one subject!",
       });
     }
 
@@ -41,7 +41,7 @@ export const addPreviousYearTest = async (req, res) => {
       if (!subjectName || !Array.isArray(subj.questions) || subj.questions.length === 0) {
         return res.status(400).json({
           success: false,
-          message: `'${subj.subjectName || "Unknown"}' subject mein subjectName aur kam se kam ek question hona chahiye!`,
+          message: `Subject '${subj.subjectName || "Unknown"}' needs a subjectName and at least one question!`,
         });
       }
 
@@ -49,7 +49,7 @@ export const addPreviousYearTest = async (req, res) => {
       if (seen.has(subjectKey(subjectName))) {
         return res.status(400).json({
           success: false,
-          message: `'${subjectName}' subject do baar aa gaya hai — ek subject sirf ek hi baar dein.`,
+          message: `Subject '${subjectName}' appears twice — give each subject only once.`,
         });
       }
       seen.add(subjectKey(subjectName));
@@ -61,14 +61,14 @@ export const addPreviousYearTest = async (req, res) => {
         if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4 || !q.correctOption) {
           return res.status(400).json({
             success: false,
-            message: `'${subjectName}' subject ke ek question mein question/options/correctOption missing hai!`,
+            message: `A question in subject '${subjectName}' is missing question/options/correctOption!`,
           });
         }
         const correctOpt = Number(q.correctOption);
         if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
           return res.status(400).json({
             success: false,
-            message: `'${subjectName}' subject ke ek question ka correctOption 1 se 4 ke beech hona chahiye!`,
+            message: `correctOption of a question in subject '${subjectName}' must be between 1 and 4!`,
           });
         }
 
@@ -113,14 +113,14 @@ export const addPreviousYearTest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${newTest.testName}' successfully add ho gaya! (${newTest.totalQuestions} questions)`,
+      message: `'${newTest.testName}' added successfully! (${newTest.totalQuestions} questions)`,
       data: newTest,
     });
   } catch (error) {
     console.error("addPreviousYearTest error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya Previous Year Test save karte waqt.",
+      message: "Server error while saving the Previous Year Test.",
       error: error.message,
     });
   }

@@ -10,17 +10,17 @@ export const resetPassword = async (req, res) => {
         const { email, otp, newPassword } = req.body;
 
         if (!email || !otp || !newPassword) {
-            return res.status(400).json({ success: false, message: "Sabhi fields zaroori hain!" });
+            return res.status(400).json({ success: false, message: "All fields are required!" });
         }
         if (String(newPassword).length < 6) {
-            return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
+            return res.status(400).json({ success: false, message: "Password must be at least 6 characters!" });
         }
 
         const normalizedEmail = String(email).toLowerCase().trim();
 
         const user = await User.findOne({ email: normalizedEmail });
         if (!user) {
-            return res.status(404).json({ success: false, message: "Is email se koi account nahi mila." });
+            return res.status(404).json({ success: false, message: "No account found with this email." });
         }
 
         // OTP verify — galat/expired/missing OTP par password reset NAHI hoga
@@ -31,12 +31,12 @@ export const resetPassword = async (req, res) => {
         user.passwordChangedAt = new Date(); // purane sabhi login sessions band
         await user.save();
 
-        return res.status(200).json({ success: true, message: "Password successfully reset ho gaya! Ab login karein." });
+        return res.status(200).json({ success: true, message: "Password reset successfully! Please log in now." });
     } catch (error) {
         console.error("resetPassword error:", error);
         return res.status(error.statusCode || 500).json({
             success: false,
-            message: error.statusCode ? error.message : "Password reset karte waqt error aaya.",
+            message: error.statusCode ? error.message : "Error while resetting the password.",
         });
     }
 };

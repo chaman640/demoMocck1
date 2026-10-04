@@ -52,7 +52,7 @@ export const LanguageProvider = ({ children }) => {
         console.warn(`[i18n] Translation missing for key: "${key}"`);
         return key;
       }
-      return entry[language] || entry.hinglish || entry.english || key;
+      return entry[language] || entry.english || entry.hinglish || key;
     },
     [language]
   );
@@ -71,7 +71,7 @@ export const LanguageProvider = ({ children }) => {
 export const useLanguage = () => {
   const ctx = useContext(LanguageContext);
   if (!ctx) {
-    throw new Error("useLanguage() sirf <LanguageProvider> ke andar use karein — App.jsx check karein.");
+    throw new Error("useLanguage() must be used inside <LanguageProvider> — check App.jsx.");
   }
   return ctx;
 };

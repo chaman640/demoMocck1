@@ -9,7 +9,7 @@ import Coupon from "../models/Coupon.js";
 import Promoter from "../models/Promoter.js";
 import User from "../models/User.js";
 
-export const CODE_RULE_TEXT = "4 se 12 akshar — sirf A-Z aur 0-9 (space ya symbol nahi)";
+export const CODE_RULE_TEXT = "4 to 12 characters — only A-Z and 0-9 (no spaces or symbols)";
 const CODE_REGEX = /^[A-Z0-9]{4,12}$/;
 const RANDOM_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
@@ -19,8 +19,8 @@ const RESERVED = new Set(["ADMIN", "ANTIM", "ANTIMPRAYASH", "TEST", "FREE", "NUL
 export const normalizeCode = (raw) => String(raw ?? "").toUpperCase().replace(/\s+/g, "").trim();
 
 export const validateCodeFormat = (code) => {
-  if (!CODE_REGEX.test(code)) return `Code ${CODE_RULE_TEXT} hona chahiye.`;
-  if (RESERVED.has(code)) return "Ye code reserved hai, koi aur chunein.";
+  if (!CODE_REGEX.test(code)) return `Code must be ${CODE_RULE_TEXT}.`;
+  if (RESERVED.has(code)) return "This code is reserved, choose another one.";
   return null;
 };
 
@@ -102,7 +102,7 @@ export const checkRequestedCode = async (raw, hint = {}, ignore = {}) => {
     return {
       ok: false,
       code,
-      message: `'${code}' pehle se kisi ne le liya hai (unavailable).`,
+      message: `'${code}' is already taken (unavailable).`,
       suggestions: await suggestCodes(code, hint),
     };
   }

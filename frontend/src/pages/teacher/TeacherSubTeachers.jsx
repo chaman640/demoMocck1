@@ -132,7 +132,7 @@ const TeacherSubTeachers = () => {
     setInviteLink("");
 
     if (invitePhone.length !== 10) {
-      setInviteError("Phone number 10 anko ka hona chahiye!");
+      setInviteError("Phone number must be 10 digits!");
       return;
     }
 
@@ -253,12 +253,12 @@ const TeacherSubTeachers = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">Sirf Main Teacher hi ye page access kar sakta hai.</p>
+          <p className="text-gray-300">Only the Main Teacher can access this page.</p>
           <button
             onClick={() => navigate("/TeacherDashboard")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Dashboard Jaayein
+            Go to Dashboard
           </button>
         </div>
         <TeacherBottomNav />
@@ -272,7 +272,7 @@ const TeacherSubTeachers = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -290,7 +290,7 @@ const TeacherSubTeachers = () => {
 
         {/* ── Invite Form ── */}
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
-          <h3 className="font-semibold text-sm mb-4">Naya Sub-Teacher Invite Karein</h3>
+          <h3 className="font-semibold text-sm mb-4">Invite a New Sub-Teacher</h3>
 
           {inviteError && (
             <div className="mb-4 p-3 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">
@@ -300,7 +300,7 @@ const TeacherSubTeachers = () => {
 
           {inviteLink && (
             <div className="mb-4 p-3.5 bg-green-500/10 border border-green-500/25 rounded-xl">
-              <p className="text-xs text-green-400 mb-2">Invite ready hai! Ye link copy karke bhejein:</p>
+              <p className="text-xs text-green-400 mb-2">Invite ready! Copy this link and send it:</p>
               <div className="flex items-center gap-2 bg-[#0A0D14] border border-gray-700 rounded-lg px-3 py-2">
                 <span className="text-xs text-gray-300 truncate flex-1">{inviteLink}</span>
                 <button
@@ -329,7 +329,7 @@ const TeacherSubTeachers = () => {
 
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                Coupon / Subject Assign Karein (optional, baad mein bhi kar sakte hain)
+                Assign Coupon / Subject (optional, you can do it later too)
               </label>
               {/* 🆕 Ab subject list Blueprint se aati hai (checkbox se
                   chunte hain) — free-type nahi karte, isliye spelling
@@ -362,7 +362,7 @@ const TeacherSubTeachers = () => {
                       </div>
 
                       {a.couponId && subjectsLoadingFor === a.couponId && (
-                        <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
+                        <p className="text-[11px] text-gray-500">Loading subjects...</p>
                       )}
                       {a.couponId && subjectsLoadingFor !== a.couponId && subjectList.length === 0 && (
                         <p className="text-[11px] text-amber-400">⚠️ No Blueprint found for this coupon's exam — ask the Admin to create one.</p>
@@ -401,7 +401,7 @@ const TeacherSubTeachers = () => {
               disabled={inviting}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
             >
-              {inviting ? "Sending invite..." : "Invite Link Banayein"}
+              {inviting ? "Sending invite..." : "Create Invite Link"}
             </button>
           </form>
         </div>
@@ -409,12 +409,12 @@ const TeacherSubTeachers = () => {
         {/* ── Sub-Teachers List ── */}
         <div>
           <h3 className="font-semibold text-sm mb-3 text-gray-300">
-            Aapki Team ({subTeachers.length})
+            Your Team ({subTeachers.length})
           </h3>
 
           {subTeachers.length === 0 ? (
             <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-              <p className="text-sm text-gray-400">Abhi tak koi sub-teacher invite nahi kiya.</p>
+              <p className="text-sm text-gray-400">No sub-teachers invited yet.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -475,14 +475,14 @@ const TeacherSubTeachers = () => {
                             ))}
                           </div>
                         ) : (
-                          <p className="text-xs text-gray-500">Abhi koi subject-access assign nahi hai.</p>
+                          <p className="text-xs text-gray-500">No subject access assigned yet.</p>
                         )}
 
                         {/* Assign new access — sirf active teacher ke liye useful */}
                         {t.status !== "removed" && (
                           <div className="bg-[#0A0D14] border border-gray-800 rounded-lg p-3">
                             <p className="text-[11px] text-gray-500 uppercase tracking-wide mb-2">
-                              Naya Access Assign Karein
+                              Assign New Access
                             </p>
                             {assignError && (
                               <p className="text-xs text-red-400 mb-2">{assignError}</p>
@@ -501,7 +501,7 @@ const TeacherSubTeachers = () => {
 
                               {/* 🆕 Subject ab checkbox se — Blueprint se aata hai, free-type nahi */}
                               {assignForm.couponId && subjectsLoadingFor === assignForm.couponId && (
-                                <p className="text-[11px] text-gray-500">Subjects load ho rahe hain...</p>
+                                <p className="text-[11px] text-gray-500">Loading subjects...</p>
                               )}
                               {assignForm.couponId && subjectsLoadingFor !== assignForm.couponId && (subjectsByCoupon[assignForm.couponId] || []).length === 0 && (
                                 <p className="text-[11px] text-amber-400">⚠️ No Blueprint found for this coupon's exam — ask the Admin to create one.</p>
@@ -553,7 +553,7 @@ const TeacherSubTeachers = () => {
                                 disabled={resendingId === t._id}
                                 className="text-xs px-3 py-2 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500 disabled:opacity-50"
                               >
-                                {resendingId === t._id ? "Sending..." : "Invite Link Dobara Bhejein"}
+                                {resendingId === t._id ? "Sending..." : "Resend Invite Link"}
                               </button>
                             )}
                           </div>
@@ -566,7 +566,7 @@ const TeacherSubTeachers = () => {
                             disabled={removingId === t._id}
                             className="w-full py-2 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 text-xs font-medium disabled:opacity-50"
                           >
-                            {removingId === t._id ? "Removing..." : "Sub-Teacher Remove Karein"}
+                            {removingId === t._id ? "Removing..." : "Remove Sub-Teacher"}
                           </button>
                         )}
                       </div>

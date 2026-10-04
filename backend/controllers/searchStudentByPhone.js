@@ -17,14 +17,14 @@ export const searchStudentByPhone = async (req, res) => {
     if (!phone || String(phone).trim().length < 3) {
       return res.status(400).json({
         success: false,
-        message: "Search ke liye kam se kam 3 digit ka phone number dein.",
+        message: "Enter at least 3 digits of the phone number to search.",
       });
     }
 
     if (!req.teacher.activeCoupon) {
       return res.status(400).json({
         success: false,
-        message: "Pehle apna active group/coupon select karein (switch-active-coupon se).",
+        message: "Select your active group/coupon first (via switch-active-coupon).",
       });
     }
 
@@ -33,7 +33,7 @@ export const searchStudentByPhone = async (req, res) => {
     if (cleanedPhone.length < 3) {
       return res.status(400).json({
         success: false,
-        message: "Kam se kam 3 digit (sirf number) daalein.",
+        message: "Enter at least 3 digits (numbers only).",
       });
     }
 
@@ -56,7 +56,7 @@ export const searchStudentByPhone = async (req, res) => {
     console.error("searchStudentByPhone error:", error);
     return res.status(500).json({
       success: false,
-      message: "Student search karte waqt error aaya.",
+      message: "Error while searching for the student.",
       error: error.message,
     });
   }

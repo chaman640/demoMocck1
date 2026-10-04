@@ -16,7 +16,7 @@ export const getClassTopicAnalysis = async (req, res) => {
     if (studentIds.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Is batch mein abhi koi student nahi hai.",
+        message: "There are no students in this batch yet.",
         data: { topics: [], testTypeComparison: [], misconceptions: [], totalBatchStudents, selectedCount: 0 },
       });
     }
@@ -47,7 +47,7 @@ export const getClassTopicAnalysis = async (req, res) => {
     console.error("getClassTopicAnalysis error:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "Class topic analysis fetch karte waqt error aaya.",
+      message: error.statusCode ? error.message : "Error while fetching class topic analysis.",
       error: error.statusCode ? undefined : error.message,
     });
   }

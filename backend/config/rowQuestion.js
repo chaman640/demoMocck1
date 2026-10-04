@@ -58,9 +58,9 @@ const allowInsecure = String(process.env.MONGO_ALLOW_INSECURE_TLS || "").toLower
 
 if (allowInsecure && isProduction) {
   console.error("\n" + "═".repeat(62));
-  console.error("❌ MONGO_ALLOW_INSECURE_TLS=true production mein allowed nahi hai.");
-  console.error("   Ye database traffic ko MITM attack ke liye khol deta hai.");
-  console.error("   Render ke Environment se ye variable hata dein.");
+  console.error("❌ MONGO_ALLOW_INSECURE_TLS=true is not allowed in production.");
+  console.error("   It exposes database traffic to MITM attacks.");
+  console.error("   Remove this variable from the Render Environment.");
   console.error("═".repeat(62) + "\n");
   process.exit(1);
 }
@@ -88,9 +88,9 @@ if (useTls) {
     connectionOptions.tlsAllowInvalidCertificates = true;
     connectionOptions.tlsAllowInvalidHostnames = true;
     console.warn("\n" + "⚠".repeat(31));
-    console.warn("⚠️  MONGO_ALLOW_INSECURE_TLS=true — TLS certificate check BAND hai.");
-    console.warn("    Ye sirf temporary debugging ke liye hai. Database traffic");
-    console.warn("    is waqt MITM attack se surakshit NAHI hai.");
+    console.warn("⚠️  MONGO_ALLOW_INSECURE_TLS=true — TLS certificate check is OFF.");
+    console.warn("    This is only for temporary debugging. Database traffic");
+    console.warn("    is NOT safe from MITM attacks right now.");
     console.warn("⚠".repeat(31) + "\n");
   }
 }
@@ -107,21 +107,21 @@ rowQuestionConnection.on("error", (err) => {
   // Sabse common galtiyon ke liye seedha ishara
   const m = String(err.message || "");
   if (/certificate|SSL|TLS/i.test(m)) {
-    console.error("   → Ye TLS certificate ki problem lag rahi hai. Check karein:");
-    console.error("     1. Node version 18+ hai? (node -v)");
-    console.error("     2. Atlas → Network Access mein IP whitelist hai?");
+    console.error("   → This looks like a TLS certificate problem. Check:");
+    console.error("     1. Is Node version 18+? (node -v)");
+    console.error("     2. Is the IP whitelisted in Atlas → Network Access?");
   } else if (/ENOTFOUND|querySrv|getaddrinfo/i.test(m)) {
-    console.error("   → Connection string ka hostname galat lag raha hai (ROWQUESTION_URI check karein).");
+    console.error("   → The connection string hostname looks wrong (check ROWQUESTION_URI).");
   } else if (/Authentication failed|bad auth/i.test(m)) {
-    console.error("   → Username/password galat hai, ya password ke special characters");
-    console.error("     URL-encode nahi hue (@ → %40, # → %23, / → %2F).");
+    console.error("   → Wrong username/password, or special characters in the password");
+    console.error("     were not URL-encoded (@ → %40, # → %23, / → %2F).");
   } else if (/IP|whitelist|not allowed/i.test(m)) {
-    console.error("   → Atlas → Network Access mein current IP allow karein.");
+    console.error("   → Allow the current IP in Atlas → Network Access.");
   }
 });
 
 rowQuestionConnection.on("disconnected", () => {
-  console.warn("⚠️  Database disconnected — mongoose apne aap reconnect karne ki koshish karega.");
+  console.warn("⚠️  Database disconnected — mongoose will try to reconnect automatically.");
 });
 
 rowQuestionConnection.on("reconnected", () => {

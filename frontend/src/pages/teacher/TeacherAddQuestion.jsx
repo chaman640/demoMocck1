@@ -73,7 +73,7 @@ const TeacherAddQuestion = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Data load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the data.");
       setPhase("error");
     }
   }, [navigate]);
@@ -101,7 +101,7 @@ const TeacherAddQuestion = () => {
     setFormError("");
 
     if (!teacher?.activeCoupon) {
-      setFormError("Pehle apna active batch select karein!");
+      setFormError("Select your active batch first!");
       return;
     }
     if (
@@ -115,7 +115,7 @@ const TeacherAddQuestion = () => {
       !form.correctOption ||
       !form.answerExplain.trim()
     ) {
-      setFormError("Sabhi fields (photo ke alawa) zaroori hain!");
+      setFormError("All fields (except the photo) are required!");
       return;
     }
 
@@ -145,7 +145,7 @@ const TeacherAddQuestion = () => {
       ]);
       resetForm();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Question save nahi ho paaya.");
+      setFormError(err.response?.data?.message || "Could not save the question.");
     } finally {
       setSubmitting(false);
     }
@@ -166,15 +166,15 @@ const TeacherAddQuestion = () => {
     },
   ];
   const AI_PROMPT_HINT =
-    "Neeche diye JSON format mein mujhe [SUBJECT/TOPIC BADLEIN] ke [KITNE CHAHIYE VO NUMBER] MCQ questions Hindi mein do. Sirf ek JSON array return karo, koi extra text mat likhna. correctOption hamesha 1,2,3,4 mein se ek number ho (1 ka matlab option1 sahi hai).";
+    "Using the JSON format below, give me [NUMBER NEEDED] MCQ questions in Hindi for [CHANGE SUBJECT/TOPIC]. Return only one JSON array, do not write any extra text. correctOption must always be one of the numbers 1,2,3,4 (1 means option1 is correct).";
 
   const copyBulkDemoForAI = async () => {
     const text = `${AI_PROMPT_HINT}\n\n${JSON.stringify(DEMO_BULK_QUESTIONS, null, 2)}`;
     try {
       await navigator.clipboard.writeText(text);
-      setBulkMessage("📋 Demo JSON + prompt copy ho gaya — kisi AI chatbot mein paste karke bhej dein.");
+      setBulkMessage("📋 Demo JSON + prompt copied — paste it into any AI chatbot and send.");
     } catch {
-      setBulkMessage("❌ Copy nahi ho paaya.");
+      setBulkMessage("❌ Could not copy.");
     }
   };
 
@@ -183,7 +183,7 @@ const TeacherAddQuestion = () => {
     setBulkMessage("");
 
     if (!teacher?.activeCoupon) {
-      setBulkMessage("❌ Pehle apna active batch select karein!");
+      setBulkMessage("❌ Select your active batch first!");
       return;
     }
 
@@ -191,25 +191,25 @@ const TeacherAddQuestion = () => {
     try {
       parsed = JSON.parse(bulkJson);
     } catch {
-      setBulkMessage("❌ JSON format galat hai — check karein.");
+      setBulkMessage("❌ Invalid JSON format — please check.");
       return;
     }
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      setBulkMessage("❌ JSON ek array hona chahiye, kam se kam 1 question ke saath.");
+      setBulkMessage("❌ JSON must be an array with at least 1 question.");
       return;
     }
 
     setSubmitting(true);
     try {
       await api.post("/teacher/add-question", { couponId: teacher.activeCoupon, questions: parsed });
-      setBulkMessage(`✅ ${parsed.length} questions add ho gaye!`);
+      setBulkMessage(`✅ ${parsed.length} questions added!`);
       setSessionAdded((prev) => [
         ...parsed.map((q) => ({ question: q.question, subjectName: q.subjectName, topicName: q.topicName })),
         ...prev,
       ]);
       setBulkJson("");
     } catch (err) {
-      setBulkMessage(err.response?.data?.message || "Questions save nahi ho paaye.");
+      setBulkMessage(err.response?.data?.message || "Could not save the questions.");
     } finally {
       setSubmitting(false);
     }
@@ -223,7 +223,7 @@ const TeacherAddQuestion = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -238,8 +238,8 @@ const TeacherAddQuestion = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
-          <h1 className="text-2xl font-bold mb-1">Question Add Karein</h1>
-          <p className="text-gray-400 text-sm">Apne active batch ke liye naya sawaal jodein</p>
+          <h1 className="text-2xl font-bold mb-1">Add Question</h1>
+          <p className="text-gray-400 text-sm">Add a new question for your active batch</p>
         </div>
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
@@ -247,10 +247,10 @@ const TeacherAddQuestion = () => {
         {teacher?.activeCoupon && (
           <div className="flex gap-2">
             <button type="button" onClick={() => setMode("single")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "single" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-              Ek-Ek Karke (form)
+              One by one (form)
             </button>
             <button type="button" onClick={() => setMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-              Bulk JSON (AI se likhwa ke)
+              Bulk JSON (written with AI)
             </button>
           </div>
         )}
@@ -258,7 +258,7 @@ const TeacherAddQuestion = () => {
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
             <p className="text-sm text-gray-400">
-              Sawaal add karne se pehle upar se ek active batch select karein.
+              Select an active batch at the top before adding questions.
             </p>
           </div>
         ) : mode === "bulk" ? (
@@ -270,18 +270,18 @@ const TeacherAddQuestion = () => {
             )}
             <form onSubmit={handleBulkSubmit} className="space-y-3">
               <button type="button" onClick={copyBulkDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
-                📋 Demo JSON + AI Prompt Copy Karein
+                📋 Copy Demo JSON + AI Prompt
               </button>
-              <p className="text-[11px] text-gray-500">Upar wala button dabao → copy hua text kisi AI chatbot mein paste karo → jo JSON array mile use neeche paste karke submit karo. Photo bulk mode mein add nahi hoti — photo wale sawaal "Ek-Ek Karke" mode se add karein.</p>
+              <p className="text-[11px] text-gray-500">Press the button above → paste the copied text into an AI chatbot → paste the JSON array you get below and submit. Photos cannot be added in bulk mode — add questions with photos using "One by one" mode.</p>
               <textarea
                 value={bulkJson}
                 onChange={(e) => setBulkJson(e.target.value)}
                 rows={12}
-                placeholder="Yahan AI se mila JSON array paste karein..."
+                placeholder="Paste the JSON array from the AI here..."
                 className={`${inputClass} font-mono text-xs`}
               />
               <button type="submit" disabled={submitting || !bulkJson.trim()} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50">
-                {submitting ? "Save ho raha hai..." : "Sabhi Sawaal Save Karein"}
+                {submitting ? "Saving..." : "Save All Questions"}
               </button>
             </form>
           </div>
@@ -306,7 +306,7 @@ const TeacherAddQuestion = () => {
                       onChange={handleChange}
                       className={`${inputClass} appearance-none cursor-pointer`}
                     >
-                      <option value="">Subject chunein</option>
+                      <option value="">Select subject</option>
                       {subjectOptions.map((s) => (
                         <option key={s} value={s}>{s}</option>
                       ))}
@@ -347,7 +347,7 @@ const TeacherAddQuestion = () => {
                   value={form.question}
                   onChange={handleChange}
                   rows={3}
-                  placeholder="Sawaal yahan likhein..."
+                  placeholder="Write the question here..."
                   className={inputClass}
                 />
               </div>
@@ -368,17 +368,17 @@ const TeacherAddQuestion = () => {
                   student ko sawaal ke niche isi label ke roop mein dikhega */}
               <div>
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                  Pehle Kab Pucha Gaya? (optional)
+                  Asked before in? (optional)
                 </label>
                 <input
                   type="text"
                   name="askedIn"
                   value={form.askedIn}
                   onChange={handleChange}
-                  placeholder="jaise: UPSSSC PET 2019"
+                  placeholder="e.g. UPSSSC PET 2019"
                   className={inputClass}
                 />
-                <p className="text-[11px] text-gray-500 mt-1">Agar ye ek PYQ hai, to yahan bata dein — student ko sawaal ke niche dikhega.</p>
+                <p className="text-[11px] text-gray-500 mt-1">If this is a PYQ, mention it here — students will see it below the question.</p>
               </div>
 
               <div className="space-y-3">
@@ -392,7 +392,7 @@ const TeacherAddQuestion = () => {
                           ? "border-green-500 bg-green-500/20 text-green-400"
                           : "border-gray-600 text-gray-500 hover:border-gray-400"
                       }`}
-                      title="Sahi jawab set karein"
+                      title="Set as correct answer"
                     >
                       {n}
                     </button>
@@ -407,7 +407,7 @@ const TeacherAddQuestion = () => {
                   </div>
                 ))}
                 <p className="text-[11px] text-gray-500">
-                  Number pe click karke sahi jawab set karein (abhi: {form.correctOption || "koi nahi"})
+                  Click a number to set the correct answer (current: {form.correctOption || "none"})
                 </p>
               </div>
 
@@ -420,7 +420,7 @@ const TeacherAddQuestion = () => {
                   value={form.answerExplain}
                   onChange={handleChange}
                   rows={2}
-                  placeholder="Sahi jawab kyun sahi hai..."
+                  placeholder="Why the correct answer is correct..."
                   className={inputClass}
                 />
               </div>
@@ -442,7 +442,7 @@ const TeacherAddQuestion = () => {
                 disabled={submitting}
                 className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
               >
-                {submitting ? "Save ho raha hai..." : "Sawaal Save Karein"}
+                {submitting ? "Saving..." : "Save Question"}
               </button>
             </form>
           </div>
@@ -452,7 +452,7 @@ const TeacherAddQuestion = () => {
         {sessionAdded.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-300 mb-3">
-              Is session mein add kiye gaye ({sessionAdded.length})
+              Added this session ({sessionAdded.length})
             </h3>
             <div className="space-y-2">
               {sessionAdded.map((q, i) => (

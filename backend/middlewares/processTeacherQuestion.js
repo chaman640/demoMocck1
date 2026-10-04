@@ -21,7 +21,7 @@ const ensureCloudinary = () => {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
     throw new Error(
-      "Cloudinary env variables set nahi hain (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
+      "Cloudinary env variables are not set (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
     );
   }
 
@@ -92,7 +92,7 @@ export const processTeacherQuestionMiddleware = (req, res, next) => {
         !topicName ||
         !answerExplain
       ) {
-        return res.status(400).json({ success: false, message: "❌ Sabhi fields zaroori hain!" });
+        return res.status(400).json({ success: false, message: "❌ All fields are required!" });
       }
 
       // 🐛 FIX #3: `correctOption` multipart mein STRING aata hai ("3").
@@ -102,7 +102,7 @@ export const processTeacherQuestionMiddleware = (req, res, next) => {
       if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
         return res
           .status(400)
-          .json({ success: false, message: "❌ correctOption 1 se 4 ke beech hona chahiye!" });
+          .json({ success: false, message: "❌ correctOption must be between 1 and 4!" });
       }
       req.body.correctOption = correctOpt;
 
@@ -124,7 +124,7 @@ export const processTeacherQuestionMiddleware = (req, res, next) => {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "❌ Middleware mein processing error aaya",
+        message: "❌ Processing error in middleware",
         error: error.message,
       });
     }

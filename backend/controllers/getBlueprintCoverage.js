@@ -14,7 +14,7 @@ export const getBlueprintCoverage = async (req, res) => {
     const { examName, blueprintName } = req.params;
     const blueprint = await Blueprint.findOne({ examName, blueprintName });
     if (!blueprint) {
-      return res.status(404).json({ success: false, message: "Ye blueprint nahi mila." });
+      return res.status(404).json({ success: false, message: "Blueprint not found." });
     }
 
     const subjectsReport = [];
@@ -85,6 +85,6 @@ export const getBlueprintCoverage = async (req, res) => {
     });
   } catch (error) {
     console.error("getBlueprintCoverage error:", error);
-    return res.status(500).json({ success: false, message: "Coverage check karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while checking coverage." });
   }
 };

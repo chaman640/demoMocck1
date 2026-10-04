@@ -19,7 +19,7 @@ const CreatePromoterCard = ({ onCreated }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (codeStatusBlocksSubmit(form.code, codeStatus)) {
-      setMessage("Ye code available nahi hai — koi suggestion chunein ya khaali chhod dein.");
+      setMessage("This code is not available — choose a suggestion or leave it empty.");
       return;
     }
     setStatus("submitting");
@@ -29,14 +29,14 @@ const CreatePromoterCard = ({ onCreated }) => {
       const d = res.data.data;
       setMessage(
         d.emailSent
-          ? "✅ Promoter ban gaya aur credentials email bhej diye gaye hain!"
-          : `✅ Promoter ban gaya (code: ${d.code}), lekin email bhejne mein dikkat aayi — khud bata dein.`
+          ? "✅ Promoter created and credentials emailed!"
+          : `✅ Promoter created (code: ${d.code}), but the email could not be sent — please share the details yourself.`
       );
       setForm({ name: "", email: "", phone: "", password: "", code: "" });
       onCreated?.();
     } catch (err) {
       const sugg = err.response?.data?.suggestions;
-      setMessage((err.response?.data?.message || "Error aaya.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
+      setMessage((err.response?.data?.message || "Something went wrong.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
     } finally {
       setStatus("idle");
     }
@@ -44,9 +44,9 @@ const CreatePromoterCard = ({ onCreated }) => {
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
-      <h3 className="font-semibold text-base mb-1">Naya Promoter Banayein</h3>
+      <h3 className="font-semibold text-base mb-1">Create a New Promoter</h3>
       <p className="text-xs text-gray-500 mb-4">
-        Password aap khud set karein — promoter ko email par login link, email aur password chala jayega.
+        Set the password yourself — the promoter will get the login link, email and password by email.
       </p>
 
       {message && (
@@ -56,18 +56,18 @@ const CreatePromoterCard = ({ onCreated }) => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input name="name" value={form.name} onChange={handleChange} placeholder="Naam" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
+        <input name="name" value={form.name} onChange={handleChange} placeholder="Name" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="email@example.com" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="phone" value={form.phone} onChange={handleChange} placeholder="10-digit phone" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
-        <input name="password" type="text" value={form.password} onChange={handleChange} placeholder="Password (kam se kam 6 characters)" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
+        <input name="password" type="text" value={form.password} onChange={handleChange} placeholder="Password (at least 6 characters)" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <CodePicker
-          label="Promoter code (optional) — students signup mein yahi daalenge"
+          label="Promoter code (optional) — students will enter this at signup"
           value={form.code}
           onChange={(code) => setForm((prev) => ({ ...prev, code }))}
           onStatusChange={setCodeStatus}
         />
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm transition-colors disabled:opacity-50">
-          {status === "submitting" ? "Ban raha hai..." : "Promoter Banayein"}
+          {status === "submitting" ? "Creating..." : "Create Promoter"}
         </button>
       </form>
     </div>
@@ -86,12 +86,12 @@ const SettleForm = ({ promoter, onDone }) => {
     setMsg("");
     try {
       await api.post(`/admin/promoters/${promoter._id}/settle`, { amount: Number(amount), note });
-      setMsg("✅ Hisab settle ho gaya!");
+      setMsg("✅ Payment settled!");
       setAmount("");
       setNote("");
       onDone?.();
     } catch (err) {
-      setMsg(err.response?.data?.message || "Error aaya.");
+      setMsg(err.response?.data?.message || "Something went wrong.");
     } finally {
       setSubmitting(false);
     }
@@ -100,8 +100,7 @@ const SettleForm = ({ promoter, onDone }) => {
   return (
     <form onSubmit={submit} className="mt-3 p-3 bg-[#0A0D14] border border-gray-800 rounded-xl space-y-2">
       <p className="text-[11px] text-gray-500">
-        Pending questions: <span className="text-white font-semibold">{promoter.pendingQuestionsCount}</span> — ye
-        settle karne par 0 ho jayega.
+        Pending questions: <span className="text-white font-semibold">{promoter.pendingQuestionsCount}</span> — this becomes 0 after settling.
       </p>
       <input
         type="number"
@@ -121,7 +120,7 @@ const SettleForm = ({ promoter, onDone }) => {
       />
       {msg && <p className="text-xs text-center text-gray-300">{msg}</p>}
       <button type="submit" disabled={submitting} className="w-full py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-50">
-        {submitting ? "Settle ho raha hai..." : "Hisab Settle Karein"}
+        {submitting ? "Settling..." : "Settle Payment"}
       </button>
     </form>
   );
@@ -140,10 +139,10 @@ const EditForm = ({ promoter, onDone }) => {
     setMsg("");
     try {
       await api.post(`/admin/promoters/${promoter._id}/update`, form);
-      setMsg("✅ Update ho gaya!");
+      setMsg("✅ Updated!");
       onDone?.();
     } catch (err) {
-      setMsg(err.response?.data?.message || "Error aaya.");
+      setMsg(err.response?.data?.message || "Something went wrong.");
     } finally {
       setSubmitting(false);
     }
@@ -151,13 +150,13 @@ const EditForm = ({ promoter, onDone }) => {
 
   return (
     <form onSubmit={submit} className="mt-3 p-3 bg-[#0A0D14] border border-gray-800 rounded-xl space-y-2">
-      <input name="name" value={form.name} onChange={handleChange} placeholder="Naam" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
+      <input name="name" value={form.name} onChange={handleChange} placeholder="Name" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
       <input name="email" value={form.email} onChange={handleChange} placeholder="Email" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
       <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
-      <input name="newPassword" type="text" value={form.newPassword} onChange={handleChange} placeholder="Naya password (sirf badalna ho to)" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
+      <input name="newPassword" type="text" value={form.newPassword} onChange={handleChange} placeholder="New password (only if changing)" className="w-full px-3 py-2 text-sm bg-[#111827] border border-gray-700 rounded-lg outline-none text-white placeholder-gray-600" />
       {msg && <p className="text-xs text-center text-gray-300">{msg}</p>}
       <button type="submit" disabled={submitting} className="w-full py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-50">
-        {submitting ? "Save ho raha hai..." : "Save Karein"}
+        {submitting ? "Saving..." : "Save"}
       </button>
     </form>
   );
@@ -182,7 +181,7 @@ const PromoterCard = ({ promoter, onChanged }) => {
       await api.post(`/admin/promoters/${promoter._id}/status`, { status: newStatus });
       onChanged?.();
     } catch (err) {
-      alert(err.response?.data?.message || "Status badalte waqt error aaya.");
+      alert(err.response?.data?.message || "Error while changing the status.");
     } finally {
       setTogglingStatus(false);
     }
@@ -229,7 +228,7 @@ const PromoterCard = ({ promoter, onChanged }) => {
 
       <div className="flex flex-wrap gap-2 mt-3">
         <button onClick={() => toggle("settle")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-[#7C3AED]/15 text-[#A78BFA] hover:bg-[#7C3AED]/25">
-          Hisab Settle Karein
+          Settle Payment
         </button>
         <button onClick={() => toggle("edit")} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300">
           Edit
@@ -242,7 +241,7 @@ const PromoterCard = ({ promoter, onChanged }) => {
           disabled={togglingStatus}
           className={`text-[11px] px-2.5 py-1.5 rounded-lg disabled:opacity-50 ${promoter.status === "active" ? "border border-red-500/30 text-red-400 hover:bg-red-500/10" : "border border-green-500/30 text-green-400 hover:bg-green-500/10"}`}
         >
-          {promoter.status === "active" ? "Remove Karein" : "Active Karein"}
+          {promoter.status === "active" ? "Remove" : "Activate"}
         </button>
       </div>
 
@@ -261,7 +260,7 @@ const PromoterCard = ({ promoter, onChanged }) => {
               </div>
             ))
           ) : (
-            <p className="text-xs text-gray-500 text-center">Abhi tak koi hisab settle nahi hua.</p>
+            <p className="text-xs text-gray-500 text-center">No payments settled yet.</p>
           )}
         </div>
       )}
@@ -325,11 +324,11 @@ const AdminPromoters = () => {
         <CreatePromoterCard onCreated={loadPromoters} />
 
         <div className="space-y-3">
-          <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Sabhi Promoters</p>
+          <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">All Promoters</p>
           {loadingList ? (
             <SkeletonBlock className="w-full h-24 rounded-2xl" />
           ) : promoters.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-6">Abhi tak koi promoter nahi banaya gaya.</p>
+            <p className="text-sm text-gray-500 text-center py-6">No promoters created yet.</p>
           ) : (
             promoters.map((p) => <PromoterCard key={p._id} promoter={p} onChanged={loadPromoters} />)
           )}

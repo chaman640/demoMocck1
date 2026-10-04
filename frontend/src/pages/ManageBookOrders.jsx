@@ -32,10 +32,10 @@ const OrderCard = ({ order, onSaved }) => {
     setMsg("");
     try {
       await api.post(`/admin/book-orders/${order._id}/update`, { status, trackingInfo: tracking });
-      setMsg("Save ho gaya");
+      setMsg("Saved");
       onSaved();
     } catch (err) {
-      setMsg(err.response?.data?.message || "Save nahi ho paya.");
+      setMsg(err.response?.data?.message || "Could not save.");
     } finally {
       setSaving(false);
     }
@@ -106,7 +106,7 @@ const OrderCard = ({ order, onSaved }) => {
               disabled={!dirty || saving}
               className="flex-1 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-40"
             >
-              {saving ? "Save ho raha hai..." : "Save Karein"}
+              {saving ? "Saving..." : "Save"}
             </button>
             {msg && <span className="text-[11px] text-gray-400">{msg}</span>}
           </div>
@@ -158,7 +158,7 @@ const ManageBookOrders = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="w-full max-w-sm bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center space-y-4">
           <div className="text-4xl">🔒</div>
-          <p className="text-sm text-gray-300">Orders dekhne ke liye Admin ya Teacher login zaroori hai.</p>
+          <p className="text-sm text-gray-300">Admin or Teacher login is required to view orders.</p>
           <div className="space-y-2">
             <Link to="/AdminLogin" className="block py-2.5 rounded-xl bg-[#7C3AED] text-sm font-semibold">Admin Login</Link>
             <Link to="/TeacherLogin" className="block py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300">Teacher Login</Link>
@@ -224,12 +224,12 @@ const ManageBookOrders = () => {
         )}
 
         {phase === "loading" && [1, 2].map((i) => <SkeletonBlock key={i} className="w-full h-56 rounded-2xl" />)}
-        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Orders load nahi ho paye.</p>}
+        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Could not load orders.</p>}
 
         {phase === "ready" && visible.length === 0 && (
           <div className="text-center py-14 space-y-2">
             <p className="text-4xl">📭</p>
-            <p className="text-sm text-gray-500">Yahan abhi koi order nahi hai.</p>
+            <p className="text-sm text-gray-500">No orders here yet.</p>
           </div>
         )}
 

@@ -8,7 +8,7 @@ export const addCurrentAffairQuiz = async (req, res) => {
     if (!examName || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "examName aur kam se kam ek question zaroori hai!",
+        message: "examName and at least one question are required!",
       });
     }
 
@@ -16,13 +16,13 @@ export const addCurrentAffairQuiz = async (req, res) => {
       if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
         return res.status(400).json({
           success: false,
-          message: "Har question mein sawaal aur chaaro options zaroori hain!",
+          message: "Every question needs the question text and all four options!",
         });
       }
       if (!q.correctOption || q.correctOption < 1 || q.correctOption > 4) {
         return res.status(400).json({
           success: false,
-          message: "correctOption 1 se 4 ke beech hona chahiye!",
+          message: "correctOption must be between 1 and 4!",
         });
       }
     }
@@ -31,7 +31,7 @@ export const addCurrentAffairQuiz = async (req, res) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(finalDate)) {
       return res.status(400).json({
         success: false,
-        message: "Date format 'YYYY-MM-DD' mein hona chahiye (e.g. 2026-07-16)!",
+        message: "Date must be in 'YYYY-MM-DD' format (e.g. 2026-07-16)!",
       });
     }
 
@@ -43,13 +43,13 @@ export const addCurrentAffairQuiz = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${finalDate}' ke liye '${examName}' quiz save ho gaya! (${questions.length} sawaal)`,
+      message: `'${examName}' quiz saved for '${finalDate}'! (${questions.length} questions)`,
       data: saved,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Quiz save karte waqt error aaya.",
+      message: "Error while saving the quiz.",
       error: error.message,
     });
   }

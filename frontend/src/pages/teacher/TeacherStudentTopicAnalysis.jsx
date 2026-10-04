@@ -82,7 +82,7 @@ const TeacherStudentTopicAnalysis = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{error?.response?.data?.message || "Could not load data."}</p>
           <button onClick={() => navigate(-1)} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Wapas Jaayein
+            Go Back
           </button>
         </div>
         <TeacherBottomNav />
@@ -101,7 +101,7 @@ const TeacherStudentTopicAnalysis = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-          &larr; {subjectName} Par Wapas
+          &larr; Back to {subjectName}
         </button>
 
         <div>
@@ -111,7 +111,7 @@ const TeacherStudentTopicAnalysis = () => {
 
         {!topic ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Is topic ka data nahi mila.</p>
+            <p className="text-sm text-gray-400">No data found for this topic.</p>
           </div>
         ) : (
           <>
@@ -153,7 +153,7 @@ const TeacherStudentTopicAnalysis = () => {
             </div>
 
             {filteredQuestions.length === 0 && (
-              <p className="text-gray-400 text-sm py-8 text-center">Is category mein koi sawaal nahi hai.</p>
+              <p className="text-gray-400 text-sm py-8 text-center">No questions in this category.</p>
             )}
 
             {currentQ && (

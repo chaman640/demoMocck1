@@ -16,7 +16,7 @@ export const listExamNamesAdmin = async (req, res) => {
     });
   } catch (error) {
     console.error("listExamNamesAdmin error:", error);
-    return res.status(500).json({ success: false, message: "Exam list fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching the exam list." });
   }
 };
 
@@ -25,28 +25,28 @@ export const addExamName = async (req, res) => {
   try {
     const { name } = req.body;
     if (!name || !String(name).trim()) {
-      return res.status(400).json({ success: false, message: "Exam ka naam dalein!" });
+      return res.status(400).json({ success: false, message: "Enter the exam name!" });
     }
 
     const trimmed = String(name).trim();
 
     const exists = await ExamName.findOne({ name: { $regex: `^${trimmed}$`, $options: "i" } });
     if (exists) {
-      return res.status(409).json({ success: false, message: "Ye exam pehle se list mein hai!" });
+      return res.status(409).json({ success: false, message: "This exam is already in the list!" });
     }
 
     const created = await ExamName.create({ name: trimmed });
     return res.status(201).json({
       success: true,
-      message: `'${trimmed}' add ho gaya!`,
+      message: `'${trimmed}' added!`,
       data: { _id: created._id, name: created.name },
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ success: false, message: "Ye exam pehle se list mein hai!" });
+      return res.status(409).json({ success: false, message: "This exam is already in the list!" });
     }
     console.error("addExamName error:", error);
-    return res.status(500).json({ success: false, message: "Exam add karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while adding the exam." });
   }
 };
 
@@ -60,12 +60,12 @@ export const deleteExamName = async (req, res) => {
 
     const deleted = await ExamName.findByIdAndDelete(id);
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Ye exam nahi mila." });
+      return res.status(404).json({ success: false, message: "Exam not found." });
     }
 
-    return res.status(200).json({ success: true, message: `'${deleted.name}' hata diya gaya.` });
+    return res.status(200).json({ success: true, message: `'${deleted.name}' removed.` });
   } catch (error) {
     console.error("deleteExamName error:", error);
-    return res.status(500).json({ success: false, message: "Exam delete karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while deleting the exam." });
   }
 };

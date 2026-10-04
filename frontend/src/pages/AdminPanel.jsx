@@ -28,23 +28,23 @@ const CreateMainTeacherCard = () => {
       const { emailSent, inviteLink } = res.data.data || {};
       // Email fail hua to link yahin dikhao — admin khud WhatsApp/SMS kar de
       if (emailSent === false && inviteLink) {
-        setMessage("✅ Teacher ban gaya, lekin email nahi ja paya. Ye link teacher ko khud bhejein:");
+        setMessage("✅ Teacher created, but the email could not be sent. Send this link to the teacher yourself:");
         setManualLink(inviteLink);
       } else {
-        setMessage("✅ Invite email bhej diya gaya hai!");
+        setMessage("✅ Invite email sent!");
       }
       setForm({ name: "", email: "", phone: "", examName: "" });
       setStatus("idle");
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
       setStatus("idle");
     }
   };
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
-      <h3 className="font-semibold text-base mb-1">Naya Main Teacher Banayein</h3>
-      <p className="text-xs text-gray-500 mb-4">Teacher ke email par ek invite link jayega, wo khud apna password set karega</p>
+      <h3 className="font-semibold text-base mb-1">Create a New Main Teacher</h3>
+      <p className="text-xs text-gray-500 mb-4">An invite link will be sent to the teacher's email; they will set their own password</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -61,12 +61,12 @@ const CreateMainTeacherCard = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input name="name" value={form.name} onChange={handleChange} placeholder="Naam" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
+        <input name="name" value={form.name} onChange={handleChange} placeholder="Name" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="email" type="email" value={form.email} onChange={handleChange} placeholder="email@example.com" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <input name="phone" value={form.phone} onChange={handleChange} placeholder="10-digit phone" required className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
-        <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exams, comma se alag (jaise UPSC, SSC CGL)" className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
+        <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exams, comma separated (e.g. UPSC, SSC CGL)" className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600" />
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm transition-colors disabled:opacity-50">
-          {status === "submitting" ? "Bhej rahe hain..." : "Invite Bhejein"}
+          {status === "submitting" ? "Sending..." : "Send Invite"}
         </button>
       </form>
     </div>
@@ -90,12 +90,12 @@ const JsonActionCard = ({ title, description, endpoint, placeholder, aiHint }) =
     try {
       const parsed = JSON.parse(raw);
       await api.post(endpoint, parsed);
-      setMessage("✅ Ho gaya!");
+      setMessage("✅ Done!");
     } catch (err) {
       if (err instanceof SyntaxError) {
-        setMessage("❌ JSON format galat hai — check karein.");
+        setMessage("❌ Invalid JSON format — please check.");
       } else {
-        setMessage(err.response?.data?.message || "Error aaya.");
+        setMessage(err.response?.data?.message || "Something went wrong.");
       }
     } finally {
       setStatus("idle");
@@ -107,9 +107,9 @@ const JsonActionCard = ({ title, description, endpoint, placeholder, aiHint }) =
     const text = `${aiHint}\n\n${placeholder}`;
     try {
       await navigator.clipboard.writeText(text);
-      setMessage("📋 Demo JSON + prompt copy ho gaya — AI chatbot mein paste kar dein.");
+      setMessage("📋 Demo JSON + prompt copied — paste it into an AI chatbot.");
     } catch {
-      setMessage("❌ Copy nahi ho paaya.");
+      setMessage("❌ Could not copy.");
     }
   };
 
@@ -125,7 +125,7 @@ const JsonActionCard = ({ title, description, endpoint, placeholder, aiHint }) =
         )}
         {aiHint && (
           <button type="button" onClick={copyDemoForAI} className="w-full mb-3 py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10">
-            📋 Demo JSON + AI Prompt Copy Karein
+            📋 Copy Demo JSON + AI Prompt
           </button>
         )}
         <form onSubmit={handleSubmit}>
@@ -136,7 +136,7 @@ const JsonActionCard = ({ title, description, endpoint, placeholder, aiHint }) =
             className="w-full px-3 py-2.5 text-xs font-mono bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white"
           />
           <button type="submit" disabled={status === "submitting"} className="mt-3 w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10 disabled:opacity-50">
-            {status === "submitting" ? "Bhej rahe hain..." : "Submit Karein"}
+            {status === "submitting" ? "Sending..." : "Submit"}
           </button>
         </form>
       </div>
@@ -174,7 +174,7 @@ const ManageExamNamesCard = () => {
       setNewName("");
       loadExams();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
     } finally {
       setStatus("idle");
     }
@@ -186,14 +186,14 @@ const ManageExamNamesCard = () => {
       await api.delete(`/admin/exam-names/${id}`);
       setExams((prev) => prev.filter((e) => e._id !== id));
     } catch (err) {
-      setMessage(err.response?.data?.message || "Delete nahi ho paaya.");
+      setMessage(err.response?.data?.message || "Could not delete.");
     }
   };
 
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
-      <h3 className="font-semibold text-base mb-1">Exam Names Manage Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Yahan add kiya naya exam turant signup/dropdown mein dikhne lagega</p>
+      <h3 className="font-semibold text-base mb-1">Manage Exam Names</h3>
+      <p className="text-xs text-gray-500 mb-4">A new exam added here appears immediately in signup/dropdowns</p>
 
       {message && (
         <div className="mb-4 p-3 rounded-lg text-xs text-center bg-red-500/10 text-red-400">{message}</div>
@@ -203,7 +203,7 @@ const ManageExamNamesCard = () => {
         <input
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
-          placeholder="Jaise: UPSSSC PET"
+          placeholder="e.g. UPSSSC PET"
           className="flex-1 px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600"
         />
         <button type="submit" disabled={status === "submitting"} className="px-5 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm transition-colors disabled:opacity-50 flex-shrink-0">
@@ -214,7 +214,7 @@ const ManageExamNamesCard = () => {
       {exams === null ? (
         <SkeletonBlock className="w-full h-24 rounded-xl" />
       ) : exams.length === 0 ? (
-        <p className="text-xs text-gray-500 text-center py-4">Abhi koi exam nahi hai.</p>
+        <p className="text-xs text-gray-500 text-center py-4">No exams yet.</p>
       ) : (
         <div className="flex flex-wrap gap-2">
           {exams.map((e) => (
@@ -299,7 +299,7 @@ const AddQuestionCard = () => {
   // koi normal sawaal daal diya jaaye, to wo hamesha ke liye invisible ho
   // jaata (mock-generator is topic ke liye Question pool dekhta hi nahi,
   // seedha UnseenPassage collection dekhta hai). Aise sawaal add karne ke
-  // liye "📖 Unseen Passage Add Karein" card use karein.
+  // liye "📖 Add Unseen Passage" card use karein.
   const topicOptions = (selectedSubject?.topics || []).filter((t) => !t.isUnseenPassage);
 
   const handleChange = (e) => setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -325,19 +325,19 @@ const AddQuestionCard = () => {
       option4: "चौथा विकल्प",
       correctOption: 1,
       answerExplain: "यहाँ व्याख्या लिखें (kyu ये सही उत्तर है)",
-      askedIn: "UPSSSC PET 2019 (SIRF tab bharein jab question kisi REAL pichhle exam mein aaya ho, warna is line ko poora hata dein)",
+      askedIn: "UPSSSC PET 2019 (fill ONLY if the question appeared in a REAL past exam, otherwise remove this line completely)",
     },
   ];
   const AI_PROMPT_HINT =
-    "Neeche diye JSON format mein mujhe [SUBJECT/TOPIC BADLEIN] ke [KITNE CHAHIYE VO NUMBER LIKHEIN] MCQ questions Hindi mein do. Sirf ek JSON array return karo, koi extra text/explanation mत likhna. correctOption hamesha 1,2,3,4 mein se ek number ho (1 ka matlab option1 sahi hai). 'askedIn' field SIRF tab bharo jab tumhe pakka pata ho ki ye sawaal kisi real pichhle exam mein aaya tha — warna 'askedIn' field poori tarah hata do, khaali mat chhodo.";
+    "Using the JSON format below, give me [NUMBER NEEDED] MCQ questions in Hindi for [CHANGE SUBJECT/TOPIC]. Return only one JSON array, do not write any extra text/explanation. correctOption must always be one of the numbers 1,2,3,4 (1 means option1 is correct). Fill the 'askedIn' field ONLY if you are sure the question appeared in a real past exam — otherwise remove the 'askedIn' field completely, do not leave it empty.";
 
   const copyDemoForAI = async () => {
     const text = `${AI_PROMPT_HINT}\n\n${JSON.stringify(DEMO_QUESTIONS, null, 2)}`;
     try {
       await navigator.clipboard.writeText(text);
-      setMessage("📋 Demo JSON + prompt copy ho gaya — ab kisi AI chatbot mein paste karke bhej dein.");
+      setMessage("📋 Demo JSON + prompt copied — now paste it into any AI chatbot and send.");
     } catch {
-      setMessage("❌ Copy nahi ho paaya, browser permission check karein.");
+      setMessage("❌ Could not copy — check browser permissions.");
     }
   };
 
@@ -346,11 +346,11 @@ const AddQuestionCard = () => {
     setMessage("");
 
     if (!form.subjectName.trim() || !form.topicName.trim() || !form.question.trim()) {
-      setMessage("❌ Subject, Topic aur Question — teeno zaroori hain.");
+      setMessage("❌ Subject, Topic and Question are all required.");
       return;
     }
     if (!form.option1 || !form.option2 || !form.option3 || !form.option4 || !form.correctOption) {
-      setMessage("❌ Chaaron options aur sahi answer chunna zaroori hai.");
+      setMessage("❌ All four options and the correct answer are required.");
       return;
     }
 
@@ -373,7 +373,7 @@ const AddQuestionCard = () => {
 
       await api.post("/add-question", fd, { headers: { "Content-Type": "multipart/form-data" } });
 
-      setMessage("✅ Question add ho gaya!");
+      setMessage("✅ Question added!");
       setCountThisSession((c) => c + 1);
       setQuestionPhoto(null);
       setAnswerPhoto(null);
@@ -386,7 +386,7 @@ const AddQuestionCard = () => {
         topicName: prev.topicName,
       }));
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
     } finally {
       setStatus("idle");
     }
@@ -399,22 +399,22 @@ const AddQuestionCard = () => {
     try {
       parsed = JSON.parse(bulkJson);
     } catch {
-      setMessage("❌ JSON format galat hai — check karein.");
+      setMessage("❌ Invalid JSON format — please check.");
       return;
     }
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      setMessage("❌ JSON ek array hona chahiye, kam se kam 1 question ke saath.");
+      setMessage("❌ JSON must be an array with at least 1 question.");
       return;
     }
 
     setStatus("submitting");
     try {
       await api.post("/add-question", parsed);
-      setMessage(`✅ ${parsed.length} questions add ho gaye!`);
+      setMessage(`✅ ${parsed.length} questions added!`);
       setCountThisSession((c) => c + parsed.length);
       setBulkJson("");
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
     } finally {
       setStatus("idle");
     }
@@ -426,17 +426,17 @@ const AddQuestionCard = () => {
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
       <div className="flex items-center justify-between mb-1">
-        <h3 className="font-semibold text-base">➕ Question Add Karein</h3>
-        {countThisSession > 0 && <span className="text-xs text-green-400">{countThisSession} is session mein add hue</span>}
+        <h3 className="font-semibold text-base">➕ Add Question</h3>
+        {countThisSession > 0 && <span className="text-xs text-green-400">{countThisSession} added this session</span>}
       </div>
-      <p className="text-xs text-gray-500 mb-4">Subject/Topic mein CHHOTA, SPECIFIC naam dalein (jaise "Number System", "Percentage") — bada combined naam (jaise "Elementary Arithmetic") dalne se mock test mein sirf 3 hi kabhi use honge, chahe kitne bhi daal do.</p>
+      <p className="text-xs text-gray-500 mb-4">Use a SHORT, SPECIFIC name for Subject/Topic (e.g. "Number System", "Percentage") — with a broad combined name (e.g. "Elementary Arithmetic") only 3 questions will ever be used in a mock test, no matter how many you add.</p>
 
       <div className="flex gap-2 mb-4">
         <button type="button" onClick={() => setMode("single")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "single" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-          Ek-Ek Karke (form)
+          One by one (form)
         </button>
         <button type="button" onClick={() => setMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${mode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-          Bulk JSON (AI se likhwa ke)
+          Bulk JSON (written with AI)
         </button>
       </div>
 
@@ -448,23 +448,23 @@ const AddQuestionCard = () => {
 
       {mode === "single" ? (
         <form onSubmit={handleSingleSubmit} className="space-y-3">
-          <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
+          <input name="examName" value={form.examName} onChange={handleChange} placeholder="Exam Name (e.g. UPSSSC PET)" className={inputClass} />
 
           {/* 🆕 Ab subject/topic TYPE nahi, blueprint se CHUNA jaata hai —
               isse spelling/spacing mismatch (jo mock ko khaali kar deta
               tha) hamesha ke liye khatam ho jaata hai */}
           {form.examName.trim() && structureLoading && (
-            <p className="text-xs text-gray-500">Blueprint check ho raha hai...</p>
+            <p className="text-xs text-gray-500">Checking blueprint...</p>
           )}
 
           {form.examName.trim() && !structureLoading && subjectOptions.length === 0 ? (
             <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
-              ⚠️ '{form.examName}' ke liye abhi koi Blueprint nahi mila. Pehle "📐 Blueprint Add Karein" se ek banayein, phir wahi subject/topic naam yahan dropdown mein milenge.
+              ⚠️ No Blueprint found for '{form.examName}' yet. First create one with "📐 Add Blueprint" — its subject/topic names will then appear in the dropdown here.
             </div>
           ) : subjectOptions.length > 0 ? (
             <>
               <select value={form.subjectName} onChange={handleSubjectSelect} className={inputClass}>
-                <option value="">Subject Chunein</option>
+                <option value="">Select Subject</option>
                 {subjectOptions.map((s) => <option key={s.subjectName} value={s.subjectName}>{s.subjectName}</option>)}
               </select>
 
@@ -478,22 +478,22 @@ const AddQuestionCard = () => {
                   name="topicName"
                   className={inputClass}
                 >
-                  <option value="">Topic Chunein</option>
+                  <option value="">Select Topic</option>
                   {topicOptions.map((t) => <option key={t.topicName} value={t.topicName}>{t.topicName}</option>)}
-                  <option value="__custom__">+ Naya topic likhein...</option>
+                  <option value="__custom__">+ Type a new topic...</option>
                 </select>
               )}
               {form.subjectName && useCustomTopic && (
                 <div className="flex gap-2">
-                  <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Naya topic naam (agla Blueprint update mein isi naam se add karein)" className={`${inputClass} flex-1`} />
+                  <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="New topic name (add it with this exact name in the next blueprint update)" className={`${inputClass} flex-1`} />
                   <button type="button" onClick={() => setUseCustomTopic(false)} className="px-3 rounded-xl bg-[#1F2937] border border-gray-700 text-xs text-gray-400">List</button>
                 </div>
               )}
             </>
           ) : (
             <>
-              <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject naam (exam type karte hi dropdown ban jayega)" className={inputClass} />
-              <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic naam" className={inputClass} />
+              <input name="subjectName" value={form.subjectName} onChange={handleChange} placeholder="Subject name (a dropdown appears once you type the exam)" className={inputClass} />
+              <input name="topicName" value={form.topicName} onChange={handleChange} placeholder="Topic name" className={inputClass} />
             </>
           )}
 
@@ -513,7 +513,7 @@ const AddQuestionCard = () => {
           </div>
 
           <select name="correctOption" value={form.correctOption} onChange={handleChange} className={inputClass}>
-            <option value="">Sahi Answer Chunein</option>
+            <option value="">Select Correct Answer</option>
             <option value="1">Option 1</option>
             <option value="2">Option 2</option>
             <option value="3">Option 3</option>
@@ -528,29 +528,29 @@ const AddQuestionCard = () => {
             <input type="file" accept="image/*" onChange={(e) => setAnswerPhoto(e.target.files?.[0] || null)} className={fileInputClass} />
           </div>
 
-          <input name="askedIn" value={form.askedIn} onChange={handleChange} placeholder='Pehle kab pucha gaya? jaise "UPSSSC PET 2019" (optional — sirf real ho to bharein)' className={inputClass} />
+          <input name="askedIn" value={form.askedIn} onChange={handleChange} placeholder='Asked in which exam before? e.g. "UPSSSC PET 2019" (optional — fill only if real)' className={inputClass} />
 
           <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-            {status === "submitting" ? "Add ho raha hai..." : "Question Add Karein"}
+            {status === "submitting" ? "Adding..." : "Add Question"}
           </button>
         </form>
       ) : (
         <form onSubmit={handleBulkSubmit} className="space-y-3">
           <button type="button" onClick={copyDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
-            📋 Demo JSON + AI Prompt Copy Karein
+            📋 Copy Demo JSON + AI Prompt
           </button>
-          <p className="text-[11px] text-gray-500">Upar wala button dabao → copy hua text kisi AI chatbot (ChatGPT/Claude/Gemini) mein paste karo → jo JSON array wapas mile, use neeche paste karke submit karo. Photo bulk mode mein add nahi ho sakti — photo wale questions "Ek-Ek Karke" mode se add karein.</p>
+          <p className="text-[11px] text-gray-500">Press the button above → paste the copied text into any AI chatbot (ChatGPT/Claude/Gemini) → paste the JSON array it returns below and submit. Photos can't be added in bulk mode — add questions with photos using "One by one" mode.</p>
 
           <textarea
             value={bulkJson}
             onChange={(e) => setBulkJson(e.target.value)}
             rows={12}
-            placeholder="Yahan AI se mila JSON array paste karein..."
+            placeholder="Paste the JSON array from the AI here..."
             className={`${inputClass} font-mono text-xs`}
           />
 
           <button type="submit" disabled={status === "submitting" || !bulkJson.trim()} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-            {status === "submitting" ? "Add ho raha hai..." : "Sabhi Questions Add Karein"}
+            {status === "submitting" ? "Adding..." : "Add All Questions"}
           </button>
         </form>
       )}
@@ -638,7 +638,7 @@ const AddBlueprintCard = () => {
     setMessage("");
 
     if (!examName.trim() || !blueprintName.trim()) {
-      setMessage("❌ Exam Name aur Blueprint Name zaroori hain.");
+      setMessage("❌ Exam Name and Blueprint Name are required.");
       return;
     }
 
@@ -657,7 +657,7 @@ const AddBlueprintCard = () => {
       .filter((s) => s.topics.length > 0);
 
     if (cleanSubjects.length === 0) {
-      setMessage("❌ Kam se kam ek subject, ek topic aur uska question count dalein.");
+      setMessage("❌ Add at least one subject, one topic and its question count.");
       return;
     }
 
@@ -673,11 +673,11 @@ const AddBlueprintCard = () => {
         totalQuestions,
         subjects: cleanSubjects,
       });
-      setMessage(`✅ '${blueprintName.trim()}' blueprint ban gaya! (${totalQuestions} questions, ${totalMarks} marks)`);
+      setMessage(`✅ '${blueprintName.trim()}' blueprint created! (${totalQuestions} questions, ${totalMarks} marks)`);
       setBlueprintName("");
       setSubjects([EMPTY_SUBJECT_ROW()]);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
     } finally {
       setStatus("idle");
     }
@@ -688,8 +688,8 @@ const AddBlueprintCard = () => {
 
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
-      <h3 className="font-semibold text-base mb-1">📐 Blueprint Add Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Har topic ka apna exact question count dalein — mock mein bilkul utna hi milega, koi hidden limit nahi. Unseen Passage bhi ab ek normal topic ki tarah, subject ke andar hi add hota hai.</p>
+      <h3 className="font-semibold text-base mb-1">📐 Add Blueprint</h3>
+      <p className="text-xs text-gray-500 mb-4">Enter the exact question count for each topic — the mock will have exactly that many, no hidden limit. Unseen Passage is now added inside a subject like any normal topic.</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -698,8 +698,8 @@ const AddBlueprintCard = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
-        <input value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} placeholder="Blueprint Name (jaise: UPSSSC PET Full Mock 1)" className={inputClass} />
+        <input value={examName} onChange={(e) => setExamName(e.target.value)} placeholder="Exam Name (e.g. UPSSSC PET)" className={inputClass} />
+        <input value={blueprintName} onChange={(e) => setBlueprintName(e.target.value)} placeholder="Blueprint Name (e.g. UPSSSC PET Full Mock 1)" className={inputClass} />
 
         <div className="grid grid-cols-2 gap-3">
           <select value={mockType} onChange={(e) => setMockType(e.target.value)} className={inputClass}>
@@ -727,7 +727,7 @@ const AddBlueprintCard = () => {
             {subjects.map((s, sIdx) => (
               <div key={sIdx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
                 <div className="flex gap-2 items-center">
-                  <input value={s.subjectName} onChange={(e) => updateSubjectName(sIdx, e.target.value)} placeholder="Subject naam (jaise: Reasoning, Maths & DI)" className={`${tinyInputClass} flex-1 min-w-0`} />
+                  <input value={s.subjectName} onChange={(e) => updateSubjectName(sIdx, e.target.value)} placeholder="Subject name (e.g. Reasoning, Maths & DI)" className={`${tinyInputClass} flex-1 min-w-0`} />
                   <span className="text-xs text-[#A78BFA] font-semibold flex-shrink-0 px-2">{subjectTotal(s)} Q</span>
                   <button type="button" onClick={() => removeSubjectRow(sIdx)} className="w-9 h-9 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10">✕</button>
                 </div>
@@ -746,24 +746,24 @@ const AddBlueprintCard = () => {
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic naam (jaise: Number System)" className={`${tinyInputClass} flex-1 min-w-0`} />
+                          <input value={t.topicName} onChange={(e) => updateTopic(sIdx, tIdx, "topicName", e.target.value)} placeholder="Topic name (e.g. Number System)" className={`${tinyInputClass} flex-1 min-w-0`} />
                           <input type="number" min="1" value={t.questionCount} onChange={(e) => updateTopic(sIdx, tIdx, "questionCount", e.target.value)} placeholder="Q" className={`${tinyInputClass} w-16 flex-shrink-0`} />
                           <button type="button" onClick={() => removeTopicRow(sIdx, tIdx)} className="w-7 h-7 flex-shrink-0 flex items-center justify-center rounded-lg text-gray-600 hover:text-red-400 text-xs">✕</button>
                         </div>
                       )}
                       <label className="flex items-center gap-1.5 text-[10px] text-gray-500 pl-1">
                         <input type="checkbox" checked={t.isUnseenPassage} onChange={() => toggleUnseenPassage(sIdx, tIdx)} className="accent-[#7C3AED]" />
-                        Ye ek Unseen Passage topic hai (poora passage + uske sawaal ek saath aayenge)
+                        This is an Unseen Passage topic (the full passage and its questions appear together)
                       </label>
                     </div>
                   ))}
-                  <button type="button" onClick={() => addTopicRow(sIdx)} className="text-[11px] text-[#A78BFA] hover:underline">+ Topic Jodein</button>
+                  <button type="button" onClick={() => addTopicRow(sIdx)} className="text-[11px] text-[#A78BFA] hover:underline">+ Add Topic</button>
                 </div>
               </div>
             ))}
           </div>
           <button type="button" onClick={addSubjectRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
-            + Aur Subject Jodein
+            + Add Another Subject
           </button>
         </div>
 
@@ -773,7 +773,7 @@ const AddBlueprintCard = () => {
         </div>
 
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-          {status === "submitting" ? "Bana rahe hain..." : "Blueprint Banayein"}
+          {status === "submitting" ? "Creating..." : "Create Blueprint"}
         </button>
       </form>
     </div>
@@ -831,12 +831,12 @@ const AddUnseenPassageCard = () => {
     setMessage("");
 
     if (!examName.trim() || !subjectName || !topicName || !passageText.trim()) {
-      setMessage("❌ Exam Name, Subject, Topic aur Passage text zaroori hain.");
+      setMessage("❌ Exam Name, Subject, Topic and Passage text are required.");
       return;
     }
     const validQuestions = questions.filter((q) => q.question.trim() && q.option1 && q.option2 && q.option3 && q.option4 && q.correctOption);
     if (validQuestions.length === 0) {
-      setMessage("❌ Kam se kam ek poora sawaal (options + sahi answer ke saath) dalein.");
+      setMessage("❌ Add at least one complete question (with options and the correct answer).");
       return;
     }
 
@@ -858,11 +858,11 @@ const AddUnseenPassageCard = () => {
           answerExplain: q.answerExplain.trim(),
         })),
       });
-      setMessage(`✅ Passage add ho gaya! (${validQuestions.length} questions)`);
+      setMessage(`✅ Passage added! (${validQuestions.length} questions)`);
       setPassageText("");
       setQuestions([{ ...EMPTY_PASSAGE_Q }]);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Error aaya.");
+      setMessage(err.response?.data?.message || "Something went wrong.");
     } finally {
       setStatus("idle");
     }
@@ -873,8 +873,8 @@ const AddUnseenPassageCard = () => {
 
   return (
     <div className="bg-[#111827] border border-[#7C3AED]/40 rounded-2xl p-5 sm:p-6">
-      <h3 className="font-semibold text-base mb-1">📖 Unseen Passage Add Karein</h3>
-      <p className="text-xs text-gray-500 mb-4">Ek passage + uske saare sawaal ek saath — jis subject/topic ko yahan chunoge, mock mein wahi sawaal usi subject ke andar, ek block mein saath-saath aayenge.</p>
+      <h3 className="font-semibold text-base mb-1">📖 Add Unseen Passage</h3>
+      <p className="text-xs text-gray-500 mb-4">One passage + all its questions together — in a mock, these questions appear as one block inside the subject/topic you choose here.</p>
 
       {message && (
         <div className={`mb-4 p-3 rounded-lg text-xs text-center ${message.startsWith("✅") ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
@@ -883,33 +883,33 @@ const AddUnseenPassageCard = () => {
       )}
 
       <form onSubmit={handleSubmit} className="space-y-3">
-        <input value={examName} onChange={(e) => { setExamName(e.target.value); setSubjectName(""); setTopicName(""); }} placeholder="Exam Name (jaise: UPSSSC PET)" className={inputClass} />
+        <input value={examName} onChange={(e) => { setExamName(e.target.value); setSubjectName(""); setTopicName(""); }} placeholder="Exam Name (e.g. UPSSSC PET)" className={inputClass} />
 
-        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprint check ho raha hai...</p>}
+        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Checking blueprint...</p>}
         {examName.trim() && !structureLoading && subjectsWithPassage.length === 0 ? (
           <div className="p-3 bg-amber-500/10 border border-amber-500/25 rounded-xl text-xs text-amber-400">
-            ⚠️ '{examName}' ke liye koi Unseen Passage topic nahi mila. Pehle "📐 Blueprint Add Karein" mein kisi subject ke andar ek topic ko "Unseen Passage" mark karein.
+            ⚠️ No Unseen Passage topic found for '{examName}'. First, in "📐 Add Blueprint", mark a topic inside a subject as "Unseen Passage".
           </div>
         ) : subjectsWithPassage.length > 0 ? (
           <>
             <select value={subjectName} onChange={(e) => { setSubjectName(e.target.value); setTopicName(""); }} className={inputClass}>
-              <option value="">Subject Chunein</option>
+              <option value="">Select Subject</option>
               {subjectsWithPassage.map((s) => <option key={s.subjectName} value={s.subjectName}>{s.subjectName}</option>)}
             </select>
 
             {subjectName && (
               <select value={topicName} onChange={(e) => setTopicName(e.target.value)} className={inputClass}>
-                <option value="">Passage Topic Chunein</option>
+                <option value="">Select Passage Topic</option>
                 {passageTopics.map((t) => <option key={t.topicName} value={t.topicName}>{t.topicName}</option>)}
               </select>
             )}
           </>
         ) : null}
 
-        <textarea value={passageText} onChange={(e) => setPassageText(e.target.value)} rows={6} placeholder="Poora passage yahan paste karein..." className={inputClass} />
+        <textarea value={passageText} onChange={(e) => setPassageText(e.target.value)} rows={6} placeholder="Paste the full passage here..." className={inputClass} />
 
         <div>
-          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-3 mb-2">Is Passage Ke Sawaal</p>
+          <p className="text-xs font-semibold tracking-wider text-gray-400 uppercase mt-3 mb-2">Questions for this passage</p>
           <div className="space-y-3">
             {questions.map((q, idx) => (
               <div key={idx} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3 space-y-2">
@@ -917,7 +917,7 @@ const AddUnseenPassageCard = () => {
                   <span className="text-[11px] text-gray-500">Question {idx + 1}</span>
                   <button type="button" onClick={() => removeQuestionRow(idx)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
                 </div>
-                <textarea value={q.question} onChange={(e) => updateQuestion(idx, "question", e.target.value)} rows={2} placeholder="Sawaal" className={`${tinyInputClass} w-full`} />
+                <textarea value={q.question} onChange={(e) => updateQuestion(idx, "question", e.target.value)} rows={2} placeholder="Question" className={`${tinyInputClass} w-full`} />
                 <div className="grid grid-cols-2 gap-2">
                   <input value={q.option1} onChange={(e) => updateQuestion(idx, "option1", e.target.value)} placeholder="Option 1" className={tinyInputClass} />
                   <input value={q.option2} onChange={(e) => updateQuestion(idx, "option2", e.target.value)} placeholder="Option 2" className={tinyInputClass} />
@@ -925,7 +925,7 @@ const AddUnseenPassageCard = () => {
                   <input value={q.option4} onChange={(e) => updateQuestion(idx, "option4", e.target.value)} placeholder="Option 4" className={tinyInputClass} />
                 </div>
                 <select value={q.correctOption} onChange={(e) => updateQuestion(idx, "correctOption", e.target.value)} className={`${tinyInputClass} w-full`}>
-                  <option value="">Sahi Answer Chunein</option>
+                  <option value="">Select Correct Answer</option>
                   <option value="1">Option 1</option>
                   <option value="2">Option 2</option>
                   <option value="3">Option 3</option>
@@ -936,12 +936,12 @@ const AddUnseenPassageCard = () => {
             ))}
           </div>
           <button type="button" onClick={addQuestionRow} className="mt-2 w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
-            + Aur Sawaal Jodein
+            + Add Another Question
           </button>
         </div>
 
         <button type="submit" disabled={status === "submitting"} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-          {status === "submitting" ? "Add ho raha hai..." : "Passage Add Karein"}
+          {status === "submitting" ? "Adding..." : "Add Passage"}
         </button>
       </form>
     </div>
@@ -977,7 +977,7 @@ const BlueprintCoverageCard = () => {
 
   const handleCheck = async () => {
     if (!examName.trim() || !blueprintName) {
-      setMessage("❌ Exam aur Blueprint dono chunein.");
+      setMessage("❌ Select both Exam and Blueprint.");
       return;
     }
     setChecking(true);
@@ -987,7 +987,7 @@ const BlueprintCoverageCard = () => {
       const res = await api.get(`/admin/blueprint-coverage/${encodeURIComponent(examName.trim())}/${encodeURIComponent(blueprintName)}`);
       setReport(res.data.data);
     } catch (err) {
-      setMessage(err.response?.data?.message || "Coverage check nahi ho paaya.");
+      setMessage(err.response?.data?.message || "Could not check coverage.");
     } finally {
       setChecking(false);
     }
@@ -998,21 +998,21 @@ const BlueprintCoverageCard = () => {
   return (
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
       <h3 className="font-semibold text-base mb-1">🔍 Blueprint Coverage Check</h3>
-      <p className="text-xs text-gray-500 mb-4">Mock generate karne se PEHLE check karo — har topic mein kitne question chahiye, kitne maujood hain.</p>
+      <p className="text-xs text-gray-500 mb-4">Check BEFORE generating a mock — how many questions each topic needs and how many exist.</p>
 
       {message && <div className="mb-4 p-3 rounded-lg text-xs text-center bg-red-500/10 text-red-400">{message}</div>}
 
       <div className="space-y-3 mb-4">
         <input value={examName} onChange={(e) => { setExamName(e.target.value); setBlueprintName(""); setReport(null); }} placeholder="Exam Name" className={inputClass} />
-        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Blueprints load ho rahe hain...</p>}
+        {examName.trim() && structureLoading && <p className="text-xs text-gray-500">Loading blueprints...</p>}
         {examName.trim() && !structureLoading && blueprintOptions.length > 0 && (
           <select value={blueprintName} onChange={(e) => { setBlueprintName(e.target.value); setReport(null); }} className={inputClass}>
-            <option value="">Blueprint Chunein</option>
+            <option value="">Select Blueprint</option>
             {blueprintOptions.map((b) => <option key={b.blueprintName} value={b.blueprintName}>{b.blueprintName}</option>)}
           </select>
         )}
         <button onClick={handleCheck} disabled={checking || !blueprintName} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-          {checking ? "Check ho raha hai..." : "Coverage Check Karein"}
+          {checking ? "Checking..." : "Check Coverage"}
         </button>
       </div>
 
@@ -1020,13 +1020,13 @@ const BlueprintCoverageCard = () => {
         <div className="space-y-3">
           <div className={`p-3 rounded-xl text-sm font-medium text-center ${report.anyShort ? "bg-amber-500/10 text-amber-400 border border-amber-500/25" : "bg-green-500/10 text-green-400 border border-green-500/25"}`}>
             {report.anyShort
-              ? `⚠️ Abhi mock generate karoge to sirf ~${report.totalAvailable} / ${report.totalNeeded} questions milenge`
-              : `✅ Sab theek hai — poore ${report.totalNeeded} questions available hain`}
+              ? `⚠️ If you generate a mock now, only ~${report.totalAvailable} / ${report.totalNeeded} questions will be available`
+              : `✅ All good — all ${report.totalNeeded} questions are available`}
           </div>
 
           {report.subjects.map((s) => (
             <div key={s.subjectName} className="bg-[#0A0D14] border border-gray-800 rounded-xl p-3">
-              <p className="text-xs font-semibold text-gray-300 mb-2">{s.subjectName} <span className="text-gray-500">({s.needed} chahiye)</span></p>
+              <p className="text-xs font-semibold text-gray-300 mb-2">{s.subjectName} <span className="text-gray-500">({s.needed} needed)</span></p>
               <div className="space-y-1.5">
                 {s.topics.map((t) => (
                   <div key={t.topicName} className="flex items-center justify-between text-xs">
@@ -1106,8 +1106,8 @@ const AdminPanel = () => {
           onClick={() => navigate("/AdminPromoters")}
           className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-5 sm:p-6 transition-colors"
         >
-          <h3 className="font-semibold text-base mb-1">Promoters Manage Karein →</h3>
-          <p className="text-xs text-gray-500">Naya promoter banayein, students/questions dekhein, hisab settle karein</p>
+          <h3 className="font-semibold text-base mb-1">Manage Promoters →</h3>
+          <p className="text-xs text-gray-500">Create promoters, see students/questions, settle payments</p>
         </button>
 
         <button
@@ -1115,7 +1115,7 @@ const AdminPanel = () => {
           className="w-full text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-5 sm:p-6 transition-colors"
         >
           <h3 className="font-semibold text-base mb-1">Teacher Commission →</h3>
-          <p className="text-xs text-gray-500">Main teachers ka question count dekhein aur hisab settle karein</p>
+          <p className="text-xs text-gray-500">See main teachers' question counts and settle payments</p>
         </button>
 
         <div className="grid grid-cols-2 gap-3">
@@ -1124,7 +1124,7 @@ const AdminPanel = () => {
             className="text-left bg-[#111827] border border-gray-800 hover:border-[#7C3AED] rounded-2xl p-4 transition-colors"
           >
             <span className="text-2xl block mb-1">📚</span>
-            <h3 className="font-semibold text-sm">Books Manage Karein</h3>
+            <h3 className="font-semibold text-sm">Manage Books</h3>
             <p className="text-[11px] text-gray-500 mt-0.5">Add, price, stock</p>
           </button>
           <button
@@ -1133,7 +1133,7 @@ const AdminPanel = () => {
           >
             <span className="text-2xl block mb-1">📦</span>
             <h3 className="font-semibold text-sm">Book Orders</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">Ship / deliver karein</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Ship / deliver</p>
           </button>
           <button
             onClick={() => navigate("/ManageNotes")}
@@ -1141,7 +1141,7 @@ const AdminPanel = () => {
           >
             <span className="text-2xl block mb-1">📝</span>
             <h3 className="font-semibold text-sm">Study Notes</h3>
-            <p className="text-[11px] text-gray-500 mt-0.5">Exam-wise PDF notes upload karein</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Upload exam-wise PDF notes</p>
           </button>
         </div>
 
@@ -1149,35 +1149,35 @@ const AdminPanel = () => {
           <p className="text-xs font-semibold tracking-wider text-gray-500 uppercase">Content (Advanced)</p>
 
           <JsonActionCard
-            title="📊 Rank Predictor Data Add Karein"
+            title="📊 Add Rank Predictor Data"
             description="examName, year, dataPoints ([{score, rank}]), totalCandidates, totalVacancies, isActive"
             endpoint="/add-rank-predictor-data"
             placeholder={JSON.stringify({ examName: "UPSC", year: 2026, dataPoints: [{ score: 150, rank: 500 }], totalCandidates: 500000, totalVacancies: 1000, isActive: true }, null, 2)}
-            aiHint="Neeche diye JSON format mein mujhe [EXAM NAAM BADLEIN] ke liye realistic score-vs-rank dataPoints do (kam se kam 8-10 points, high score se low score tak). Sirf ek JSON object return karo, koi extra text nahi."
+            aiHint="Using the JSON format below, give me realistic score-vs-rank dataPoints for [CHANGE EXAM NAME] (at least 8-10 points, from high score to low score). Return only one JSON object, no extra text."
           />
 
           <JsonActionCard
-            title="📄 Previous Year Test (Global) Add Karein"
+            title="📄 Add Previous Year Test (Global)"
             description="examName, testName, year, description, subjects ([{subjectName, questions: [...]}]), marksPerQuestion, negativeMarking, durationMinutes"
             endpoint="/add-previous-year-test"
             placeholder={JSON.stringify({ examName: "UPSC", testName: "UPSC Prelims 2025", year: 2025, description: "", subjects: [{ subjectName: "History", questions: [{ question: "यहाँ सवाल", option1: "विकल्प 1", option2: "विकल्प 2", option3: "विकल्प 3", option4: "विकल्प 4", correctOption: 1, answerExplain: "व्याख्या", topicName: "Ancient India" }] }], marksPerQuestion: 2, negativeMarking: 0.5, durationMinutes: 120 }, null, 2)}
-            aiHint="Neeche diye JSON format mein mujhe [EXAM NAAM] ke [SAAL] ke previous year paper jaisa poora test do — [SUBJECT NAAM BADLEIN] subject ke [KITNE CHAHIYE] MCQ questions Hindi mein. correctOption 1-4 number ho. Sirf ek JSON object return karo, koi extra text nahi."
+            aiHint="Using the JSON format below, give me a complete test like the [YEAR] previous year paper of [EXAM NAME] — [NUMBER NEEDED] MCQ questions in Hindi for the [CHANGE SUBJECT NAME] subject. correctOption must be a number 1-4. Return only one JSON object, no extra text."
           />
 
           <JsonActionCard
-            title="📰 Current Affair Add Karein"
+            title="📰 Add Current Affair"
             description="examName, date (YYYY-MM-DD), title, items ([{headline, content, category, source}])"
             endpoint="/add-current-affair"
-            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", title: "Daily Current Affairs", items: [{ headline: "यहाँ headline", content: "yahan poora detail", category: "National", source: "PIB" }] }, null, 2)}
-            aiHint="Neeche diye JSON format mein mujhe [TAREEKH] ke [EXAM NAAM] ke liye [KITNI CHAHIYE] real current affairs items do (asli, verified khabrein — banayi hui nahi). Sirf ek JSON object return karo, koi extra text nahi."
+            placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", title: "Daily Current Affairs", items: [{ headline: "यहाँ headline", content: "full detail here", category: "National", source: "PIB" }] }, null, 2)}
+            aiHint="Using the JSON format below, give me [NUMBER NEEDED] real current affairs items for [EXAM NAME] for [DATE] (real, verified news — not made up). Return only one JSON object, no extra text."
           />
 
           <JsonActionCard
-            title="📝 Current Affair Quiz Add Karein"
+            title="📝 Add Current Affair Quiz"
             description="examName, date (YYYY-MM-DD), questions ([{question, option1..4, correctOption, answerExplain}])"
             endpoint="/add-current-affair-quiz"
             placeholder={JSON.stringify({ examName: "UPSC", date: "2026-09-17", questions: [{ question: "यहाँ सवाल", option1: "विकल्प 1", option2: "विकल्प 2", option3: "विकल्प 3", option4: "विकल्प 4", correctOption: 1, answerExplain: "व्याख्या" }] }, null, 2)}
-            aiHint="Neeche diye JSON format mein mujhe [TAREEKH] ke real current affairs par based [KITNE CHAHIYE] quiz questions do. correctOption 1-4 number ho. Sirf ek JSON object return karo, koi extra text nahi."
+            aiHint="Using the JSON format below, give me [NUMBER NEEDED] quiz questions based on the real current affairs of [DATE]. correctOption must be a number 1-4. Return only one JSON object, no extra text."
           />
         </div>
       </div>

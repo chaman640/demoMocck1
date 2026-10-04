@@ -52,19 +52,19 @@ const raw = String(process.env.JWT_SECRET || "").trim();
 
 const die = (why) => {
   console.error("\n" + "═".repeat(62));
-  console.error("❌ SERVER START NAHI HO SAKTA — JWT_SECRET ki problem");
+  console.error("❌ SERVER CANNOT START — JWT_SECRET problem");
   console.error("═".repeat(62));
   console.error(why);
   console.error("");
-  console.error("THEEK KARNE KA TARIKA:");
-  console.error("  1. Ek naya random secret banayein:");
+  console.error("HOW TO FIX:");
+  console.error("  1. Generate a new random secret:");
   console.error('       node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"');
-  console.error("  2. Render → aapki service → Environment → Add Environment Variable");
+  console.error("  2. Render → your service → Environment → Add Environment Variable");
   console.error("       Key   : JWT_SECRET");
-  console.error("       Value : <upar wali command ka output>");
-  console.error("  3. Save karke redeploy karein.");
+  console.error("       Value : <output of the command above>");
+  console.error("  3. Save and redeploy.");
   console.error("");
-  console.error("  ⚠️ Secret badalne par SAARE users ek baar logout ho jayenge — ye normal hai.");
+  console.error("  ⚠️ Changing the secret will log ALL users out once — this is normal.");
   console.error("═".repeat(62) + "\n");
   process.exit(1);
 };
@@ -73,37 +73,37 @@ let secret;
 
 if (!raw) {
   if (isProduction) {
-    die("JWT_SECRET set hi nahi hai (production mein ye zaroori hai).");
+    die("JWT_SECRET is not set at all (it is required in production).");
   }
   secret = DEV_FALLBACK;
   console.warn(
-    "\n⚠️  JWT_SECRET set nahi hai — development ka temporary secret use ho raha hai.\n" +
-      "    Production pe jaane se pehle ise .env / Render me zaroor set karein.\n"
+    "\n⚠️  JWT_SECRET is not set — using a temporary development secret.\n" +
+      "    Make sure to set it in .env / Render before going to production.\n"
   );
 } else if (LEAKED_DEFAULTS.has(raw.toLowerCase())) {
   if (isProduction) {
     die(
-      `JWT_SECRET ki value "${raw}" hai — ye ek jaani-pehchaani (leaked) value hai.\n` +
-        "Isse koi bhi banda kisi ka bhi login token bana sakta hai."
+      `The JWT_SECRET value is "${raw}" — this is a well-known (leaked) value.\n` +
+        "Anyone can use it to create a login token for any user."
     );
   }
   secret = raw;
-  console.warn(`\n⚠️  JWT_SECRET ki value "${raw}" bahut kamzor/leaked hai. Production se pehle badlein.\n`);
+  console.warn(`\n⚠️  The JWT_SECRET value "${raw}" is very weak/leaked. Change it before production.\n`);
 } else if (isProduction && raw.length < 16) {
   // 16 se chhota secret sach mein brute-force ho sakta hai — yahan rukna hi padega
   die(
-    `JWT_SECRET sirf ${raw.length} characters ka hai. Itna chhota secret ` +
-      "brute-force se toda ja sakta hai. Kam se kam 32 (aur behtar 64+) rakhein."
+    `JWT_SECRET is only ${raw.length} characters long. A secret this short ` +
+      "can be brute-forced. Use at least 32 (better 64+)."
   );
 } else {
   secret = raw;
   if (raw.length < 32) {
     // Site ko down karna theek nahi — bas har startup pe yaad dilate rahenge
     console.warn("\n" + "⚠".repeat(31));
-    console.warn(`⚠️  JWT_SECRET sirf ${raw.length} characters ka hai — kamzor hai.`);
-    console.warn("    Naya banayein aur Render ki Environment mein badal dein:");
+    console.warn(`⚠️  JWT_SECRET is only ${raw.length} characters long — it is weak.`);
+    console.warn("    Generate a new one and replace it in Render's Environment:");
     console.warn('      node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"');
-    console.warn("    (Badalne par sabhi users ek baar logout ho jayenge — ye normal hai.)");
+    console.warn("    (After changing it, all users will be logged out once — this is normal.)");
     console.warn("⚠".repeat(31) + "\n");
   }
 }

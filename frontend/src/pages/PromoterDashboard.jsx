@@ -35,7 +35,7 @@ const ChangeCodeCard = ({ currentCode, onChanged }) => {
       onChanged();
     } catch (err) {
       const sugg = err.response?.data?.suggestions;
-      setMsg((err.response?.data?.message || "Code badal nahi paya.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
+      setMsg((err.response?.data?.message || "Could not change the code.") + (sugg?.length ? ` Try: ${sugg.join(", ")}` : ""));
     } finally {
       setSaving(false);
     }
@@ -45,21 +45,21 @@ const ChangeCodeCard = ({ currentCode, onChanged }) => {
     <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="font-semibold text-sm">Apna code chunein</h3>
-          <p className="text-[11px] text-gray-500">Abhi: <span className="font-mono text-gray-300">{currentCode}</span></p>
+          <h3 className="font-semibold text-sm">Choose your code</h3>
+          <p className="text-[11px] text-gray-500">Current: <span className="font-mono text-gray-300">{currentCode}</span></p>
         </div>
         {!open && (
           <button onClick={() => setOpen(true)} className="px-3 py-2 rounded-xl border border-gray-700 text-xs font-semibold text-gray-200">
-            Badlein
+            Change
           </button>
         )}
       </div>
       {msg && <p className={`text-xs mt-3 ${msg.startsWith("✅") ? "text-green-400" : "text-red-400"}`}>{msg}</p>}
       {open && (
         <div className="mt-4 space-y-3">
-          <CodePicker label="Naya code" optional={false} value={code} onChange={setCode} onStatusChange={setStatus} currentCode={currentCode} />
+          <CodePicker label="New code" optional={false} value={code} onChange={setCode} onStatusChange={setStatus} currentCode={currentCode} />
           <p className="text-[11px] text-amber-300/90">
-            Dhyan dein: code badalne par purana link kaam nahi karega. Jo students pehle jud chuke hain wo aapke hi rahenge.
+            Note: after changing the code, the old link will stop working. Students who already joined stay yours.
           </p>
           <div className="flex gap-2">
             <button onClick={() => { setOpen(false); setCode(""); }} className="flex-1 py-2.5 rounded-xl border border-gray-700 text-xs text-gray-300">
@@ -70,7 +70,7 @@ const ChangeCodeCard = ({ currentCode, onChanged }) => {
               disabled={saving || status !== "available" || code === currentCode}
               className="flex-1 py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-50"
             >
-              {saving ? "Save ho raha hai..." : "Ye code lein"}
+              {saving ? "Saving..." : "Take this code"}
             </button>
           </div>
         </div>
@@ -131,9 +131,9 @@ const PromoterDashboard = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Dashboard load nahi ho paya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load the dashboard."}</p>
           <button onClick={() => refetch()} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
       </div>
@@ -164,9 +164,9 @@ const PromoterDashboard = () => {
         </div>
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
-          <h3 className="font-semibold text-sm mb-2">Aapka Signup Link</h3>
+          <h3 className="font-semibold text-sm mb-2">Your Signup Link</h3>
           <p className="text-[11px] text-gray-500 mb-3">
-            Ye link students ko bhejein — wo is se signup karenge to seedhe aapke naam par jud jayenge.
+            Send this link to students — when they sign up with it, they are linked to you directly.
           </p>
           <div className="flex items-center gap-2">
             <div className="flex-1 min-w-0 px-3 py-2.5 bg-[#0A0D14] border border-gray-700 rounded-xl text-xs text-gray-300 truncate">
@@ -193,7 +193,7 @@ const PromoterDashboard = () => {
                 <div key={idx} className="flex items-center justify-between px-4 py-3">
                   <div>
                     <p className="text-sm text-white">{new Date(entry.settledAt).toLocaleDateString()}</p>
-                    <p className="text-[11px] text-gray-500">{entry.questionsSettled} questions settle hui</p>
+                    <p className="text-[11px] text-gray-500">{entry.questionsSettled} questions settled</p>
                     {entry.note && <p className="text-[11px] text-gray-600 mt-0.5">{entry.note}</p>}
                   </div>
                   <span className="text-sm font-semibold text-[#A78BFA]">₹{entry.amount}</span>
@@ -201,7 +201,7 @@ const PromoterDashboard = () => {
               ))}
             </div>
           ) : (
-            <p className="text-xs text-gray-500 px-4 py-6 text-center">Abhi tak koi hisab settle nahi hua hai.</p>
+            <p className="text-xs text-gray-500 px-4 py-6 text-center">No payments settled yet.</p>
           )}
         </div>
       </div>

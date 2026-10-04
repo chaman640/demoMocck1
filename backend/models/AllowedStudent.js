@@ -26,7 +26,7 @@ const allowedStudentSchema = new mongoose.Schema(
 // Kam se kam ek (phone ya email) hona zaroori hai
 allowedStudentSchema.pre("validate", function (next) {
   if (!this.phone && !this.email) {
-    return next(new Error("Phone ya email mein se ek zaroori hai."));
+    return next(new Error("Either phone or email is required."));
   }
   next();
 });

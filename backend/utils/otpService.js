@@ -31,7 +31,7 @@ export const createAndSendOtp = async (email, purpose) => {
     const secondsSinceLastSend = (Date.now() - recent.createdAt.getTime()) / 1000;
     if (secondsSinceLastSend < RESEND_COOLDOWN_SECONDS) {
       const waitMore = Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSinceLastSend);
-      const err = new Error(`Kripya ${waitMore} second baad dobara try karein.`);
+      const err = new Error(`Please try again after ${waitMore} seconds.`);
       err.statusCode = 429;
       throw err;
     }
@@ -69,19 +69,19 @@ export const verifyOtpCode = async (email, purpose, inputOtp) => {
   const record = await Otp.findOne({ identifier, purpose }).sort({ createdAt: -1 });
 
   if (!record) {
-    const err = new Error("Koi OTP request nahi mili. Pehle OTP mangwayein.");
+    const err = new Error("No OTP request found. Request an OTP first.");
     err.statusCode = 400;
     throw err;
   }
   if (record.expiresAt < new Date()) {
     await Otp.deleteOne({ _id: record._id });
-    const err = new Error("OTP expire ho gaya. Naya OTP mangwayein.");
+    const err = new Error("OTP has expired. Request a new OTP.");
     err.statusCode = 400;
     throw err;
   }
   if (record.attempts >= MAX_VERIFY_ATTEMPTS) {
     await Otp.deleteOne({ _id: record._id });
-    const err = new Error("Bahut zyada galat attempts. Naya OTP mangwayein.");
+    const err = new Error("Too many wrong attempts. Request a new OTP.");
     err.statusCode = 400;
     throw err;
   }
@@ -91,7 +91,7 @@ export const verifyOtpCode = async (email, purpose, inputOtp) => {
     record.attempts += 1;
     await record.save();
     const remaining = Math.max(0, MAX_VERIFY_ATTEMPTS - record.attempts);
-    const err = new Error(`Galat OTP. ${remaining} attempts baaki hain.`);
+    const err = new Error(`Wrong OTP. ${remaining} attempts left.`);
     err.statusCode = 400;
     throw err;
   }

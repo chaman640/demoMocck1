@@ -89,7 +89,7 @@ const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
     return (
       <p className="text-gray-400 text-sm text-center py-6">
-        Abhi tak koi attempt nahi hua.
+        No attempts yet.
       </p>
     );
   }
@@ -123,10 +123,10 @@ const LeaderboardList = ({ leaderboard, currentUserId }) => {
               </span>
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">
-                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(You)</span>}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                  {entry.correctCount} correct &middot; {entry.wrongCount} wrong
                 </p>
               </div>
             </div>
@@ -178,7 +178,7 @@ const Challenge = () => {
     const bpRes = await api.get(`/blueprints/${encodeURIComponent(exam)}`);
     const list = bpRes.data.data || [];
     if (list.length === 0) {
-      throw new Error("Aapke exam ke liye abhi koi mock test available nahi hai.");
+      throw new Error("No mock test is available for your exam yet.");
     }
     const chosenBlueprint = list.find((b) => b.mockType === "Full") || list[0];
 
@@ -200,7 +200,7 @@ const Challenge = () => {
       await generateNewChallenge(userExam, userId);
       setPhase("created");
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || err.message || "Naya challenge nahi ban paaya.");
+      setErrorMsg(err.response?.data?.message || err.message || "Could not create a new challenge.");
       setPhase("error");
     }
   };
@@ -325,7 +325,7 @@ const Challenge = () => {
         setPhase("instructions");
       }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the test.");
       setPhase("error");
     }
   };
@@ -439,7 +439,7 @@ const Challenge = () => {
         await loadLeaderboard(effectiveCode);
         setPhase("leaderboard");
       } else {
-        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setErrorMsg(err.response?.data?.message || "Submit failed.");
         setPhase("error");
       }
     }
@@ -470,7 +470,7 @@ const Challenge = () => {
     try {
       localStorage.setItem(getChallengeAttemptStorageKey(userId), JSON.stringify(toSave));
     } catch (err) {
-      console.error("Challenge attempt state save nahi ho paayi:", err);
+      console.error("Could not save the challenge attempt state:", err);
     }
   }, [
     phase,
@@ -582,7 +582,7 @@ const Challenge = () => {
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -597,9 +597,9 @@ const Challenge = () => {
           <div className="w-16 h-16 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-3xl mb-4">
             🎉
           </div>
-          <h2 className="text-xl font-bold mb-2">Challenge Taiyaar Hai!</h2>
+          <h2 className="text-xl font-bold mb-2">Challenge Ready!</h2>
           <p className="text-gray-400 text-sm mb-6">
-            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} sawaal
+            {createdChallenge.blueprintName} — {createdChallenge.totalQuestions} questions
           </p>
 
           <div className="bg-[#1F2937] border border-gray-700 rounded-lg p-3 mb-4 text-sm break-all text-gray-300">
@@ -610,7 +610,7 @@ const Challenge = () => {
             onClick={copyLink}
             className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
           >
-            {copied ? "Link Copy Ho Gaya ✓" : "Link Copy Karein"}
+            {copied ? "Link Copied ✓" : "Copy Link"}
           </button>
           <button
             onClick={startOwnTest}
@@ -622,13 +622,13 @@ const Challenge = () => {
             onClick={handleCreateNewChallenge}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-400 hover:text-gray-200 font-medium mb-3"
           >
-            Ek Naya Challenge Banao
+            Create a New Challenge
           </button>
           <button
             onClick={() => navigate("/HomePage")}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -639,7 +639,7 @@ const Challenge = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
         <div className="max-w-2xl mx-auto bg-[#111827] border border-gray-800 rounded-2xl p-8">
-          <h1 className="text-2xl font-bold mb-1">Tumhe Challenge Mila Hai! ⚔️</h1>
+          <h1 className="text-2xl font-bold mb-1">You've Been Challenged! ⚔️</h1>
           <p className="text-gray-400 text-sm mb-6">{challengeMeta.blueprintName} — {challengeMeta.examName}</p>
 
           <div className="grid grid-cols-3 gap-4 mb-8">
@@ -658,14 +658,14 @@ const Challenge = () => {
           </div>
 
           <p className="text-sm text-gray-400 mb-8">
-            Ye test sirf ek baar diya ja sakta hai. Submit karte hi tumhara score leaderboard mein sabke saamne aa jayega.
+            This test can be taken only once. As soon as you submit, your score will appear on the leaderboard for everyone.
           </p>
 
           <button
             onClick={startChallengeTest}
             className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
           >
-            Challenge Accept Karo — Test Shuru Karo
+            Accept the Challenge — Start the Test
           </button>
         </div>
       </div>
@@ -749,7 +749,7 @@ const Challenge = () => {
                 onClick={handleSubmit}
                 className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
               >
-                Submit Karo
+                Submit
               </button>
             </div>
           </div>
@@ -767,7 +767,7 @@ const Challenge = () => {
         <div className="max-w-xl mx-auto">
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold mb-1">Challenge Complete! 🏁</h1>
-            <p className="text-gray-400 text-sm">Dekho tum kahan khade ho</p>
+            <p className="text-gray-400 text-sm">See where you stand</p>
           </div>
 
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-4">
@@ -778,7 +778,7 @@ const Challenge = () => {
           <div className="bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] rounded-2xl p-6 mb-6 text-center">
             <p className="text-3xl font-bold">#{resultData.currentRank}</p>
             <p className="text-sm text-white/80 mt-1">
-              {resultData.totalParticipants} logo mein se aapki rank
+              Your rank out of {resultData.totalParticipants} participants
             </p>
           </div>
 
@@ -822,7 +822,7 @@ const Challenge = () => {
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
               className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
             >
-              Detailed Analysis Dekho
+              View Detailed Analysis
             </button>
 
             {isOwnChallenge && (
@@ -830,14 +830,14 @@ const Challenge = () => {
                 onClick={handleCreateNewChallenge}
                 className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
               >
-                Ek Naya Challenge Banao
+                Create a New Challenge
               </button>
             )}
             <button
               onClick={() => navigate("/HomePage")}
               className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Home Jaayein
+              Go Home
             </button>
           </div>
         </div>
@@ -863,7 +863,7 @@ const Challenge = () => {
               onClick={() => navigate(`/Challenge/${effectiveCode}/review`)}
               className="w-full py-3 rounded-lg bg-[#1F2937] border border-gray-700 hover:border-[#7C3AED] text-[#A78BFA] font-semibold"
             >
-              Detailed Analysis Dekho
+              View Detailed Analysis
             </button>
 
             {isOwnChallenge && (
@@ -871,14 +871,14 @@ const Challenge = () => {
                 onClick={handleCreateNewChallenge}
                 className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
               >
-                Ek Naya Challenge Banao
+                Create a New Challenge
               </button>
             )}
             <button
               onClick={() => navigate("/HomePage")}
               className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Home Jaayein
+              Go Home
             </button>
           </div>
         </div>

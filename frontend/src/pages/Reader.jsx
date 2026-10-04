@@ -114,7 +114,7 @@ const DeviceLimit = ({ devices, onRemoved }) => {
       await api.post(`/offline/devices/${encodeURIComponent(deviceId)}/remove`);
       onRemoved();
     } catch (err) {
-      setError(err.response?.data?.message || "Phone hata nahi paye.");
+      setError(err.response?.data?.message || "Could not remove the phone.");
     } finally {
       setBusy("");
     }
@@ -136,12 +136,12 @@ const DeviceLimit = ({ devices, onRemoved }) => {
             disabled={!!busy}
             className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-xs font-semibold disabled:opacity-50"
           >
-            {busy === d.deviceId ? "..." : "Hatayein"}
+            {busy === d.deviceId ? "..." : "Remove"}
           </button>
         </div>
       ))}
       {error && <p className="text-xs text-red-400">{error}</p>}
-      <p className="text-[11px] text-gray-500">Hataye gaye phone ki saari offline books/notes band ho jaayengi.</p>
+      <p className="text-[11px] text-gray-500">All offline books/notes on the removed phone will stop working.</p>
     </div>
   );
 };
@@ -171,8 +171,8 @@ const Reader = () => {
         if (!navigator.onLine) {
           throw new OfflineError(
             saved
-              ? "Offline permission khatam ho gayi hai. Internet on karke dobara kholein."
-              : "Ye phone mein save nahi hai. Pehli baar kholne ke liye internet chahiye.",
+              ? "Offline access has expired. Turn on the internet and open it again."
+              : "This is not saved on this phone. You need internet to open it the first time.",
             { code: "OFFLINE" }
           );
         }
@@ -189,7 +189,7 @@ const Reader = () => {
       setPdf(doc);
       setPhase("ready");
     } catch (err) {
-      setError(err instanceof OfflineError ? err : new OfflineError("File khul nahi payi. Dobara try karein."));
+      setError(err instanceof OfflineError ? err : new OfflineError("Could not open the file. Please try again."));
       setPhase("error");
     }
   }, [type, id]);
@@ -270,7 +270,7 @@ const Reader = () => {
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-center">
             <div className="w-10 h-10 rounded-full border-2 border-gray-700 border-t-[#7C3AED] animate-spin" />
             <p className="text-sm text-gray-400">
-              {phase === "downloading" ? "Phone mein save ho raha hai — agli baar bina internet ke khulega..." : "Khul raha hai..."}
+              {phase === "downloading" ? "Saving to your phone — next time it will open without internet..." : "Opening..."}
             </p>
           </div>
         )}
@@ -284,7 +284,7 @@ const Reader = () => {
             )}
             <div className="flex justify-center gap-3 mt-6">
               <button onClick={retry} className="px-5 py-2 rounded-lg bg-[#7C3AED] text-sm font-medium">
-                Dobara try karein
+                Try again
               </button>
               <button onClick={() => navigate("/MyDownloads")} className="px-5 py-2 rounded-lg border border-gray-700 text-sm">
                 My Downloads

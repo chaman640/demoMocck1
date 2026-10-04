@@ -8,7 +8,7 @@ export const activateBoost = async (req, res) => {
       "boostActiveUntil boostActivationsToday boostActivationsDate"
     );
     if (!user) {
-      return res.status(404).json({ success: false, message: "User nahi mila!" });
+      return res.status(404).json({ success: false, message: "User not found!" });
     }
 
     const todayStr = getISTDateString();
@@ -20,7 +20,7 @@ export const activateBoost = async (req, res) => {
     if (user.boostActivationsToday >= COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY) {
       return res.status(400).json({
         success: false,
-        message: `Aaj ke liye Boost limit (${COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY}) khatam ho gayi hai. Kal phir try karein.`,
+        message: `Today's Boost limit (${COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY}) has been used up. Try again tomorrow.`,
       });
     }
 
@@ -53,14 +53,14 @@ export const activateBoost = async (req, res) => {
     if (!saved) {
       return res.status(400).json({
         success: false,
-        message: `Aaj ke liye Boost limit (${COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY}) khatam ho gayi hai. Kal phir try karein.`,
+        message: `Today's Boost limit (${COIN_CONFIG.MAX_BOOST_ACTIVATIONS_PER_DAY}) has been used up. Try again tomorrow.`,
       });
     }
     user.boostActivationsToday = saved.boostActivationsToday;
 
     return res.status(200).json({
       success: true,
-      message: `⚡ Boost active! Agle ${COIN_CONFIG.BOOST_DURATION_MINUTES} minute tak 2x coins milenge.`,
+      message: `⚡ Boost active! You will get 2x coins for the next ${COIN_CONFIG.BOOST_DURATION_MINUTES} minutes.`,
       data: {
         boostActiveUntil: newExpiry,
         boostRemainingSeconds: Math.round((newExpiry.getTime() - now.getTime()) / 1000),
@@ -69,6 +69,6 @@ export const activateBoost = async (req, res) => {
     });
   } catch (error) {
     console.error("activateBoost error:", error);
-    return res.status(500).json({ success: false, message: "Boost activate karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while activating Boost." });
   }
 };

@@ -22,7 +22,7 @@ export const addTeacherQuestion = async (req, res) => {
     const { couponId } = req.body;
 
     if (!couponId || !mongoose.Types.ObjectId.isValid(couponId)) {
-      return res.status(400).json({ success: false, message: "Valid couponId zaroori hai!" });
+      return res.status(400).json({ success: false, message: "A valid couponId is required!" });
     }
 
     let questionsData;
@@ -34,7 +34,7 @@ export const addTeacherQuestion = async (req, res) => {
     }
 
     if (!Array.isArray(questionsData) || questionsData.length === 0) {
-      return res.status(400).json({ success: false, message: "Kam se kam ek question dena zaroori hai." });
+      return res.status(400).json({ success: false, message: "Add at least one question." });
     }
 
     // 🔒 Round 1: bulk size ki hadd — wajah utils/limits.js mein likhi hai
@@ -45,7 +45,7 @@ export const addTeacherQuestion = async (req, res) => {
     // ─────────────────────────────────────────────
     const coupon = await Coupon.findById(couponId);
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon/group nahi mila." });
+      return res.status(404).json({ success: false, message: "This coupon/group was not found." });
     }
 
     // ─────────────────────────────────────────────
@@ -77,7 +77,7 @@ export const addTeacherQuestion = async (req, res) => {
     const uniqueSubjects = [...new Set(Object.values(canonicalBySubmitted))];
 
     if (uniqueSubjects.length === 0) {
-      return res.status(400).json({ success: false, message: "Har question ka subjectName dena zaroori hai." });
+      return res.status(400).json({ success: false, message: "Every question needs a subjectName." });
     }
 
     // ─────────────────────────────────────────────
@@ -87,7 +87,7 @@ export const addTeacherQuestion = async (req, res) => {
       if (String(coupon.mainTeacher) !== String(req.teacher._id)) {
         return res.status(403).json({
           success: false,
-          message: "Ye coupon aapka nahi hai — aap isme content add nahi kar sakte.",
+          message: "This coupon is not yours — you cannot add content to it.",
         });
       }
     } else if (req.teacher.role === "sub") {
@@ -108,7 +108,7 @@ export const addTeacherQuestion = async (req, res) => {
       if (unauthorized.length > 0) {
         return res.status(403).json({
           success: false,
-          message: `Aap is coupon mein in subjects ke liye authorized nahi hain: ${unauthorized.join(", ")}`,
+          message: `You are not authorized for these subjects in this coupon: ${unauthorized.join(", ")}`,
         });
       }
 
@@ -117,7 +117,7 @@ export const addTeacherQuestion = async (req, res) => {
         if (authorizedByKey[k]) canonicalBySubmitted[k] = authorizedByKey[k];
       });
     } else {
-      return res.status(403).json({ success: false, message: "Aapki teacher role valid nahi hai." });
+      return res.status(403).json({ success: false, message: "Your teacher role is not valid." });
     }
 
     // ─────────────────────────────────────────────
@@ -126,27 +126,27 @@ export const addTeacherQuestion = async (req, res) => {
     const validationErrors = [];
     questionsData.forEach((q, idx) => {
       if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
-        validationErrors.push(`Question ${idx + 1}: sabhi options aur question text zaroori hain.`);
+        validationErrors.push(`Question ${idx + 1}: all options and the question text are required.`);
         return;
       }
       const correctOpt = Number(q.correctOption);
       if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
-        validationErrors.push(`Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`);
+        validationErrors.push(`Question ${idx + 1}: correctOption must be between 1 and 4.`);
         return;
       }
       if (!normalizeSubject(q.subjectName) || !normalizeSubject(q.topicName)) {
-        validationErrors.push(`Question ${idx + 1}: subjectName aur topicName zaroori hain.`);
+        validationErrors.push(`Question ${idx + 1}: subjectName and topicName are required.`);
         return;
       }
       if (!q.answerExplain) {
-        validationErrors.push(`Question ${idx + 1}: answerExplain zaroori hai.`);
+        validationErrors.push(`Question ${idx + 1}: answerExplain is required.`);
       }
     });
 
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Kuch questions mein validation errors hain, koi bhi save nahi hua:",
+        message: "Some questions have validation errors, nothing was saved:",
         errors: validationErrors,
       });
     }
@@ -202,13 +202,13 @@ export const addTeacherQuestion = async (req, res) => {
     // ─────────────────────────────────────────────
     const warning =
       notInBlueprint.length > 0
-        ? `⚠️ Dhyan dein: ${notInBlueprint.join(", ")} — ye subject '${coupon.exam}' ke Mock Test blueprint mein nahi hai. ` +
-          `In sawaalon ka Custom Test / PYQ mein to use hoga, lekin auto-generate hone wale Mock Test mein ye nahi aayenge.`
+        ? `⚠️ Note: ${notInBlueprint.join(", ")} — this subject is not in the '${coupon.exam}' Mock Test blueprint. ` +
+          `These questions will be used in Custom Tests / PYQs, but they will not appear in auto-generated Mock Tests.`
         : null;
 
     return res.status(201).json({
       success: true,
-      message: `🎉 ${savedQuestions.length} question(s) successfully add ho gaye "${coupon.name}" ke liye!`,
+      message: `🎉 ${savedQuestions.length} question(s) added successfully for "${coupon.name}"!`,
       warning,
       savedSubjects: uniqueSubjects,
       data: savedQuestions,
@@ -217,7 +217,7 @@ export const addTeacherQuestion = async (req, res) => {
     console.error("addTeacherQuestion error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya question add karte waqt.",
+      message: "Server error while adding questions.",
       ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
     });
   }

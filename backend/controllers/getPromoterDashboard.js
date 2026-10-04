@@ -20,6 +20,6 @@ export const getPromoterDashboard = async (req, res) => {
     });
   } catch (error) {
     console.error("getPromoterDashboard error:", error);
-    return res.status(500).json({ success: false, message: "Dashboard fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching the dashboard." });
   }
 };

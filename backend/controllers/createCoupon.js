@@ -11,7 +11,7 @@ export const createCoupon = async (req, res) => {
     if (req.teacher.role !== "main") {
       return res.status(403).json({
         success: false,
-        message: "Sirf Main Teacher hi naya coupon/group bana sakta hai!",
+        message: "Only a Main Teacher can create a new coupon/group!",
       });
     }
 
@@ -23,7 +23,7 @@ export const createCoupon = async (req, res) => {
     if (!name || !exam) {
       return res.status(400).json({
         success: false,
-        message: "name aur exam dono zaroori hain!",
+        message: "name and exam are both required!",
       });
     }
 
@@ -45,7 +45,7 @@ export const createCoupon = async (req, res) => {
     if (!code) {
       return res.status(500).json({
         success: false,
-        message: "Coupon code generate karne mein dikkat aa rahi hai, dobara try karein.",
+        message: "Problem generating the coupon code, please try again.",
       });
     }
 
@@ -63,7 +63,7 @@ export const createCoupon = async (req, res) => {
     // ─────────────────────────────────────────────
     return res.status(201).json({
       success: true,
-      message: "Coupon/Group successfully ban gaya!",
+      message: "Coupon/Group created successfully!",
       data: newCoupon,
     });
   } catch (error) {
@@ -71,13 +71,13 @@ export const createCoupon = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Ye coupon code pehle se maujood hai, dobara try karein.",
+        message: "This coupon code already exists, please try again.",
       });
     }
     console.error("createCoupon error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya coupon banate waqt.",
+      message: "Server error while creating the coupon.",
       error: error.message,
     });
   }

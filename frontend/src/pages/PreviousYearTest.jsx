@@ -101,7 +101,7 @@ const PreviousYearTest = () => {
         setPhase("instructions");
       } catch (err) {
         if (!cancelled) {
-          setErrorMsg(err.response?.data?.message || "Test load nahi ho paaya.");
+          setErrorMsg(err.response?.data?.message || "Could not load the test.");
           setPhase("error");
         }
       }
@@ -233,7 +233,7 @@ const PreviousYearTest = () => {
     try {
       localStorage.setItem(getStorageKey(userId, testId), JSON.stringify(toSave));
     } catch (err) {
-      console.error("PYQ state save nahi ho paayi:", err);
+      console.error("Could not save the PYQ state:", err);
     }
   }, [phase, testData, answers, visited, timeSpent, activeSubjectIdx, activeQIdx, userId, testId]);
 
@@ -312,7 +312,7 @@ const PreviousYearTest = () => {
       setPhase("result");
     } catch (err) {
       submittingRef.current = false;
-      setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+      setErrorMsg(err.response?.data?.message || "Submit failed.");
       setPhase("error");
     }
   };
@@ -348,7 +348,7 @@ const PreviousYearTest = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Paper load ho raha hai...</p>
+          <p className="text-gray-400 text-sm">Loading paper...</p>
         </div>
       </div>
     );
@@ -366,7 +366,7 @@ const PreviousYearTest = () => {
             onClick={() => navigate("/PreviousYearTests")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Papers List Par Jaayein
+            Go to Papers List
           </button>
         </div>
       </div>
@@ -466,21 +466,21 @@ const InstructionsScreen = ({ testData, onStart }) => {
               className="flex justify-between items-center bg-[#1F2937] border border-gray-800 rounded-lg px-4 py-2 text-sm"
             >
               <span>{s.subjectName}</span>
-              <span className="text-gray-400">{s.questions.length} sawaal</span>
+              <span className="text-gray-400">{s.questions.length} questions</span>
             </div>
           ))}
         </div>
 
         <h3 className="text-sm font-semibold text-gray-300 mb-3">Instructions</h3>
         <ul className="text-sm text-gray-400 space-y-1.5 mb-8 list-disc list-inside">
-          <li>Ye ek ASLI purane exam ka paper hai — bilkul real exam jaisa mahaul mein dein.</li>
-          <li>Timer khatam hote hi test apne aap submit ho jayega.</li>
-          <li>Har sahi jawab ke {testData.marksPerQuestion} marks milenge.</li>
+          <li>This is a REAL past exam paper — take it in a real exam-like setting.</li>
+          <li>The test is submitted automatically when the timer ends.</li>
+          <li>Each correct answer gets {testData.marksPerQuestion} marks.</li>
           {testData.negativeMarking > 0 && (
-            <li>Har galat jawab ke {testData.negativeMarking} marks katenge.</li>
+            <li>Each wrong answer loses {testData.negativeMarking} marks.</li>
           )}
-          <li>Agar galti se page reload ho jaaye to chinta na karein — aapka test wahi se resume ho jayega.</li>
-          <li>Submit karne ke baad aap apne jawab explanation ke sath review kar sakte hain.</li>
+          <li>If the page reloads by mistake, don't worry — your test will resume from where you left off.</li>
+          <li>After submitting, you can review your answers with explanations.</li>
         </ul>
 
         <label className="flex items-center gap-2 mb-6 text-sm text-gray-300">
@@ -490,7 +490,7 @@ const InstructionsScreen = ({ testData, onStart }) => {
             onChange={(e) => setAgreed(e.target.checked)}
             className="w-4 h-4 accent-[#7C3AED]"
           />
-          Maine sabhi instructions padh liye hain
+          I have read all the instructions
         </label>
 
         <button
@@ -500,7 +500,7 @@ const InstructionsScreen = ({ testData, onStart }) => {
             agreed ? "bg-[#7C3AED] hover:bg-[#6D28D9]" : "bg-gray-700 cursor-not-allowed text-gray-400"
           }`}
         >
-          Paper Shuru Karein
+          Start Paper
         </button>
       </div>
     </div>
@@ -670,7 +670,7 @@ const TestScreen = ({
       {showSubmitConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center px-6 z-20">
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold mb-4">Paper submit karein?</h3>
+            <h3 className="text-lg font-semibold mb-4">Submit the paper?</h3>
             <div className="space-y-1.5 text-sm text-gray-400 mb-6">
               <p>Answered: <span className="text-green-400">{summary.answered}</span></p>
               <p>Not Answered: <span className="text-red-400">{summary.notAnswered}</span></p>
@@ -682,14 +682,14 @@ const TestScreen = ({
                 disabled={submitting}
                 className="flex-1 py-2 rounded-lg border border-gray-700 text-sm text-gray-300"
               >
-                Wapas Jaayein
+                Go Back
               </button>
               <button
                 onClick={onConfirmSubmit}
                 disabled={submitting}
                 className="flex-1 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
               >
-                {submitting ? "Submit ho raha hai..." : "Haan, Submit Karein"}
+                {submitting ? "Submitting..." : "Yes, Submit"}
               </button>
             </div>
           </div>
@@ -738,25 +738,25 @@ const ResultScreen = ({ resultData, onHome, onReview, onRetake, onBackToList }) 
             onClick={onReview}
             className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
           >
-            Jawab Review Karein
+            Review Answers
           </button>
           <button
             onClick={onRetake}
             className="w-full py-3 rounded-lg border border-[#7C3AED] text-[#A78BFA] hover:bg-[#7C3AED]/10 font-semibold"
           >
-            Dobara Attempt Karein
+            Attempt Again
           </button>
           <button
             onClick={onBackToList}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
           >
-            Sabhi Papers Dekhein
+            View All Papers
           </button>
           <button
             onClick={onHome}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -826,7 +826,7 @@ const ReviewScreen = ({ attemptId, onBack }) => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Sawaal load ho rahe hain...</p>
+          <p className="text-gray-400 text-sm">Loading questions...</p>
         </div>
       </div>
     );
@@ -837,13 +837,13 @@ const ReviewScreen = ({ attemptId, onBack }) => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">
-            {error?.response?.data?.message || "Data load nahi ho paaya."}
+            {error?.response?.data?.message || "Could not load the data."}
           </p>
           <button
             onClick={onBack}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Wapas Jaayein
+            Go Back
           </button>
         </div>
       </div>
@@ -857,7 +857,7 @@ const ReviewScreen = ({ attemptId, onBack }) => {
           onClick={onBack}
           className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
         >
-          &larr; Result par wapas jaayein
+          &larr; Back to result
         </button>
 
         <h1 className="text-xl sm:text-2xl font-bold mb-1">Answer Review</h1>
@@ -878,7 +878,7 @@ const ReviewScreen = ({ attemptId, onBack }) => {
                   : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
               }`}
             >
-              Sabhi Subjects
+              All Subjects
             </button>
             {subjects.map((s) => (
               <button
@@ -914,7 +914,7 @@ const ReviewScreen = ({ attemptId, onBack }) => {
 
         {filteredQuestions.length === 0 && (
           <p className="text-gray-400 text-sm py-10 text-center">
-            Is category mein koi sawaal nahi hai.
+            No questions in this category.
           </p>
         )}
 
@@ -985,9 +985,9 @@ const QuestionDetailCard = ({ q }) => {
                 {n}
               </span>
               <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Correct answer</span>}
               {isUserPick && !isCorrectOpt && (
-                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+                <span className="text-xs flex-shrink-0">❌ Your answer</span>
               )}
             </div>
           );
@@ -995,7 +995,7 @@ const QuestionDetailCard = ({ q }) => {
       </div>
 
       {q.userAnswer == null && (
-        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+        <p className="text-xs text-yellow-500 mb-4">You did not attempt this question.</p>
       )}
 
       {q.timeTakenInSeconds != null && (

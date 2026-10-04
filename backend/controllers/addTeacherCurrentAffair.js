@@ -10,28 +10,28 @@ import { getTodayIST } from "../utils/dateHelpers.js";
 export const addTeacherCurrentAffair = async (req, res) => {
   try {
     if (!req.teacher.activeCoupon) {
-      return res.status(400).json({ success: false, message: "Pehle apna active batch select karein!" });
+      return res.status(400).json({ success: false, message: "Select your active batch first!" });
     }
 
     const coupon = await Coupon.findById(req.teacher.activeCoupon).select("exam name");
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Active batch nahi mila." });
+      return res.status(404).json({ success: false, message: "Active batch not found." });
     }
 
     const { date, title, items } = req.body;
 
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, message: "Kam se kam ek item zaroori hai!" });
+      return res.status(400).json({ success: false, message: "At least one item is required!" });
     }
     for (const item of items) {
       if (!item.headline || !item.content) {
-        return res.status(400).json({ success: false, message: "Har item mein headline aur content zaroori hai!" });
+        return res.status(400).json({ success: false, message: "Every item needs a headline and content!" });
       }
     }
 
     const finalDate = date || getTodayIST();
     if (!/^\d{4}-\d{2}-\d{2}$/.test(finalDate)) {
-      return res.status(400).json({ success: false, message: "Date format 'YYYY-MM-DD' mein hona chahiye." });
+      return res.status(400).json({ success: false, message: "Date must be in 'YYYY-MM-DD' format." });
     }
 
     const saved = await CurrentAffair.findOneAndUpdate(
@@ -42,12 +42,12 @@ export const addTeacherCurrentAffair = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${coupon.name}' batch ke liye '${finalDate}' current affairs save ho gaye!`,
+      message: `Current affairs for '${finalDate}' saved for batch '${coupon.name}'!`,
       data: saved,
     });
   } catch (error) {
     console.error("addTeacherCurrentAffair error:", error);
-    return res.status(500).json({ success: false, message: "Current affairs save karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while saving current affairs." });
   }
 };
 
@@ -55,13 +55,13 @@ export const addTeacherCurrentAffair = async (req, res) => {
 export const getTeacherCurrentAffair = async (req, res) => {
   try {
     if (!req.teacher.activeCoupon) {
-      return res.status(400).json({ success: false, message: "Pehle apna active batch select karein!" });
+      return res.status(400).json({ success: false, message: "Select your active batch first!" });
     }
     const finalDate = req.params.date || getTodayIST();
     const affair = await CurrentAffair.findOne({ coupon: req.teacher.activeCoupon, date: finalDate });
     return res.status(200).json({ success: true, data: affair || null });
   } catch (error) {
     console.error("getTeacherCurrentAffair error:", error);
-    return res.status(500).json({ success: false, message: "Fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching." });
   }
 };

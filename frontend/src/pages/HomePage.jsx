@@ -180,7 +180,7 @@ const HomePage = () => {
     {
       icon: "📝",
       label: "Study Notes",
-      sub: "Offline bhi padhein",
+      sub: "Read offline too",
       onClick: () => navigate("/Notes"),
     },
     {
@@ -245,7 +245,7 @@ const HomePage = () => {
     {
       icon: "🎁",
       title: "Rewards Store",
-      desc: "Coins se books lein",
+      desc: "Get books with coins",
       primary: false,
       wide: true,
       onClick: () => navigate("/RewardsStore"),
@@ -260,7 +260,7 @@ const HomePage = () => {
       <>
         {userFailureCount > 0 && (
           <div className="fixed top-0 inset-x-0 z-40 px-4 py-2 bg-[#7C3AED] text-white text-xs text-center">
-            Server se connect ho raha hai, thoda ruk jaiye...
+            Connecting to the server, please wait...
           </div>
         )}
         <HomePageSkeleton />
@@ -275,24 +275,24 @@ const HomePage = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-16">
         <div className="max-w-sm text-center space-y-4">
           <div className="text-4xl">📡</div>
-          <p className="text-base font-semibold">Server se connect nahi ho paya</p>
+          <p className="text-base font-semibold">Could not connect to the server</p>
           <p className="text-sm text-gray-400">
             {navigator.onLine
-              ? "Thodi der baad dobara try karein."
-              : "Aap offline hain. Internet on karke dobara try karein."}
+              ? "Please try again in a while."
+              : "You are offline. Turn on the internet and try again."}
           </p>
           <button
             onClick={() => refetchUser()}
             disabled={userFetching}
             className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-60"
           >
-            {userFetching ? "Try ho raha hai..." : "Dobara try karein"}
+            {userFetching ? "Retrying..." : "Try again"}
           </button>
           <button
             onClick={() => navigate("/MyDownloads")}
             className="w-full py-3 rounded-xl border border-gray-700 text-sm text-gray-300"
           >
-            Saved books & notes padhein
+            Read saved books & notes
           </button>
         </div>
         <BottomNav />

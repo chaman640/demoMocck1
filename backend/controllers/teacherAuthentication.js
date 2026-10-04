@@ -15,7 +15,7 @@ export const loginTeacher = async (req, res) => {
     if ((!email && !phone) || !password) {
       return res.status(400).json({
         success: false,
-        message: "Login karne ke liye Email ya Phone, aur Password dena zaroori hai!",
+        message: "Email or phone, and password are required to log in!",
       });
     }
 
@@ -29,7 +29,7 @@ export const loginTeacher = async (req, res) => {
     if (!teacher) {
       return res.status(404).json({
         success: false,
-        message: "Is email ya phone se koi account nahi mila.",
+        message: "No account found with this email or phone.",
       });
     }
 
@@ -39,10 +39,10 @@ export const loginTeacher = async (req, res) => {
       // aata tha. Ab har status ka apna clear message hai.
       const message =
         teacher.status === "pending"
-          ? "Aapka account abhi activate nahi hua. Main Teacher se mila invite link kholkar naam/email/password set karein."
+          ? "Your account is not activated yet. Open the invite link from your Main Teacher and set your name/email/password."
           : teacher.status === "removed"
-          ? "Aapka account Main Teacher ne remove kar diya hai. Unse dobara invite mangwayein."
-          : "Aapka account abhi active nahi hai.";
+          ? "Your account has been removed by the Main Teacher. Ask them for a new invite."
+          : "Your account is not active yet.";
       return res.status(403).json({ success: false, message });
     }
 
@@ -51,14 +51,14 @@ export const loginTeacher = async (req, res) => {
     if (!teacher.password) {
       return res.status(403).json({
         success: false,
-        message: "Is account ka password set nahi hai. Invite link se account activate karein.",
+        message: "This account has no password set. Activate your account using the invite link.",
       });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, teacher.password);
     if (!isPasswordCorrect) {
       // 🐛 FIX: galat password pe 400 ke bajaye standard 401
-      return res.status(401).json({ success: false, message: "Galat password!" });
+      return res.status(401).json({ success: false, message: "Wrong password!" });
     }
 
     const token = jwt.sign(
@@ -86,7 +86,7 @@ export const loginTeacher = async (req, res) => {
     console.error("Teacher Login Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya login karte waqt.",
+      message: "Server error while logging in.",
       ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
     });
   }

@@ -113,16 +113,14 @@ const NotFound = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md text-center">
         <div className="text-5xl mb-4">🧭</div>
-        <h1 className="text-xl font-bold mb-2">Ye page nahi mila</h1>
-        <p className="text-gray-400 text-sm mb-1">Aapne ye address khola tha:</p>
+        <h1 className="text-xl font-bold mb-2">Page not found</h1>
+        <p className="text-gray-400 text-sm mb-1">You opened this address:</p>
         <p className="text-xs font-mono text-[#A78BFA] bg-[#111827] border border-gray-800 rounded-lg px-3 py-2 mb-6 break-all">
           #{location.pathname}
         </p>
 
         <p className="text-[11px] text-gray-500 mb-4 leading-relaxed">
-          Dhyan dein: is site ke saare address me <b className="text-gray-300">#</b> aata hai —
-          jaise <span className="font-mono text-gray-300">site.com/#/TeacherLogin</span>.
-          Bina <b className="text-gray-300">#</b> ke likhne par hamesha HomePage hi khulta hai.
+          Note: every address on this site contains <b className="text-gray-300">#</b> — for example <span className="font-mono text-gray-300">site.com/#/TeacherLogin</span>. Without the <b className="text-gray-300">#</b> the HomePage always opens.
         </p>
 
         <div className="space-y-2.5">

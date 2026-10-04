@@ -16,13 +16,13 @@ const currentAffairSchema = new mongoose.Schema(
   {
     examName: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
+      required: [true, "Exam name is required"],
       trim: true,
       index: true,
     },
     date: {
       type: String, // "YYYY-MM-DD" — IST date key
-      required: [true, "Date zaroori hai"],
+      required: [true, "Date is required"],
       trim: true,
     },
     title: { type: String, trim: true },

@@ -12,7 +12,7 @@ const ensureCloudinary = () => {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
     throw new Error(
-      "Cloudinary env variables set nahi hain (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
+      "Cloudinary env variables are not set (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
     );
   }
   cloudinary.config({
@@ -76,7 +76,7 @@ export const processBookUploadMiddleware = (req, res, next) => {
       // wo sirf app ke reader mein (watermark ke saath) padh sakta hai.
       if (digitalFile) {
         if (!isPdfBuffer(digitalFile.buffer)) {
-          return res.status(400).json({ success: false, message: "Digital book sirf PDF ho sakti hai." });
+          return res.status(400).json({ success: false, message: "A digital book can only be a PDF." });
         }
         const uploaded = await uploadPrivatePdf(digitalFile.buffer, "book_digital_files");
         req.body.digitalFilePublicId = uploaded.publicId;
@@ -86,7 +86,7 @@ export const processBookUploadMiddleware = (req, res, next) => {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Upload processing mein error aaya",
+        message: "Error while processing the upload",
         error: error.message,
       });
     }

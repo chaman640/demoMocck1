@@ -43,7 +43,7 @@ const LeaderboardSkeleton = () => (
 // FIX: naam se compare karne ki jagah ab userId se compare hoga
 const LeaderboardList = ({ leaderboard, currentUserId }) => {
   if (!leaderboard || leaderboard.leaderboard.length === 0) {
-    return <p className="text-gray-400 text-sm text-center py-6">Abhi tak koi attempt nahi hua.</p>;
+    return <p className="text-gray-400 text-sm text-center py-6">No attempts yet.</p>;
   }
   return (
     <div className="space-y-2.5">
@@ -72,10 +72,10 @@ const LeaderboardList = ({ leaderboard, currentUserId }) => {
               </span>
               <div className="min-w-0">
                 <p className="font-medium text-sm truncate">
-                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(Aap)</span>}
+                  {entry.userName} {isMe && <span className="text-[#A78BFA]">(You)</span>}
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5">
-                  {entry.correctCount} sahi &middot; {entry.wrongCount} galat
+                  {entry.correctCount} correct &middot; {entry.wrongCount} wrong
                 </p>
               </div>
             </div>
@@ -118,7 +118,7 @@ const MyChallenges = () => {
           navigate("/Singup");
           return;
         }
-        setErrorMsg(err.response?.data?.message || "Challenges load nahi ho paaye.");
+        setErrorMsg(err.response?.data?.message || "Could not load challenges.");
         setPhase("error");
       }
     };
@@ -138,8 +138,8 @@ const MyChallenges = () => {
       // 7 din baad Challenge document apne aap delete ho jaata hai (TTL) — tab ye 404 dega
       setErrorMsg(
         err.response?.status === 404
-          ? "Ye challenge expire ho chuka hai, ab iska data available nahi hai."
-          : err.response?.data?.message || "Leaderboard load nahi ho paaya."
+          ? "This challenge has expired; its data is no longer available."
+          : err.response?.data?.message || "Could not load the leaderboard."
       );
       setPhase("error");
     }
@@ -170,14 +170,14 @@ const MyChallenges = () => {
                 onClick={backToList}
                 className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 hover:border-gray-500"
               >
-                List Par Wapas
+                Back to List
               </button>
             )}
             <button
               onClick={() => navigate("/HomePage")}
               className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
             >
-              Home Jaayein
+              Go Home
             </button>
           </div>
         </div>
@@ -196,11 +196,11 @@ const MyChallenges = () => {
             &larr; Home
           </button>
 
-          <h1 className="text-2xl font-bold mb-1">Aapke Challenges</h1>
+          <h1 className="text-2xl font-bold mb-1">Your Challenges</h1>
           <p className="text-gray-400 text-sm mb-8">
             {challenges.length === 0
-              ? "Aapne abhi tak koi challenge attempt nahi kiya hai."
-              : `Aapne ab tak ${challenges.length} challenge${challenges.length > 1 ? "s" : ""} diye hain`}
+              ? "You have not attempted any challenge yet."
+              : `You have taken ${challenges.length} challenge${challenges.length > 1 ? "s" : ""} so far`}
           </p>
 
           {challenges.length === 0 ? (
@@ -208,7 +208,7 @@ const MyChallenges = () => {
               onClick={() => navigate("/Challenge")}
               className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
             >
-              Ek Challenge Shuru Karein
+              Start a Challenge
             </button>
           ) : (
             <div className="space-y-3">
@@ -224,7 +224,7 @@ const MyChallenges = () => {
                   </div>
                   <p className="text-xs text-gray-500">
                     {c.examName} &middot; Banaya: {c.createdByName}
-                    {c.createdByName === userName ? " (Aap)" : ""}
+                    {c.createdByName === userName ? " (You)" : ""}
                   </p>
                   <p className="text-xs text-gray-600 mt-1">
                     {new Date(c.attemptedAt).toLocaleString("en-IN", {
@@ -252,7 +252,7 @@ const MyChallenges = () => {
             onClick={backToList}
             className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
           >
-            &larr; Sabhi Challenges
+            &larr; All Challenges
           </button>
 
           <h1 className="text-2xl font-bold mb-1">Leaderboard 🏆</h1>
@@ -273,7 +273,7 @@ const MyChallenges = () => {
               onClick={() => navigate("/HomePage")}
               className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Home Jaayein
+              Go Home
             </button>
           </div>
         </div>

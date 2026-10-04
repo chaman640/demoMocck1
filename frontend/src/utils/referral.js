@@ -12,5 +12,5 @@ export const useReferral = (enabled = true) =>
   });
 
 export const referralShareText = (ref) =>
-  `Main AntimPrayash.in par free mock tests aur PYQ se taiyari kar raha hoon 📚\n` +
-  `Tum bhi join karo — mera code: ${ref.code}\n${ref.link}`;
+  `I'm preparing with free mock tests and PYQs on AntimPrayash.in 📚\n` +
+  `Join too — my code: ${ref.code}\n${ref.link}`;

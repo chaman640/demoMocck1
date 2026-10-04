@@ -10,12 +10,12 @@ export const adminSettlePromoterCommission = async (req, res) => {
 
     const numericAmount = Number(amount);
     if (amount === undefined || amount === null || amount === "" || Number.isNaN(numericAmount) || numericAmount < 0) {
-      return res.status(400).json({ success: false, message: "Sahi amount daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid amount!" });
     }
 
     const promoter = await Promoter.findById(promoterId);
     if (!promoter) {
-      return res.status(404).json({ success: false, message: "Promoter nahi mila!" });
+      return res.status(404).json({ success: false, message: "Promoter not found!" });
     }
 
     // Atomic: sirf utne hi questions ghatao jitne settle hue — pehle poora
@@ -39,7 +39,7 @@ export const adminSettlePromoterCommission = async (req, res) => {
       { new: true }
     );
     if (!updated) {
-      return res.status(409).json({ success: false, message: "Hisab abhi badla hai — page refresh karke dobara settle karein." });
+      return res.status(409).json({ success: false, message: "The balance just changed — refresh the page and settle again." });
     }
     Object.assign(promoter, {
       pendingQuestionsCount: updated.pendingQuestionsCount,
@@ -49,7 +49,7 @@ export const adminSettlePromoterCommission = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Hisab settle ho gaya!",
+      message: "Balance settled!",
       data: {
         _id: promoter._id,
         pendingQuestionsCount: promoter.pendingQuestionsCount,
@@ -59,7 +59,7 @@ export const adminSettlePromoterCommission = async (req, res) => {
     });
   } catch (error) {
     console.error("adminSettlePromoterCommission error:", error);
-    return res.status(500).json({ success: false, message: "Hisab settle karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while settling the balance." });
   }
 };
 
@@ -70,17 +70,17 @@ export const adminSettleTeacherCommission = async (req, res) => {
 
     const numericAmount = Number(amount);
     if (amount === undefined || amount === null || amount === "" || Number.isNaN(numericAmount) || numericAmount < 0) {
-      return res.status(400).json({ success: false, message: "Sahi amount daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid amount!" });
     }
 
     const teacher = await Teacher.findById(teacherId);
     if (!teacher) {
-      return res.status(404).json({ success: false, message: "Teacher nahi mila!" });
+      return res.status(404).json({ success: false, message: "Teacher not found!" });
     }
     if (teacher.role !== "main") {
       return res.status(400).json({
         success: false,
-        message: "Sirf Main Teacher ka hisab settle kiya ja sakta hai.",
+        message: "Only a Main Teacher's balance can be settled.",
       });
     }
 
@@ -105,7 +105,7 @@ export const adminSettleTeacherCommission = async (req, res) => {
       { new: true }
     );
     if (!updated) {
-      return res.status(409).json({ success: false, message: "Hisab abhi badla hai — page refresh karke dobara settle karein." });
+      return res.status(409).json({ success: false, message: "The balance just changed — refresh the page and settle again." });
     }
     Object.assign(teacher, {
       pendingQuestionsCount: updated.pendingQuestionsCount,
@@ -115,7 +115,7 @@ export const adminSettleTeacherCommission = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Hisab settle ho gaya!",
+      message: "Balance settled!",
       data: {
         _id: teacher._id,
         pendingQuestionsCount: teacher.pendingQuestionsCount,
@@ -125,7 +125,7 @@ export const adminSettleTeacherCommission = async (req, res) => {
     });
   } catch (error) {
     console.error("adminSettleTeacherCommission error:", error);
-    return res.status(500).json({ success: false, message: "Hisab settle karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while settling the balance." });
   }
 };
 
@@ -175,6 +175,6 @@ export const adminListTeacherCommissions = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("adminListTeacherCommissions error:", error);
-    return res.status(500).json({ success: false, message: "Teachers list karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while listing teachers." });
   }
 };

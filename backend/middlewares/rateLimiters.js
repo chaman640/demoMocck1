@@ -97,7 +97,7 @@ export const globalLimiter = rateLimit({
   ...base,
   windowMs: 15 * MIN,
   limit: num("GLOBAL_RATE_LIMIT", 3000),
-  handler: jsonMessage("Bahut zyada requests aa rahi hain. Thodi der baad try karein."),
+  handler: jsonMessage("Too many requests. Try again in a little while."),
   skip: (req) => req.path === "/health", // uptime monitor kabhi block na ho
 });
 
@@ -114,7 +114,7 @@ export const otpLimiter = rateLimit({
   limit: num("OTP_PHONE_LIMIT", 5),
   keyGenerator: ipPlus((req) => req.body?.phone),
   handler: jsonMessage(
-    "Is number par bahut zyada OTP maange ja chuke hain. Kripya 1 ghante baad try karein."
+    "Too many OTPs have been requested for this number. Please try again after 1 hour."
   ),
 });
 
@@ -128,7 +128,7 @@ export const otpIpLimiter = rateLimit({
   ...base,
   windowMs: 60 * MIN,
   limit: num("OTP_IP_LIMIT", 60),
-  handler: jsonMessage("Bahut zyada OTP requests. Kripya thodi der baad try karein."),
+  handler: jsonMessage("Too many OTP requests. Please try again in a little while."),
 });
 
 // ─────────────────────────────────────────────
@@ -152,7 +152,7 @@ export const loginLimiter = rateLimit({
   // ek hi CGNAT IP ke doosre users ki galtiyan aap par gir jatin)
   skip: (req) => !String(req.body?.phone || "").trim(),
   handler: jsonMessage(
-    "Bahut baar galat password daala gaya hai. Kripya 15 minute baad try karein."
+    "Too many wrong password attempts. Please try again after 15 minutes."
   ),
 });
 
@@ -175,7 +175,7 @@ export const loginEmailLimiter = rateLimit({
   keyGenerator: ipPlus((req) => req.body?.email),
   skip: (req) => !String(req.body?.email || "").trim(),
   handler: jsonMessage(
-    "Bahut baar galat password daala gaya hai. Kripya 15 minute baad try karein."
+    "Too many wrong password attempts. Please try again after 15 minutes."
   ),
 });
 
@@ -193,7 +193,7 @@ export const loginIpLimiter = rateLimit({
   windowMs: 15 * MIN,
   limit: num("LOGIN_IP_LIMIT", 200),
   skipSuccessfulRequests: true,
-  handler: jsonMessage("Bahut zyada login koshishein. Kripya thodi der baad try karein."),
+  handler: jsonMessage("Too many login attempts. Please try again in a little while."),
 });
 
 // ─────────────────────────────────────────────
@@ -220,7 +220,7 @@ export const signupLimiter = rateLimit({
   keyGenerator: ipPlus((req) =>
     `${String(req.body?.phone || "").trim()}|${String(req.body?.email || "").trim().toLowerCase()}`
   ),
-  handler: jsonMessage("Bahut zyada koshishein. Kripya 1 ghante baad try karein."),
+  handler: jsonMessage("Too many attempts. Please try again after 1 hour."),
 });
 
 // Aur ye poore IP par ek moti chhat — mass fake-account banane wale script ke
@@ -231,7 +231,7 @@ export const signupIpLimiter = rateLimit({
   ...base,
   windowMs: 60 * MIN,
   limit: num("SIGNUP_IP_LIMIT", 120),
-  handler: jsonMessage("Bahut zyada koshishein. Kripya 1 ghante baad try karein."),
+  handler: jsonMessage("Too many attempts. Please try again after 1 hour."),
 });
 
 // ─────────────────────────────────────────────
@@ -244,7 +244,7 @@ export const adminLimiter = rateLimit({
   ...base,
   windowMs: 15 * MIN,
   limit: num("ADMIN_LIMIT", 60),
-  handler: jsonMessage("Admin requests ki limit paar ho gayi. Thodi der baad try karein."),
+  handler: jsonMessage("Admin request limit exceeded. Try again in a little while."),
 });
 
 // ─────────────────────────────────────────────
@@ -264,7 +264,7 @@ export const writeLimiter = rateLimit({
   windowMs: 1 * MIN,
   limit: num("WRITE_LIMIT", 60),
   keyGenerator: userOrIp,
-  handler: jsonMessage("Thoda dheere! Ek minute me itni requests allowed nahi hain."),
+  handler: jsonMessage("Slow down! That many requests are not allowed in one minute."),
 });
 
 // Offline books/notes download — har download par server PDF watermark +
@@ -274,5 +274,5 @@ export const offlineDownloadLimiter = rateLimit({
   windowMs: 60 * MIN,
   limit: num("OFFLINE_DOWNLOAD_LIMIT", 30),
   keyGenerator: userOrIp,
-  handler: jsonMessage("Ek ghante mein bahut zyada downloads. Thodi der baad try karein."),
+  handler: jsonMessage("Too many downloads in one hour. Try again in a little while."),
 });

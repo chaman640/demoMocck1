@@ -22,6 +22,6 @@ export const getMyRedemptions = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("getMyRedemptions error:", error);
-    return res.status(500).json({ success: false, message: "Orders list nahi ho payi." });
+    return res.status(500).json({ success: false, message: "Could not load the orders list." });
   }
 };

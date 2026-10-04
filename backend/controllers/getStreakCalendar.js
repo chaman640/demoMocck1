@@ -8,12 +8,12 @@ export const getStreakCalendar = async (req, res) => {
     const month = Number(req.query.month) || now.getMonth() + 1;
 
     if (month < 1 || month > 12 || year < 2000 || year > 2100) {
-      return res.status(400).json({ success: false, message: "Month 1 se 12 aur year 2000 se 2100 ke beech hona chahiye." });
+      return res.status(400).json({ success: false, message: "Month must be between 1 and 12 and year between 2000 and 2100." });
     }
 
     const user = await User.findById(req.user._id).select("activityDates longestStreak");
     if (!user) {
-      return res.status(404).json({ success: false, message: "User nahi mila!" });
+      return res.status(404).json({ success: false, message: "User not found!" });
     }
 
     const days = buildStreakCalendar(user.activityDates, year, month);
@@ -31,6 +31,6 @@ export const getStreakCalendar = async (req, res) => {
     });
   } catch (error) {
     console.error("getStreakCalendar error:", error);
-    return res.status(500).json({ success: false, message: "Streak calendar fetch nahi ho paya." });
+    return res.status(500).json({ success: false, message: "Could not fetch the streak calendar." });
   }
 };

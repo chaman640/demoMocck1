@@ -6,7 +6,7 @@ const rankPredictorDataSchema = new mongoose.Schema(
   {
     examName: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
+      required: [true, "Exam name is required"],
       trim: true,
       index: true,
     },

@@ -8,7 +8,7 @@ export const addRankPredictorData = async (req, res) => {
     if (!examName || !year || !Array.isArray(dataPoints) || dataPoints.length < 2) {
       return res.status(400).json({
         success: false,
-        message: "examName, year, aur kam se kam 2 dataPoints zaroori hain!",
+        message: "examName, year and at least 2 dataPoints are required!",
       });
     }
 
@@ -17,7 +17,7 @@ export const addRankPredictorData = async (req, res) => {
       if (typeof point.score !== "number" || typeof point.rank !== "number") {
         return res.status(400).json({
           success: false,
-          message: "Har dataPoint mein numeric score aur rank hona zaroori hai!",
+          message: "Every dataPoint needs a numeric score and rank!",
         });
       }
     }
@@ -45,14 +45,14 @@ export const addRankPredictorData = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Rank predictor data successfully save ho gaya!",
+      message: "Rank predictor data saved successfully!",
       data: newData,
     });
   } catch (error) {
     console.error("addRankPredictorData error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya data save karte waqt.",
+      message: "Server error while saving data.",
       error: error.message,
     });
   }

@@ -12,7 +12,7 @@ export const requestTeacherResetOtp = async (req, res) => {
     const { email } = req.body;
 
     if (!email || !/^\S+@\S+\.\S+$/.test(String(email).trim())) {
-      return res.status(400).json({ success: false, message: "Sahi email address dalein!" });
+      return res.status(400).json({ success: false, message: "Enter a valid email address!" });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
@@ -21,18 +21,18 @@ export const requestTeacherResetOtp = async (req, res) => {
     if (!teacher) {
       return res.status(404).json({
         success: false,
-        message: "Is email se koi active teacher account nahi mila.",
+        message: "No active teacher account found with this email.",
       });
     }
 
     await createAndSendOtp(normalizedEmail, "teacher_reset");
 
-    return res.status(200).json({ success: true, message: "OTP email par bhej diya gaya hai!" });
+    return res.status(200).json({ success: true, message: "OTP sent to your email!" });
   } catch (error) {
     console.error("requestTeacherResetOtp error:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "OTP bhejte waqt error aaya.",
+      message: error.statusCode ? error.message : "Error while sending the OTP.",
     });
   }
 };
@@ -43,17 +43,17 @@ export const resetTeacherPassword = async (req, res) => {
     const { email, otp, newPassword } = req.body;
 
     if (!email || !otp || !newPassword) {
-      return res.status(400).json({ success: false, message: "Sabhi fields zaroori hain!" });
+      return res.status(400).json({ success: false, message: "All fields are required!" });
     }
     if (String(newPassword).length < 6) {
-      return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters!" });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
 
     const teacher = await Teacher.findOne({ email: normalizedEmail, status: "active" });
     if (!teacher) {
-      return res.status(404).json({ success: false, message: "Is email se koi active teacher account nahi mila." });
+      return res.status(404).json({ success: false, message: "No active teacher account found with this email." });
     }
 
     await verifyOtpCode(normalizedEmail, "teacher_reset", otp);
@@ -63,12 +63,12 @@ export const resetTeacherPassword = async (req, res) => {
     teacher.passwordChangedAt = new Date(); // purane sabhi login sessions band
     await teacher.save();
 
-    return res.status(200).json({ success: true, message: "Password successfully reset ho gaya! Ab login karein." });
+    return res.status(200).json({ success: true, message: "Password reset successfully! Please log in now." });
   } catch (error) {
     console.error("resetTeacherPassword error:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "Password reset karte waqt error aaya.",
+      message: error.statusCode ? error.message : "Error while resetting the password.",
     });
   }
 };

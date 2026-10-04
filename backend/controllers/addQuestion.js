@@ -19,7 +19,7 @@ export const addQuestion = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "Blank data aa raha hai. Format check karein.",
+        message: "Blank data received. Check the format.",
       });
     }
 
@@ -39,20 +39,20 @@ export const addQuestion = async (req, res) => {
       const n = idx + 1;
 
       if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
-        errors.push(`Question ${n}: question aur chaaro options zaroori hain.`);
+        errors.push(`Question ${n}: question and all four options are required.`);
         return;
       }
       const correctOpt = Number(q.correctOption);
       if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
-        errors.push(`Question ${n}: correctOption 1 se 4 ke beech hona chahiye.`);
+        errors.push(`Question ${n}: correctOption must be between 1 and 4.`);
         return;
       }
       if (!q.subjectName || !q.topicName) {
-        errors.push(`Question ${n}: subjectName aur topicName zaroori hain.`);
+        errors.push(`Question ${n}: subjectName and topicName are required.`);
         return;
       }
       if (!q.answerExplain) {
-        errors.push(`Question ${n}: answerExplain zaroori hai (schema mein required hai).`);
+        errors.push(`Question ${n}: answerExplain is required (it is required in the schema).`);
         return;
       }
 
@@ -65,7 +65,7 @@ export const addQuestion = async (req, res) => {
         ? [q.examName]
         : [];
       if (examName.length === 0) {
-        errors.push(`Question ${n}: examName (array) zaroori hai.`);
+        errors.push(`Question ${n}: examName (array) is required.`);
         return;
       }
 
@@ -89,7 +89,7 @@ export const addQuestion = async (req, res) => {
     if (errors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Kuch questions mein validation errors hain — koi bhi save nahi hua:",
+        message: "Some questions have validation errors — nothing was saved:",
         errors,
       });
     }
@@ -132,7 +132,7 @@ export const addQuestion = async (req, res) => {
     console.error("addQuestion error:", error);
     return res.status(500).json({
       success: false,
-      message: "❌ Question save karne mein error aaya",
+      message: "❌ Error while saving the question",
       ...errorDetail(error), // 🔒 production me andar ka detail bahar nahi jata
     });
   }

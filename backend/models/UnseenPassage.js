@@ -41,7 +41,7 @@ const unseenPassageSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Passage mein kam se kam ek sawaal hona chahiye",
+        message: "A passage must have at least one question",
       },
     },
   },

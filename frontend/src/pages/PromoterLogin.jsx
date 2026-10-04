@@ -21,7 +21,7 @@ const PromoterLogin = () => {
     setError("");
 
     if (!formData.identifier.trim() || !formData.password) {
-      setError("Email/Phone aur password dono zaroori hain!");
+      setError("Email/Phone and password are both required!");
       return;
     }
 
@@ -39,7 +39,7 @@ const PromoterLogin = () => {
         navigate("/PromoterDashboard");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Login fail ho gaya.");
+      setError(err.response?.data?.message || "Login failed.");
     } finally {
       setLoading(false);
     }
@@ -51,7 +51,7 @@ const PromoterLogin = () => {
         <div className="text-center mb-8">
           <img src={LOGO_URL} alt="AntimPrayash.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
           <h1 className="text-2xl font-bold">Promoter Login</h1>
-          <p className="text-gray-400 text-sm mt-1">Apne promoter account mein login karein</p>
+          <p className="text-gray-400 text-sm mt-1">Log in to your promoter account</p>
         </div>
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 sm:p-8">
@@ -104,7 +104,7 @@ const PromoterLogin = () => {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50 mt-2"
             >
-              {loading ? "Login ho raha hai..." : "Login"}
+              {loading ? "Logging in..." : "Login"}
             </button>
           </form>
         </div>
@@ -112,7 +112,7 @@ const PromoterLogin = () => {
         <p className="text-center text-xs text-gray-600 mt-6">
           Student ho?{" "}
           <Link to="/Login" className="text-gray-400 hover:underline">
-            Yahan Login karein
+            Log in here
           </Link>
         </p>
       </div>

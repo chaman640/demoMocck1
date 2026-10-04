@@ -50,9 +50,9 @@ const TeacherStudentSubjectAnalysis = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
-          <p className="text-gray-300">{error?.response?.data?.message || "Data load nahi ho paaya."}</p>
+          <p className="text-gray-300">{error?.response?.data?.message || "Could not load the data."}</p>
           <button onClick={() => navigate(-1)} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Wapas Jaayein
+            Go Back
           </button>
         </div>
         <TeacherBottomNav />
@@ -72,7 +72,7 @@ const TeacherStudentSubjectAnalysis = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <button onClick={() => navigate(-1)} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-          &larr; {studentName || "Student"} Par Wapas
+          &larr; Back to {studentName || "Student"}
         </button>
 
         <div>
@@ -82,7 +82,7 @@ const TeacherStudentSubjectAnalysis = () => {
 
         {!subj ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Is subject ka data nahi mila.</p>
+            <p className="text-sm text-gray-400">No data found for this subject.</p>
           </div>
         ) : (
           <>
@@ -102,7 +102,7 @@ const TeacherStudentSubjectAnalysis = () => {
                 <h3 className="font-semibold text-sm">Topic-wise Efficiency</h3>
               </div>
               {subj.topicList?.length === 0 ? (
-                <p className="p-6 text-sm text-gray-500">Koi topic data nahi hai.</p>
+                <p className="p-6 text-sm text-gray-500">No topic data.</p>
               ) : (
                 <div className="divide-y divide-gray-800">
                   {subj.topicList.map((t, i) => (
@@ -123,13 +123,13 @@ const TeacherStudentSubjectAnalysis = () => {
                 <h3 className="font-semibold text-sm text-red-400">Top Weak Topics</h3>
               </div>
               {subj.weakTopics?.length === 0 ? (
-                <p className="p-6 text-sm text-green-400">Koi khaas kamzor topic nahi mila.</p>
+                <p className="p-6 text-sm text-green-400">No particularly weak topic found.</p>
               ) : (
                 <div className="divide-y divide-gray-800">
                   {subj.weakTopics.map((t, i) => (
                     <button key={i} onClick={() => goToTopic(t.topicName)} className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-red-500/5">
                       <p className="text-sm text-gray-200 truncate flex-1">{t.topicName}</p>
-                      <span className="flex-shrink-0 text-xs text-red-300">{t.wrongCount} galat</span>
+                      <span className="flex-shrink-0 text-xs text-red-300">{t.wrongCount} wrong</span>
                       <span className="text-red-300 text-xs flex-shrink-0">→</span>
                     </button>
                   ))}

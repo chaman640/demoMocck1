@@ -34,27 +34,27 @@ const MyDownloads = () => {
     /* eslint-enable react-hooks/set-state-in-effect */
     syncOffline()
       .then((r) => {
-        if (r.removed) setMessage(`${r.removed} item ka access khatam ho gaya tha, isliye hata diya gaya.`);
+        if (r.removed) setMessage(`Access to ${r.removed} item(s) had ended, so they were removed.`);
         loadItems();
       })
       .catch(() => {});
   }, [loadItems, loadDevices]);
 
   const deleteItem = async (item) => {
-    if (!window.confirm(`"${item.title}" phone se hatayein?`)) return;
+    if (!window.confirm(`Remove "${item.title}" from this phone?`)) return;
     await removeOffline(item.type, item.id);
     loadItems();
   };
 
   const removeDevice = async (d) => {
-    if (!window.confirm(`"${d.label}" hatayein? Us phone ki saari offline books/notes band ho jaayengi.`)) return;
+    if (!window.confirm(`Remove "${d.label}"? All offline books/notes on that phone will stop working.`)) return;
     setBusy(d.deviceId);
     try {
       const res = await api.post(`/offline/devices/${encodeURIComponent(d.deviceId)}/remove`);
       setMessage(res.data.message);
       await loadDevices();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Phone hata nahi paye.");
+      setMessage(err.response?.data?.message || "Could not remove the phone.");
     } finally {
       setBusy("");
     }
@@ -76,18 +76,18 @@ const MyDownloads = () => {
 
         <section>
           <div className="flex items-end justify-between mb-2">
-            <h2 className="text-sm font-semibold">Is phone mein saved</h2>
-            {items?.length > 0 && <p className="text-[11px] text-gray-500">{formatBytes(totalBytes)} use ho raha hai</p>}
+            <h2 className="text-sm font-semibold">Saved on this phone</h2>
+            {items?.length > 0 && <p className="text-[11px] text-gray-500">{formatBytes(totalBytes)} used</p>}
           </div>
           <p className="text-[11px] text-gray-500 mb-3 leading-relaxed">
-            Ye sirf is app mein khulte hain — 15 din tak bina internet ke. Internet on hote hi apne aap aage badh jaata hai.
+            These open only inside this app — for up to 15 days without internet. It renews automatically when you are online.
           </p>
 
           {items === null && <div className="h-16 rounded-2xl bg-gray-800/70 animate-pulse" />}
           {items?.length === 0 && (
             <div className="text-center py-10 space-y-3 bg-[#111827] border border-gray-800 rounded-2xl">
               <p className="text-3xl">📥</p>
-              <p className="text-sm text-gray-500">Abhi kuch save nahi hai. Koi book ya notes kholte hi yahan aa jayenge.</p>
+              <p className="text-sm text-gray-500">Nothing saved yet. Books or notes you open will appear here.</p>
               <div className="flex justify-center gap-2">
                 <button onClick={() => navigate("/Notes")} className="px-4 py-2 rounded-lg bg-[#7C3AED] text-xs font-semibold">Notes</button>
                 <button onClick={() => navigate("/MyRedemptions")} className="px-4 py-2 rounded-lg border border-gray-700 text-xs">My Books</button>
@@ -105,7 +105,7 @@ const MyDownloads = () => {
                     <p className="text-sm font-semibold truncate">{item.title}</p>
                     <p className={`text-[11px] ${expired ? "text-amber-400" : "text-gray-500"}`}>
                       {item.type === "book" ? "Book" : "Notes"} · {formatBytes(item.size)} ·{" "}
-                      {expired ? "Renew ke liye internet on karein" : `${daysLeft(item)} din offline`}
+                      {expired ? "Turn on the internet to renew" : `${daysLeft(item)} days offline`}
                     </p>
                   </button>
                   <button onClick={() => deleteItem(item)} className="text-gray-500 hover:text-red-400 text-lg px-2" aria-label="Delete">
@@ -118,19 +118,19 @@ const MyDownloads = () => {
         </section>
 
         <section>
-          <h2 className="text-sm font-semibold mb-1">Mere phones</h2>
+          <h2 className="text-sm font-semibold mb-1">My phones</h2>
           <p className="text-[11px] text-gray-500 mb-3">
-            Ek account {maxDevices} phones par offline chal sakta hai. 30 din mein 3 baar tak phone badal sakte hain.
+            One account can be used offline on {maxDevices} phones. You can change phones up to 3 times in 30 days.
           </p>
-          {!navigator.onLine && <p className="text-xs text-gray-500">Phones dekhne ke liye internet chahiye.</p>}
-          {devices?.length === 0 && <p className="text-xs text-gray-500">Abhi kisi phone par kuch save nahi hai.</p>}
+          {!navigator.onLine && <p className="text-xs text-gray-500">Internet is needed to see your phones.</p>}
+          {devices?.length === 0 && <p className="text-xs text-gray-500">Nothing is saved on any phone yet.</p>}
           <div className="space-y-2">
             {devices?.map((d) => (
               <div key={d.deviceId} className="flex items-center gap-3 bg-[#111827] border border-gray-800 rounded-2xl p-3.5">
                 <span className="text-xl">📱</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {d.label} {d.isThisDevice && <span className="text-[10px] text-[#A78BFA]">(ye phone)</span>}
+                    {d.label} {d.isThisDevice && <span className="text-[10px] text-[#A78BFA]">(this phone)</span>}
                   </p>
                   <p className="text-[11px] text-gray-500">Last used {new Date(d.lastSeenAt).toLocaleDateString()}</p>
                 </div>
@@ -139,7 +139,7 @@ const MyDownloads = () => {
                   disabled={!!busy}
                   className="px-3 py-1.5 rounded-lg border border-red-500/40 text-red-300 text-xs font-semibold disabled:opacity-50"
                 >
-                  {busy === d.deviceId ? "..." : "Hatayein"}
+                  {busy === d.deviceId ? "..." : "Remove"}
                 </button>
               </div>
             ))}

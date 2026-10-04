@@ -18,7 +18,7 @@ export const addBluePrint = async (req, res) => {
         if (!blueprintName || !examName || !totalQuestions || !marksPerQuestion || !subjects) {
             return res.status(400).json({
                 success: false,
-                message: "blueprintName, examName, totalQuestions, marksPerQuestion, aur subjects bharna zaroori hai!"
+                message: "blueprintName, examName, totalQuestions, marksPerQuestion and subjects are required!"
             });
         }
 
@@ -26,7 +26,7 @@ export const addBluePrint = async (req, res) => {
         if (!Array.isArray(subjects) || subjects.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: "Subjects me kam se kam ek subject ka data hona chahiye!"
+                message: "Subjects must contain data for at least one subject!"
             });
         }
 
@@ -53,14 +53,14 @@ export const addBluePrint = async (req, res) => {
         // 5. Success Response
         res.status(201).json({
             success: true,
-            message: "Blueprint successfully create ho gaya!",
+            message: "Blueprint created successfully!",
             data: newBlueprint
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Server me error aa gaya blueprint save karte waqt.",
+            message: "Server error while saving the blueprint.",
             error: error.message
         });
     }

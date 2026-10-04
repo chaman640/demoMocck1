@@ -23,5 +23,5 @@ export const anyStaff = async (req, res, next) => {
   if (req.cookies?.teacherToken && (await attempt(teacherInfo, req))) return next();
   if (req.cookies?.promoterToken && (await attempt(promoterInfo, req))) return next();
   if ((req.cookies?.adminToken || req.headers["x-admin-secret"]) && (await attempt(adminOnly, req))) return next();
-  return res.status(401).json({ success: false, message: "Teacher, promoter ya admin login zaroori hai." });
+  return res.status(401).json({ success: false, message: "Teacher, promoter or admin login required." });
 };

@@ -49,16 +49,16 @@ import Otp from "../models/Otp.js";
 export const INDEX_PLAN = [
   {
     model: Performance,
-    label: "Performance (sabse bada — har test ka record)",
+    label: "Performance (the largest — one record per test)",
     indexes: [
       {
         name: "perf_user_exam_date",
         keys: { userId: 1, examName: 1, createdAt: -1 },
         why:
-          "SABSE ZAROORI INDEX. Student ki analysis, teacher ka student-view, class " +
-          "analysis, aur naya mock banate waqt 'ye sawaal pehle aa chuka hai' — " +
-          "ye sab isi query par tike hain. Iske bina 1 lakh students par har " +
-          "analysis page 10+ second lega.",
+          "THE MOST IMPORTANT INDEX. Student analysis, the teacher's student view, class " +
+          "analysis, and 'this question has already appeared' when building a new mock — " +
+          "all of these depend on this query. Without it, with 1 lakh students every " +
+          "analysis page will take 10+ seconds.",
       },
     ],
   },
@@ -71,17 +71,17 @@ export const INDEX_PLAN = [
         name: "user_batch_phone",
         keys: { activeCoupon: 1, phone: 1 },
         why:
-          "Teacher jab apne batch mein phone se student dhoondhta hai. Abhi ye " +
-          "poore 1 lakh users ko scan karta hai. Iske baad sirf usi batch ke " +
-          "students dekhe jaate hain.",
+          "When a teacher searches for a student by phone in their batch. Right now this " +
+          "scans all 1 lakh users. After this, only the students of that batch " +
+          "are checked.",
       },
       {
         name: "user_batch_name",
         keys: { activeCoupon: 1, name: 1 },
         why:
-          "Batch ke students ki list (class analysis + dashboard ki ginti). Isme " +
-          "naam bhi index ke andar hai, isliye MongoDB ko asli record kholne ki " +
-          "zaroorat hi nahi padti — sirf index se kaam ho jata hai (sabse tez tarika).",
+          "List of a batch's students (class analysis + dashboard counts). The " +
+          "name is also inside the index, so MongoDB never needs to open the " +
+          "actual record — the index alone is enough (the fastest way).",
       },
     ],
   },
@@ -94,21 +94,21 @@ export const INDEX_PLAN = [
         name: "q_exam_sub_topic",
         keys: { examName: 1, subjectName: 1, topicName: 1 },
         why:
-          "Mock test banate waqt sawaal chunna, admin ka question count, aur " +
-          "challenge banana. Question bank sabse tezi se badhta hai, isliye ye " +
-          "index jaldi hi zaroori ho jayega.",
+          "Picking questions when building a mock test, the admin's question count, and " +
+          "creating challenges. The question bank grows the fastest, so this " +
+          "index will soon become essential.",
       },
       {
         name: "q_coupon_sub_topic",
         keys: { coupon: 1, subjectName: 1, topicName: 1 },
         why:
-          "Teacher ke apne batch ke sawaal — question add karte waqt numbering, " +
-          "batch ka mock test, aur subject ki suchi.",
+          "Questions of the teacher's own batch — numbering when adding questions, " +
+          "the batch mock test, and the subject list.",
       },
       {
         name: "q_addedby",
         keys: { addedByTeacher: 1 },
-        why: "Teacher dashboard: 'aapne kitne sawaal add kiye'.",
+        why: "Teacher dashboard: 'how many questions you have added'.",
       },
     ],
   },
@@ -120,22 +120,22 @@ export const INDEX_PLAN = [
       {
         name: "coupon_teacher_date",
         keys: { mainTeacher: 1, createdAt: -1 },
-        why: "Teacher ke apne batches ki list (nayi pehle). Har teacher login par chalti hai.",
+        why: "List of the teacher's own batches (newest first). Runs on every teacher login.",
       },
     ],
   },
 
   {
     model: CouponAccess,
-    label: "CouponAccess (sub-teacher ka access)",
+    label: "CouponAccess (sub-teacher access)",
     indexes: [
       {
         name: "ca_subteacher_date",
         keys: { subTeacher: 1, createdAt: -1 },
         why:
-          "Sub-teacher ko kaunse batch/subject mila hai. Purana index sirf " +
-          "coupon se shuru hota hai, isliye sirf subTeacher se dhoondhne par " +
-          "wo kaam nahi aata.",
+          "Which batch/subject a sub-teacher has been given. The old index only " +
+          "starts with coupon, so it does not help when searching " +
+          "by subTeacher alone.",
       },
     ],
   },
@@ -148,35 +148,35 @@ export const INDEX_PLAN = [
         name: "teacher_parent_date",
         keys: { parentTeacher: 1, createdAt: -1 },
         why:
-          "'Mere sub-teachers' ki list (nayi pehle). Dashboard ki active/pending " +
-          "ginti bhi isi se chal jaati hai — parentTeacher se list nikaal kar " +
-          "status chhaan liya jaata hai. " +
-          "NOTE: pehle isme beech mein 'status' bhi daala tha, lekin tab MongoDB " +
-          "ko sorting RAM mein karni padti (equality → sort ka kram tootne se). " +
-          "Sub-teacher waise bhi 50 se kam hote hain, isliye status ka alag index " +
-          "faltu hai.",
+          "'My sub-teachers' list (newest first). The dashboard's active/pending " +
+          "counts also use this — the list is fetched by parentTeacher and " +
+          "filtered by status. " +
+          "NOTE: 'status' was earlier placed in the middle of this index, but then MongoDB " +
+          "had to sort in RAM (the equality → sort order breaks). " +
+          "There are fewer than 50 sub-teachers anyway, so a separate status index " +
+          "is unnecessary.",
       },
       {
         name: "teacher_invite",
         keys: { inviteToken: 1 },
         options: { sparse: true },
         why:
-          "Invite link kholte hi token se teacher dhoondhna. sparse = jinke paas " +
-          "token nahi hai wo index mein aate hi nahi, isliye index chhota rehta hai.",
+          "Finding the teacher by token when an invite link is opened. sparse = documents without " +
+          "a token are not in the index at all, so the index stays small.",
       },
     ],
   },
 
   {
     model: Blueprint,
-    label: "Blueprint (test ka dhaancha)",
+    label: "Blueprint (test structure)",
     indexes: [
       {
         name: "bp_exam_name",
         keys: { examName: 1, blueprintName: 1 },
         why:
-          "Har mock test banane, submit karne aur analysis mein blueprint " +
-          "dhoondha jata hai. Chhoti collection hai, lekin query bahut baar chalti hai.",
+          "The blueprint is looked up when every mock test is built, submitted and " +
+          "analysed. A small collection, but the query runs very often.",
       },
     ],
   },
@@ -188,12 +188,12 @@ export const INDEX_PLAN = [
       {
         name: "ct_coupon_exam_active_date",
         keys: { couponId: 1, examName: 1, isActive: 1, createdAt: -1 },
-        why: "Student ko apne batch ke test dikhana, aur teacher ko apne banaye test.",
+        why: "Showing students their batch's tests, and teachers the tests they created.",
       },
       {
         name: "ct_createdby",
         keys: { createdBy: 1 },
-        why: "Teacher dashboard: 'aapne kitne test banaye'.",
+        why: "Teacher dashboard: 'how many tests you have created'.",
       },
     ],
   },
@@ -206,9 +206,9 @@ export const INDEX_PLAN = [
         name: "cta_user_test",
         keys: { userId: 1, testId: 1 },
         why:
-          "'Ye test aapne pehle diya hai ya nahi' — test list ke har item par " +
-          "check hota hai. Purana index testId se shuru hota hai, isliye sirf " +
-          "userId se dhoondhne par kaam nahi aata.",
+          "'Have you taken this test before or not' — checked for every item " +
+          "in the test list. The old index starts with testId, so it does not help " +
+          "when searching by userId alone.",
       },
     ],
   },
@@ -220,12 +220,12 @@ export const INDEX_PLAN = [
       {
         name: "pyq_coupon_exam_status_year",
         keys: { couponId: 1, examName: 1, status: 1, year: -1 },
-        why: "Student ko purane saal ke paper dikhana (naye saal pehle).",
+        why: "Showing students previous year papers (newest year first).",
       },
       {
         name: "pyq_coupon_date",
         keys: { couponId: 1, createdAt: -1 },
-        why: "Teacher ke apne banaye paper ki list.",
+        why: "List of papers the teacher created.",
       },
     ],
   },
@@ -237,7 +237,7 @@ export const INDEX_PLAN = [
       {
         name: "pya_user_test",
         keys: { userId: 1, testId: 1 },
-        why: "'Ye paper aapne pehle diya hai ya nahi' — CustomTestAttempt wali hi baat.",
+        why: "'Have you taken this paper before or not' — same as CustomTestAttempt.",
       },
     ],
   },
@@ -250,14 +250,14 @@ export const INDEX_PLAN = [
         name: "chatt_leaderboard",
         keys: { challengeId: 1, totalScore: -1, totalTimeTakenInSeconds: 1 },
         why:
-          "Leaderboard. Iske bina MongoDB saare attempts uthakar RAM mein sort " +
-          "karta hai — aur 32MB se upar jaate hi query FAIL ho jati hai. Is " +
-          "index ke saath list pehle se sorted milti hai. Rank nikalna bhi isi se tez hota hai.",
+          "Leaderboard. Without this, MongoDB loads all attempts and sorts them " +
+          "in RAM — and the query FAILS once it goes above 32MB. With this " +
+          "index the list comes back already sorted. Calculating rank is faster too.",
       },
       {
         name: "chatt_user_date",
         keys: { userId: 1, createdAt: -1 },
-        why: "'Mere challenges' ki list.",
+        why: "'My challenges' list.",
       },
     ],
   },
@@ -270,8 +270,8 @@ export const INDEX_PLAN = [
         name: "otp_phone_purpose_date",
         keys: { phone: 1, purpose: 1, createdAt: -1 },
         why:
-          "Har OTP bhejne aur check karne par sabse naya OTP dhoondha jata hai. " +
-          "Purana index sirf phone par tha, purpose (signup/reset) par nahi.",
+          "The newest OTP is looked up every time an OTP is sent and checked. " +
+          "The old index was only on phone, not on purpose (signup/reset).",
       },
     ],
   },

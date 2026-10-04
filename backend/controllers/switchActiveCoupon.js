@@ -11,7 +11,7 @@ export const switchActiveCoupon = async (req, res) => {
     const { couponId } = req.body;
 
     if (!couponId) {
-      return res.status(400).json({ success: false, message: "couponId zaroori hai!" });
+      return res.status(400).json({ success: false, message: "couponId is required!" });
     }
     if (!mongoose.Types.ObjectId.isValid(couponId)) {
       return res.status(400).json({ success: false, message: "Invalid couponId." });
@@ -28,14 +28,14 @@ export const switchActiveCoupon = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `Active group '${coupon.name}' set ho gaya.`,
+      message: `Active group set to '${coupon.name}'.`,
       data: { activeCoupon: coupon },
     });
   } catch (error) {
     console.error("switchActiveCoupon error:", error);
     return res.status(500).json({
       success: false,
-      message: "Active coupon switch karte waqt error aaya.",
+      message: "Error while switching the active coupon.",
       error: error.message,
     });
   }

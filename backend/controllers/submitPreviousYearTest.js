@@ -24,7 +24,7 @@ export const submitPreviousYearTest = async (req, res) => {
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+        message: "attemptedQuestions must contain at least one question!",
       });
     }
 
@@ -42,7 +42,7 @@ export const submitPreviousYearTest = async (req, res) => {
     if (!test) {
       return res.status(404).json({
         success: false,
-        message: "Ye Previous Year Test nahi mila.",
+        message: "Previous Year Test not found.",
       });
     }
 
@@ -55,7 +55,7 @@ export const submitPreviousYearTest = async (req, res) => {
       if (studentCouponId !== test.couponId.toString()) {
         return res.status(403).json({
           success: false,
-          message: "Ye paper aapki batch ke liye available nahi hai.",
+          message: "This paper is not available for your batch.",
         });
       }
     }
@@ -110,7 +110,7 @@ export const submitPreviousYearTest = async (req, res) => {
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Koi valid question match nahi hua is test ke sath.",
+        message: "No valid question matched this test.",
       });
     }
 
@@ -148,7 +148,7 @@ export const submitPreviousYearTest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Previous Year Test submit ho gaya!",
+      message: "Previous Year Test submitted!",
       data: {
         attemptId: newAttempt._id,
         coinsEarned,
@@ -166,7 +166,7 @@ export const submitPreviousYearTest = async (req, res) => {
     console.error("submitPreviousYearTest error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya test submit karte waqt.",
+      message: "Server error while submitting the test.",
       error: error.message,
     });
   }

@@ -39,7 +39,7 @@ export const rewardReferrerIfDue = async (userId) => {
         type: "referral_bonus",
         amount: COIN_CONFIG.REFERRAL_BONUS_COINS,
         balanceAfter: referrer.coins,
-        note: `Dost ne join kiya: ${referee.name || "student"}`,
+        note: `Friend joined: ${referee.name || "student"}`,
       });
     } catch (ledgerError) {
       console.error("referral ledger write failed:", ledgerError.message);
@@ -100,7 +100,7 @@ export const creditDailyCoinsIfEligible = async (user, { attempted, total }) => 
         type,
         amount: coinsToAward,
         balanceAfter: updated.coins,
-        note: isBoosted ? "2x Boost active" : isStreakBonus ? `${newStreak}-din streak bonus` : undefined,
+        note: isBoosted ? "2x Boost active" : isStreakBonus ? `${newStreak}-day streak bonus` : undefined,
       });
     } catch (ledgerError) {
       console.error("CoinTransaction ledger write failed:", ledgerError.message);

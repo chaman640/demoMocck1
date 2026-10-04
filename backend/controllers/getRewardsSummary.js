@@ -7,7 +7,7 @@ export const getRewardsSummary = async (req, res) => {
       "coins activityDates longestStreak boostActiveUntil"
     );
     if (!user) {
-      return res.status(404).json({ success: false, message: "User nahi mila!" });
+      return res.status(404).json({ success: false, message: "User not found!" });
     }
 
     const { currentStreak, lastActive } = getStreakStatus(user.activityDates);
@@ -30,6 +30,6 @@ export const getRewardsSummary = async (req, res) => {
     });
   } catch (error) {
     console.error("getRewardsSummary error:", error);
-    return res.status(500).json({ success: false, message: "Rewards summary fetch nahi ho paya." });
+    return res.status(500).json({ success: false, message: "Could not fetch the rewards summary." });
   }
 };

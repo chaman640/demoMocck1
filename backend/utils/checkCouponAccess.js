@@ -14,12 +14,12 @@ import { ciExact, normalizeSubject } from "./subjectName.js";
  */
 export const checkCouponAccess = async (teacher, couponId, subject = null) => {
   if (!couponId) {
-    return { allowed: false, coupon: null, reason: "couponId zaroori hai." };
+    return { allowed: false, coupon: null, reason: "couponId is required." };
   }
 
   const coupon = await Coupon.findById(couponId);
   if (!coupon) {
-    return { allowed: false, coupon: null, reason: "Coupon nahi mila." };
+    return { allowed: false, coupon: null, reason: "Coupon not found." };
   }
 
   // Main Teacher — agar wahi coupon ka owner hai, hamesha allow
@@ -27,7 +27,7 @@ export const checkCouponAccess = async (teacher, couponId, subject = null) => {
     if (coupon.mainTeacher.toString() === teacher._id.toString()) {
       return { allowed: true, coupon, subject: normalizeSubject(subject) || null };
     }
-    return { allowed: false, coupon, reason: "Ye aapka coupon nahi hai." };
+    return { allowed: false, coupon, reason: "This is not your coupon." };
   }
 
   // Sub Teacher — CouponAccess record dhundo
@@ -45,8 +45,8 @@ export const checkCouponAccess = async (teacher, couponId, subject = null) => {
       allowed: false,
       coupon,
       reason: subject
-        ? `Aap is coupon ke '${normalizeSubject(subject)}' subject ke liye authorized nahi hain.`
-        : "Aap is coupon ke liye authorized nahi hain.",
+        ? `You are not authorized for subject '${normalizeSubject(subject)}' in this coupon.`
+        : "You are not authorized for this coupon.",
     };
   }
 

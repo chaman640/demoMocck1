@@ -41,7 +41,7 @@ export const adminOnly = async (req, res, next) => {
       return res.status(503).json({
         success: false,
         message:
-          "Admin routes band hain. Kripya backend/.env mein ADMIN_SECRET ya ADMIN_EMAIL set karein.",
+          "Admin routes are disabled. Please set ADMIN_SECRET or ADMIN_EMAIL in backend/.env.",
       });
     }
 
@@ -57,7 +57,7 @@ export const adminOnly = async (req, res, next) => {
     if (!adminToken) {
       return res.status(401).json({
         success: false,
-        message: "Admin access chahiye. Admin Login page se email link mangwayein, ya x-admin-secret header bhejein.",
+        message: "Admin access required. Request an email link from the Admin Login page, or send the x-admin-secret header.",
       });
     }
 
@@ -67,7 +67,7 @@ export const adminOnly = async (req, res, next) => {
     } catch {
       return res.status(401).json({
         success: false,
-        message: "Admin session expire ho chuki hai. Naya login link mangwayein.",
+        message: "Admin session has expired. Request a new login link.",
       });
     }
 
@@ -77,7 +77,7 @@ export const adminOnly = async (req, res, next) => {
     if (!decoded?.isAdmin || !wantEmail || haveEmail !== wantEmail) {
       return res.status(403).json({
         success: false,
-        message: "Ye route sirf admin ke liye hai.",
+        message: "This route is for admins only.",
       });
     }
 
@@ -88,7 +88,7 @@ export const adminOnly = async (req, res, next) => {
     console.error("adminOnly error:", error.message);
     return res.status(401).json({
       success: false,
-      message: "Admin verification fail ho gaya.",
+      message: "Admin verification failed.",
     });
   }
 };

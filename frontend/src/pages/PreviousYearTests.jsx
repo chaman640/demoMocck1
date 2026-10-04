@@ -52,7 +52,7 @@ const PreviousYearTests = () => {
           navigate("/Singup");
           return;
         }
-        setErrorMsg(err.response?.data?.message || "Previous Year Tests load nahi ho paaye.");
+        setErrorMsg(err.response?.data?.message || "Could not load Previous Year Tests.");
         setPhase("error");
       }
     };
@@ -72,7 +72,7 @@ const PreviousYearTests = () => {
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -92,8 +92,8 @@ const PreviousYearTests = () => {
         <h1 className="text-2xl font-bold mb-1">Previous Year Papers</h1>
         <p className="text-gray-400 text-sm mb-8">
           {tests.length === 0
-            ? `${examName} ke liye abhi koi previous year paper available nahi hai.`
-            : `${examName} ke ${tests.length} paper${tests.length > 1 ? "s" : ""} available hain`}
+            ? `No previous year paper is available for ${examName} yet.`
+            : `${tests.length} paper${tests.length > 1 ? "s" : ""} available for ${examName}`}
         </p>
 
         {tests.length === 0 ? (
@@ -101,7 +101,7 @@ const PreviousYearTests = () => {
             onClick={() => navigate("/HomePage")}
             className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
           >
-            Home Jaayein
+            Go Home
           </button>
         ) : (
           <div className="space-y-3">
@@ -121,12 +121,12 @@ const PreviousYearTests = () => {
                   <p className="text-xs text-gray-500 mb-2">{t.description}</p>
                 )}
                 <p className="text-xs text-gray-500">
-                  {t.totalQuestions} sawaal &middot; {t.durationMinutes} min &middot;{" "}
+                  {t.totalQuestions} questions &middot; {t.durationMinutes} min &middot;{" "}
                   {t.negativeMarking > 0 ? `-${t.negativeMarking} negative` : "no negative marking"}
                 </p>
                 {t.attemptsCount > 0 && (
                   <p className="text-xs text-[#A78BFA] mt-2">
-                    {t.attemptsCount} baar diya &middot; Best Score: {t.bestScore}
+                    {t.attemptsCount} attempt(s) &middot; Best Score: {t.bestScore}
                   </p>
                 )}
               </button>

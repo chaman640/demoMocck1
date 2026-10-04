@@ -23,7 +23,7 @@ const FilePicker = ({ label, hint, accept, file, existingUrl, onPick, preview })
         </div>
       )}
       <div className="min-w-0">
-        <p className="text-sm text-white truncate">{file ? file.name : existingUrl ? "Purani file lagi hai — badalne ke liye tap karein" : "File chunein"}</p>
+        <p className="text-sm text-white truncate">{file ? file.name : existingUrl ? "A file is already attached — tap to replace it" : "Choose file"}</p>
         <p className="text-[11px] text-gray-500">{hint}</p>
       </div>
       <input
@@ -66,11 +66,11 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
 
   const pickFile = (setter, file, kind) => {
     if (file && file.size > MAX_FILE_BYTES) {
-      setError("File 25 MB se badi hai.");
+      setError("File is larger than 25 MB.");
       return;
     }
     if (file && kind === "image" && !file.type.startsWith("image/")) {
-      setError("Cover ke liye sirf image chunein.");
+      setError("Please choose an image for the cover.");
       return;
     }
     setError("");
@@ -79,11 +79,11 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!form.title.trim()) return setError("Book ka naam zaroori hai.");
-    if (!form.isFree && !(Number(form.coinCost) > 0)) return setError("Paid book ke liye coins 0 se zyada hone chahiye.");
-    if (!isEdit && form.type === "digital" && !digitalFile) return setError("Digital book ke liye file upload karna zaroori hai.");
+    if (!form.title.trim()) return setError("Book name is required.");
+    if (!form.isFree && !(Number(form.coinCost) > 0)) return setError("A paid book must cost more than 0 coins.");
+    if (!isEdit && form.type === "digital" && !digitalFile) return setError("A file upload is required for a digital book.");
     if (form.stockQuantity !== "" && (Number(form.stockQuantity) < 0 || Number.isNaN(Number(form.stockQuantity)))) {
-      return setError("Stock sahi number hona chahiye.");
+      return setError("Stock must be a valid number.");
     }
 
     const fd = new FormData();
@@ -103,9 +103,9 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
       } else {
         await api.post("/admin/books", fd);
       }
-      onSaved(isEdit ? "Book update ho gayi!" : "Book add ho gayi!");
+      onSaved(isEdit ? "Book updated!" : "Book added!");
     } catch (err) {
-      setError(err.response?.data?.message || "Save nahi ho paya.");
+      setError(err.response?.data?.message || "Could not save.");
     } finally {
       setSaving(false);
     }
@@ -118,8 +118,8 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
         className="bg-[#111827] border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg p-5 max-h-[92vh] overflow-y-auto space-y-4"
       >
         <div>
-          <h3 className="font-bold text-lg">{isEdit ? "Book Edit Karein" : "Nayi Book Add Karein"}</h3>
-          <p className="text-xs text-gray-500">Ye students ko Rewards Store mein dikhegi.</p>
+          <h3 className="font-bold text-lg">{isEdit ? "Edit Book" : "Add New Book"}</h3>
+          <p className="text-xs text-gray-500">Students will see this in the Rewards Store.</p>
         </div>
 
         {error && (
@@ -127,13 +127,13 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
         )}
 
         <div>
-          <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Naam</label>
-          <input value={form.title} onChange={(e) => setField("title", e.target.value)} placeholder="Jaise: UP Police Constable Practice Set" className={inputCls} />
+          <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Name</label>
+          <input value={form.title} onChange={(e) => setField("title", e.target.value)} placeholder="e.g. UP Police Constable Practice Set" className={inputCls} />
         </div>
 
         <div>
           <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Description</label>
-          <textarea value={form.description} onChange={(e) => setField("description", e.target.value)} rows={2} placeholder="Chhota sa vivaran (optional)" className={`${inputCls} resize-none`} />
+          <textarea value={form.description} onChange={(e) => setField("description", e.target.value)} rows={2} placeholder="Short description (optional)" className={`${inputCls} resize-none`} />
         </div>
 
         <div>
@@ -141,7 +141,7 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
           <div className="grid grid-cols-2 gap-2">
             {[
               { v: "digital", label: "📄 Digital (PDF)" },
-              { v: "physical", label: "📦 Physical (Dak se)" },
+              { v: "physical", label: "📦 Physical (by post)" },
             ].map((opt) => (
               <button
                 key={opt.v}
@@ -158,14 +158,14 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
               </button>
             ))}
           </div>
-          {isEdit && <p className="text-[11px] text-gray-600 mt-1">Type baad mein badla nahi ja sakta.</p>}
+          {isEdit && <p className="text-[11px] text-gray-600 mt-1">The type cannot be changed later.</p>}
         </div>
 
         <div className="flex items-center justify-between bg-[#0A0D14] border border-gray-800 rounded-xl px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Free hai?</p>
+            <p className="text-sm font-medium">Free?</p>
             <p className="text-[11px] text-gray-500">
-              {form.type === "physical" ? "Free physical book har student ko sirf 1 baar milegi" : "Free book koi bhi student le sakta hai"}
+              {form.type === "physical" ? "Each student can get a free physical book only once" : "Any student can take a free book"}
             </p>
           </div>
           <button
@@ -182,21 +182,21 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
             <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Coins (Price)</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-3 flex items-center text-base">🪙</span>
-              <input type="number" min="1" value={form.coinCost} onChange={(e) => setField("coinCost", e.target.value)} placeholder="Jaise: 100" className={`${inputCls} pl-10`} />
+              <input type="number" min="1" value={form.coinCost} onChange={(e) => setField("coinCost", e.target.value)} placeholder="e.g. 100" className={`${inputCls} pl-10`} />
             </div>
           </div>
         )}
 
         {form.type === "physical" && (
           <div>
-            <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Stock (kitni copies)</label>
-            <input type="number" min="0" value={form.stockQuantity} onChange={(e) => setField("stockQuantity", e.target.value)} placeholder="Khaali chhodne par unlimited" className={inputCls} />
+            <label className="block text-[11px] font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Stock (number of copies)</label>
+            <input type="number" min="0" value={form.stockQuantity} onChange={(e) => setField("stockQuantity", e.target.value)} placeholder="Leave empty for unlimited" className={inputCls} />
           </div>
         )}
 
         <FilePicker
           label="Cover Image"
-          hint="JPG/PNG, 25 MB tak"
+          hint="JPG/PNG, up to 25 MB"
           accept="image/*"
           file={coverFile}
           existingUrl={initial?.coverImageUrl}
@@ -207,7 +207,7 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
         {form.type === "digital" && (
           <FilePicker
             label="Book File"
-            hint="Sirf PDF, 25 MB tak — students app ke andar hi padh payenge"
+            hint="PDF only, up to 25 MB — students can read it only inside the app"
             accept=".pdf,application/pdf"
             file={digitalFile}
             existingUrl={initial?.digitalFilePublicId || initial?.digitalFileUrl}
@@ -220,7 +220,7 @@ const BookForm = ({ initial, onSaved, onCancel }) => {
             Cancel
           </button>
           <button type="submit" disabled={saving} className="flex-1 py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-50">
-            {saving ? "Save ho raha hai..." : isEdit ? "Update Karein" : "Add Karein"}
+            {saving ? "Saving..." : isEdit ? "Update" : "Add"}
           </button>
         </div>
       </form>
@@ -278,7 +278,7 @@ const BookRow = ({ book, onEdit, onToggle, toggling }) => {
                 : "border-red-500/30 text-red-400 hover:bg-red-500/10"
             }`}
           >
-            {hidden ? "Show Karein" : "Hide Karein"}
+            {hidden ? "Show" : "Hide"}
           </button>
         </div>
       </div>
@@ -323,7 +323,7 @@ const ManageBooks = () => {
       });
       await load();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Status badal nahi paya.");
+      setMessage(err.response?.data?.message || "Could not change the status.");
     } finally {
       setTogglingId(null);
     }
@@ -334,7 +334,7 @@ const ManageBooks = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="w-full max-w-sm bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center space-y-4">
           <div className="text-4xl">🔒</div>
-          <p className="text-sm text-gray-300">Books manage karne ke liye Admin ya Teacher login zaroori hai.</p>
+          <p className="text-sm text-gray-300">Admin or Teacher login is required to manage books.</p>
           <div className="space-y-2">
             <Link to="/AdminLogin" className="block py-2.5 rounded-xl bg-[#7C3AED] text-sm font-semibold">Admin Login</Link>
             <Link to="/TeacherLogin" className="block py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300">Teacher Login</Link>
@@ -371,17 +371,17 @@ const ManageBooks = () => {
           }}
           className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] font-semibold text-sm shadow-lg shadow-purple-900/20 active:scale-[0.98] transition-transform"
         >
-          + Nayi Book Add Karein
+          + Add New Book
         </button>
 
         {phase === "loading" && [1, 2, 3].map((i) => <SkeletonBlock key={i} className="w-full h-28 rounded-2xl" />)}
 
-        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Books load nahi ho payi.</p>}
+        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Could not load books.</p>}
 
         {phase === "ready" && books.length === 0 && (
           <div className="text-center py-14 space-y-2">
             <p className="text-4xl">📚</p>
-            <p className="text-sm text-gray-500">Abhi tak koi book add nahi hui hai.</p>
+            <p className="text-sm text-gray-500">No books added yet.</p>
           </div>
         )}
 

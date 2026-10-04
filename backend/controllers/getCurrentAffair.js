@@ -59,11 +59,11 @@ export const getCurrentAffair = async (req, res) => {
     if (!globalAffair && !batchAffair) {
       const anyForThisExamAnyDate = await CurrentAffair.countDocuments({ examName });
       const allExamNamesInDB = await CurrentAffair.distinct("examName");
-      console.log(`🔍 [CURRENT-AFFAIR-DEBUG] Student ka exam field: "${user?.exam}" — request kiya examName: "${examName}"`);
-      console.log(`   → Is exact examName ke liye DB mein kahin bhi (kisi bhi date ka) entry: ${anyForThisExamAnyDate}`);
-      console.log(`   → DB mein current-affairs jin examName ke liye maujood hain: ${JSON.stringify(allExamNamesInDB)}`);
+      console.log(`🔍 [CURRENT-AFFAIR-DEBUG] Student exam field: "${user?.exam}" — requested examName: "${examName}"`);
+      console.log(`   → Entries in the DB for this exact examName (any date): ${anyForThisExamAnyDate}`);
+      console.log(`   → examNames that have current affairs in the DB: ${JSON.stringify(allExamNamesInDB)}`);
       if (anyForThisExamAnyDate === 0 && allExamNamesInDB.length > 0) {
-        console.log(`   ⚠️ examName mismatch ho sakta hai! Upar wali list mein se koi "${examName}" se milta-julta (lekin exact match nahi) naam dhoondein.`);
+        console.log(`   ⚠️ examName may not match! Look in the list above for a name similar to (but not exactly) "${examName}".`);
       }
 
       return res.status(200).json({ success: true, available: false, data: null });
@@ -108,7 +108,7 @@ export const getCurrentAffair = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Current affairs fetch karte waqt error aaya.",
+      message: "Error while fetching current affairs.",
       error: error.message,
     });
   }
@@ -149,7 +149,7 @@ export const getCurrentAffairDates = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Dates list fetch karte waqt error aaya.",
+      message: "Error while fetching the dates list.",
       error: error.message,
     });
   }

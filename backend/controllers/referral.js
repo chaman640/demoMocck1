@@ -38,7 +38,7 @@ const ensureReferralCode = async (user) => {
 export const getMyReferral = async (req, res) => {
   try {
     const code = await ensureReferralCode(req.user);
-    if (!code) return res.status(500).json({ success: false, message: "Referral code ban nahi paya. Dobara try karein." });
+    if (!code) return res.status(500).json({ success: false, message: "Could not create the referral code. Try again." });
 
     const [joinedCount, rewardedCount, earned] = await Promise.all([
       User.countDocuments({ referredBy: req.user._id }),
@@ -63,6 +63,6 @@ export const getMyReferral = async (req, res) => {
     });
   } catch (error) {
     console.error("getMyReferral error:", error);
-    return res.status(500).json({ success: false, message: "Referral details load nahi ho paye." });
+    return res.status(500).json({ success: false, message: "Could not load referral details." });
   }
 };

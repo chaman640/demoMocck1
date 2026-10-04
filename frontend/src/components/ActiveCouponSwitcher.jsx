@@ -39,7 +39,7 @@ const ActiveCouponSwitcher = ({ activeCouponId, onChanged }) => {
       setOpen(false);
       if (onChanged) onChanged();
     } catch (err) {
-      alert(err.response?.data?.message || "Switch nahi ho paaya.");
+      alert(err.response?.data?.message || "Could not switch.");
     } finally {
       setSwitching(false);
     }
@@ -54,7 +54,7 @@ const ActiveCouponSwitcher = ({ activeCouponId, onChanged }) => {
         <div className="min-w-0">
           <p className="text-[10px] text-gray-500 uppercase tracking-wide mb-0.5">Active Batch</p>
           <p className="text-sm font-semibold text-white truncate">
-            {activeCoupon ? activeCoupon.name : "Koi batch select nahi"}
+            {activeCoupon ? activeCoupon.name : "No batch selected"}
           </p>
         </div>
         <span className="text-gray-500 flex-shrink-0">{open ? "▲" : "▼"}</span>
@@ -63,18 +63,18 @@ const ActiveCouponSwitcher = ({ activeCouponId, onChanged }) => {
       {open && (
         <div className="absolute z-20 mt-2 w-full bg-[#111827] border border-gray-800 rounded-xl shadow-xl max-h-72 overflow-y-auto">
           {loading ? (
-            <p className="p-4 text-sm text-gray-500 text-center">Load ho raha hai...</p>
+            <p className="p-4 text-sm text-gray-500 text-center">Loading...</p>
           ) : coupons.length === 0 ? (
             <div className="p-4 text-center">
               <p className="text-sm text-gray-500 mb-3">
-                {role === "main" ? "Abhi koi coupon nahi bana." : "Aap kisi coupon ke liye authorized nahi hain."}
+                {role === "main" ? "No coupon created yet." : "You are not authorized for any coupon."}
               </p>
               {role === "main" && (
                 <button
                   onClick={() => navigate("/TeacherCoupons")}
                   className="text-xs px-3 py-1.5 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9]"
                 >
-                  Coupon Banayein
+                  Create Coupon
                 </button>
               )}
             </div>

@@ -128,7 +128,7 @@ const TeacherDashboard = () => {
           >
             <span className="text-2xl block mb-1">📝</span>
             <p className="font-semibold text-sm">Study Notes</p>
-            <p className="text-[11px] text-gray-500 mt-0.5">Apne batch ke liye PDF notes upload karein</p>
+            <p className="text-[11px] text-gray-500 mt-0.5">Upload PDF notes for your batch</p>
           </button>
         </div>
 

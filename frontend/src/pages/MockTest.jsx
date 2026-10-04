@@ -336,7 +336,7 @@ const MockTest = () => {
     try {
       localStorage.setItem(getStorageKey(userId), JSON.stringify(toSave));
     } catch (err) {
-      console.error("Mock test state save nahi ho paayi:", err);
+      console.error("Could not save the mock test state:", err);
     }
   }, [
     phase,
@@ -495,7 +495,7 @@ const MockTest = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-          <p className="text-gray-400 text-sm">Test taiyaar ho raha hai...</p>
+          <p className="text-gray-400 text-sm">Preparing your test...</p>
         </div>
       </div>
     );
@@ -514,13 +514,13 @@ const MockTest = () => {
               onClick={() => navigate("/Login")}
               className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
             >
-              Login page par jaayein
+              Go to Login page
             </button>
             <button
               onClick={() => window.location.reload()}
               className="px-5 py-2 rounded-lg border border-gray-700 hover:border-gray-500 text-sm font-medium text-gray-300"
             >
-              Dobara try karein
+              Try again
             </button>
           </div>
         </div>
@@ -532,8 +532,8 @@ const MockTest = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12 pb-24">
         <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold mb-1">Mock Test Chuniye</h1>
-          <p className="text-gray-400 text-sm mb-8">{examName} ke liye ye tests available hain</p>
+          <h1 className="text-2xl font-bold mb-1">Choose a Mock Test</h1>
+          <p className="text-gray-400 text-sm mb-8">Tests available for {examName}</p>
           <div className="space-y-4">
             {blueprints.map((bp) => (
               <button
@@ -548,7 +548,7 @@ const MockTest = () => {
                   </span>
                 </div>
                 <p className="text-sm text-gray-400">
-                  {bp.totalQuestions} sawaal &middot; {bp.marksPerQuestion} marks/sawaal &middot;{" "}
+                  {bp.totalQuestions} questions &middot; {bp.marksPerQuestion} marks/question &middot;{" "}
                   {bp.negativeMarking > 0 ? `-${bp.negativeMarking} negative` : "no negative marking"}
                 </p>
               </button>
@@ -670,20 +670,20 @@ const InstructionsScreen = ({ examName, blueprint, durMin, onStart }) => {
               className="flex justify-between items-center bg-[#1F2937] border border-gray-800 rounded-lg px-4 py-2 text-sm"
             >
               <span>{s.subjectName}</span>
-              <span className="text-gray-400">{s.questionCount} sawaal</span>
+              <span className="text-gray-400">{s.questionCount} questions</span>
             </div>
           ))}
         </div>
 
         <h3 className="text-sm font-semibold text-gray-300 mb-3">Instructions</h3>
         <ul className="text-sm text-gray-400 space-y-1.5 mb-8 list-disc list-inside">
-          <li>Timer khatam hote hi test apne aap submit ho jayega.</li>
-          <li>Har sahi jawab ke {blueprint.marksPerQuestion} marks milenge.</li>
+          <li>The test is submitted automatically when the timer ends.</li>
+          <li>Each correct answer gets {blueprint.marksPerQuestion} marks.</li>
           {blueprint.negativeMarking > 0 && (
-            <li>Har galat jawab ke {blueprint.negativeMarking} marks katenge.</li>
+            <li>Each wrong answer loses {blueprint.negativeMarking} marks.</li>
           )}
-          <li>Agar galti se page reload ho jaaye to chinta na karein — aapka test wahi se resume ho jayega.</li>
-          <li>Kisi bhi sawaal ko "Mark for Review" karke baad mein wapas aa sakte hain.</li>
+          <li>If the page reloads by mistake, don't worry — your test will resume from where you left off.</li>
+          <li>You can "Mark for Review" any question and come back to it later.</li>
         </ul>
 
         <label className="flex items-center gap-2 mb-6 text-sm text-gray-300">
@@ -693,7 +693,7 @@ const InstructionsScreen = ({ examName, blueprint, durMin, onStart }) => {
             onChange={(e) => setAgreed(e.target.checked)}
             className="w-4 h-4 accent-[#7C3AED]"
           />
-          Maine sabhi instructions padh liye hain
+          I have read all the instructions
         </label>
 
         <button
@@ -703,7 +703,7 @@ const InstructionsScreen = ({ examName, blueprint, durMin, onStart }) => {
             agreed ? "bg-[#7C3AED] hover:bg-[#6D28D9]" : "bg-gray-700 cursor-not-allowed text-gray-400"
           }`}
         >
-          Test Shuru Karein
+          Start Test
         </button>
       </div>
     </div>
@@ -916,7 +916,7 @@ const TestScreen = ({
       {showSubmitConfirm && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center px-6 z-20">
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 max-w-sm w-full">
-            <h3 className="text-lg font-semibold mb-4">Test submit karein?</h3>
+            <h3 className="text-lg font-semibold mb-4">Submit the test?</h3>
             <div className="space-y-1.5 text-sm text-gray-400 mb-6">
               <p>
                 Answered: <span className="text-green-400">{summary.answered}</span>
@@ -937,14 +937,14 @@ const TestScreen = ({
                 disabled={submitting}
                 className="flex-1 py-2 rounded-lg border border-gray-700 text-sm text-gray-300"
               >
-                Wapas Jaayein
+                Go Back
               </button>
               <button
                 onClick={onConfirmSubmit}
                 disabled={submitting}
                 className="flex-1 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
               >
-                {submitting ? "Submit ho raha hai..." : "Haan, Submit Karein"}
+                {submitting ? "Submitting..." : "Yes, Submit"}
               </button>
             </div>
           </div>
@@ -961,7 +961,7 @@ const ResultsScreen = ({ resultData, shareTitle, maxScore, onHome, onAnalysis, o
     <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
       <div className="max-w-2xl mx-auto">
         <h1 className="text-2xl font-bold mb-1">Test Complete!</h1>
-        <p className="text-gray-400 text-sm mb-8">Aapka result neeche hai</p>
+        <p className="text-gray-400 text-sm mb-8">Your result is below</p>
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 text-center mb-6">
           <p className="text-5xl font-bold text-[#A78BFA]">{scoreDetails.totalScore}</p>
@@ -1036,7 +1036,7 @@ const ResultsScreen = ({ resultData, shareTitle, maxScore, onHome, onAnalysis, o
             onClick={onAnalysis}
             className="flex-1 py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Detailed Analysis Dekhein
+            View Detailed Analysis
           </button>
         </div>
       </div>
@@ -1109,7 +1109,7 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
           onClick={onBack}
           className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
         >
-          &larr; Result par wapas jaayein
+          &larr; Back to result
         </button>
 
         <h1 className="text-xl sm:text-2xl font-bold mb-4">Question Review</h1>
@@ -1124,7 +1124,7 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
                   : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
               }`}
             >
-              Sabhi Subjects
+              All Subjects
             </button>
             {subjects.map((s) => (
               <button
@@ -1161,19 +1161,19 @@ const QuestionReviewScreen = ({ performanceId, initialSubject, initialFilter, on
         {isLoading && (
           <div className="flex flex-col items-center gap-3 py-16">
             <div className="w-10 h-10 border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin" />
-            <p className="text-gray-400 text-sm">Sawaal load ho rahe hain...</p>
+            <p className="text-gray-400 text-sm">Loading questions...</p>
           </div>
         )}
 
         {isError && (
           <p className="text-red-400 text-sm py-10 text-center">
-            {error?.response?.data?.message || "Data load nahi ho paaya."}
+            {error?.response?.data?.message || "Could not load the data."}
           </p>
         )}
 
         {!isLoading && !isError && filteredQuestions.length === 0 && (
           <p className="text-gray-400 text-sm py-10 text-center">
-            Is category mein koi sawaal nahi hai.
+            No questions in this category.
           </p>
         )}
 
@@ -1250,9 +1250,9 @@ const QuestionDetailCard = ({ q }) => {
                 {n}
               </span>
               <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Correct answer</span>}
               {isUserPick && !isCorrectOpt && (
-                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+                <span className="text-xs flex-shrink-0">❌ Your answer</span>
               )}
             </div>
           );
@@ -1261,13 +1261,13 @@ const QuestionDetailCard = ({ q }) => {
 
       {q.userAnswer == null && (
         <p className="text-xs text-yellow-500 mb-4">
-          Aapne ye sawaal attempt nahi kiya tha.
+          You did not attempt this question.
         </p>
       )}
 
       {q.timeTakenInSeconds != null && (
         <p className="text-xs text-gray-500 mb-4">
-          Time liya gaya: {q.timeTakenInSeconds}s
+          Time taken: {q.timeTakenInSeconds}s
         </p>
       )}
 

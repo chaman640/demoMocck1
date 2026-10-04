@@ -23,9 +23,9 @@ export const tooManyItems = (res, arr, label = "questions") => {
     res.status(400).json({
       success: false,
       message:
-        `Ek baar mein zyada se zyada ${MAX_BULK_QUESTIONS} ${label} bhej sakte hain ` +
-        `(aapne ${arr.length} bheje). Apni file ko ${MAX_BULK_QUESTIONS}-${label} ` +
-        `ke chhote hisso mein todkar ek-ek karke upload karein.`,
+        `You can send at most ${MAX_BULK_QUESTIONS} ${label} at a time ` +
+        `(you sent ${arr.length}). Split your file into smaller parts of ${MAX_BULK_QUESTIONS} ${label} ` +
+        `and upload them one by one.`,
     });
     return true;
   }

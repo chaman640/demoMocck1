@@ -20,18 +20,18 @@ export const createCustomTest = async (req, res) => {
     if (!couponId || !testName || !Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "couponId, testName aur kam se kam ek subject ka data zaroori hai!",
+        message: "couponId, testName and data for at least one subject are required!",
       });
     }
     if (!durationMinutes) {
-      return res.status(400).json({ success: false, message: "durationMinutes zaroori hai!" });
+      return res.status(400).json({ success: false, message: "durationMinutes is required!" });
     }
 
     for (const subj of subjects) {
       if (!normalizeSubject(subj.subjectName) || !Array.isArray(subj.questions) || subj.questions.length === 0) {
         return res.status(400).json({
           success: false,
-          message: `'${subj.subjectName || "Unknown"}' subject mein subjectName aur kam se kam ek question hona zaroori hai!`,
+          message: `Subject '${subj.subjectName || "Unknown"}' needs a subjectName and at least one question!`,
         });
       }
     }
@@ -80,7 +80,7 @@ export const createCustomTest = async (req, res) => {
       if (!allowed) {
         return res.status(403).json({
           success: false,
-          message: reason || `Aapko '${subjectName}' subject ka access nahi hai.`,
+          message: reason || `You do not have access to subject '${subjectName}'.`,
         });
       }
       // Sub-teacher ke access record wali spelling ko priority do
@@ -95,12 +95,12 @@ export const createCustomTest = async (req, res) => {
     for (const [subjName, qs] of mergedBySubject.entries()) {
       qs.forEach((q, idx) => {
         if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
-          validationErrors.push(`'${subjName}' Question ${idx + 1}: sabhi options aur question text zaroori hain.`);
+          validationErrors.push(`'${subjName}' Question ${idx + 1}: all options and the question text are required.`);
           return;
         }
         const correctOpt = Number(q.correctOption);
         if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
-          validationErrors.push(`'${subjName}' Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`);
+          validationErrors.push(`'${subjName}' Question ${idx + 1}: correctOption must be between 1 and 4.`);
         }
       });
     }
@@ -108,7 +108,7 @@ export const createCustomTest = async (req, res) => {
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Kuch questions mein validation errors hain, test save nahi hua:",
+        message: "Some questions have validation errors, the test was not saved:",
         errors: validationErrors,
       });
     }
@@ -155,14 +155,14 @@ export const createCustomTest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${newTest.testName}' successfully ban gaya! (${newTest.totalQuestions} questions)`,
+      message: `'${newTest.testName}' created successfully! (${newTest.totalQuestions} questions)`,
       data: newTest,
     });
   } catch (error) {
     console.error("createCustomTest error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya custom test banate waqt.",
+      message: "Server error while creating the custom test.",
       error: error.message,
     });
   }

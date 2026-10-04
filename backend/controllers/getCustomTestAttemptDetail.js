@@ -14,14 +14,14 @@ export const getCustomTestAttemptDetail = async (req, res) => {
 
     const attempt = await CustomTestAttempt.findOne({ _id: attemptId, userId });
     if (!attempt) {
-      return res.status(404).json({ success: false, message: "Ye attempt nahi mila." });
+      return res.status(404).json({ success: false, message: "Attempt not found." });
     }
 
     const test = await CustomTest.findById(attempt.testId);
     if (!test) {
       return res.status(404).json({
         success: false,
-        message: "Is attempt ka original test ab available nahi hai.",
+        message: "The original test for this attempt is no longer available.",
       });
     }
 
@@ -89,7 +89,7 @@ export const getCustomTestAttemptDetail = async (req, res) => {
     console.error("getCustomTestAttemptDetail error:", error);
     return res.status(500).json({
       success: false,
-      message: "Attempt detail fetch karte waqt error aaya.",
+      message: "Error while fetching attempt details.",
       error: error.message,
     });
   }

@@ -7,7 +7,7 @@ const performanceSchema = new mongoose.Schema(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "User ID zaroori hai"],
+      required: [true, "User ID is required"],
     },
 
     attemptedQuestions: [
@@ -33,7 +33,7 @@ const performanceSchema = new mongoose.Schema(
         timeTakenInSeconds: {
           type: Number,
           default: null,
-          min: [0, "Time negative nahi ho sakta"],
+          min: [0, "Time cannot be negative"],
         },
         isMarkedForReview: {
           type: Boolean,
@@ -44,12 +44,12 @@ const performanceSchema = new mongoose.Schema(
 
     examName: {
       type: String,
-      required: [true, "Main exam ka naam zaroori hai (e.g., UP Constable)"],
+      required: [true, "Main exam name is required (e.g., UP Constable)"],
       trim: true,
     },
     blueprintName: {
       type: String,
-      required: [true, "Specific test ka naam zaroori hai (e.g., UP Constable Full Mock 1)"],
+      required: [true, "Specific test name is required (e.g., UP Constable Full Mock 1)"],
       trim: true,
     },
 

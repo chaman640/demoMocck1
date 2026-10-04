@@ -12,7 +12,7 @@ const AdminVerify = () => {
     const token = searchParams.get("token");
     if (!token) {
       setStatus("error");
-      setError("Login link mein token missing hai.");
+      setError("Token is missing from the login link.");
       return;
     }
 
@@ -24,7 +24,7 @@ const AdminVerify = () => {
       })
       .catch((err) => {
         setStatus("error");
-        setError(err.response?.data?.message || "Login verify nahi ho paaya.");
+        setError(err.response?.data?.message || "Could not verify the login.");
       });
   }, [searchParams, navigate]);
 
@@ -34,14 +34,14 @@ const AdminVerify = () => {
         {status === "verifying" && (
           <>
             <div className="w-10 h-10 mx-auto border-4 border-gray-700 border-t-[#8B5CF6] rounded-full animate-spin mb-4" />
-            <p className="text-sm text-gray-400">Login verify ho raha hai...</p>
+            <p className="text-sm text-gray-400">Verifying login...</p>
           </>
         )}
 
         {status === "success" && (
           <>
             <div className="w-14 h-14 mx-auto rounded-full bg-green-500/10 text-green-400 flex items-center justify-center text-2xl mb-4">✅</div>
-            <p className="text-sm text-gray-300">Login ho gaya! Admin panel khul raha hai...</p>
+            <p className="text-sm text-gray-300">Logged in! Opening the admin panel...</p>
           </>
         )}
 
@@ -50,7 +50,7 @@ const AdminVerify = () => {
             <div className="w-14 h-14 mx-auto rounded-full bg-red-500/10 text-red-400 flex items-center justify-center text-2xl mb-4">✕</div>
             <p className="text-sm text-gray-300 mb-6">{error}</p>
             <button onClick={() => navigate("/AdminLogin")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-              Naya Link Mangwayein
+              Request a New Link
             </button>
           </>
         )}

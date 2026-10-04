@@ -17,7 +17,7 @@ export const deleteCustomTest = async (req, res) => {
 
     const test = await CustomTest.findById(testId);
     if (!test) {
-      return res.status(404).json({ success: false, message: "Ye test nahi mila." });
+      return res.status(404).json({ success: false, message: "Test not found." });
     }
 
     const isCreator = test.createdBy?.toString() === req.teacher._id.toString();
@@ -28,14 +28,14 @@ export const deleteCustomTest = async (req, res) => {
     }
 
     if (!isCreator && !isOwningMainTeacher) {
-      return res.status(403).json({ success: false, message: "Ye test delete karne ki permission nahi hai." });
+      return res.status(403).json({ success: false, message: "You do not have permission to delete this test." });
     }
 
     await CustomTest.deleteOne({ _id: testId });
 
-    return res.status(200).json({ success: true, message: `'${test.testName}' test delete ho gaya.` });
+    return res.status(200).json({ success: true, message: `Test '${test.testName}' deleted.` });
   } catch (error) {
     console.error("deleteCustomTest error:", error);
-    return res.status(500).json({ success: false, message: "Test delete karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while deleting the test." });
   }
 };

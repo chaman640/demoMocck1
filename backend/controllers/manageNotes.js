@@ -24,7 +24,7 @@ export const uploadNotePdfMiddleware = (req, res, next) => {
   uploadPdf(req, res, (err) => {
     if (err) {
       const message =
-        err.code === "LIMIT_FILE_SIZE" ? "PDF 25 MB se badi hai." : "File upload mein error: " + err.message;
+        err.code === "LIMIT_FILE_SIZE" ? "PDF is larger than 25 MB." : "File upload error: " + err.message;
       return res.status(400).json({ success: false, message });
     }
     next();
@@ -61,7 +61,7 @@ export const getNoteUploadOptions = async (req, res) => {
     return res.status(200).json({ success: true, data: { actor: "teacher", role: req.teacher.role, batches } });
   } catch (error) {
     console.error("getNoteUploadOptions error:", error);
-    return res.status(500).json({ success: false, message: "Options load nahi ho paye." });
+    return res.status(500).json({ success: false, message: "Could not load options." });
   }
 };
 
@@ -73,10 +73,10 @@ export const createNote = async (req, res) => {
     const topicName = clean(req.body.topicName, 100);
 
     if (!title || !subjectName) {
-      return res.status(400).json({ success: false, message: "Title aur subject zaroori hain." });
+      return res.status(400).json({ success: false, message: "Title and subject are required." });
     }
     if (!req.file || !isPdfBuffer(req.file.buffer)) {
-      return res.status(400).json({ success: false, message: "Sirf PDF file upload karein." });
+      return res.status(400).json({ success: false, message: "Upload a PDF file only." });
     }
 
     const note = {
@@ -90,7 +90,7 @@ export const createNote = async (req, res) => {
     if (req.actor.type === "admin") {
       const examName = clean(req.body.examName, 100);
       if (!examName || !(await ExamName.exists({ name: examName }))) {
-        return res.status(400).json({ success: false, message: "Sahi exam chunein." });
+        return res.status(400).json({ success: false, message: "Choose a valid exam." });
       }
       note.visibility = "public";
       note.examName = examName;
@@ -108,14 +108,14 @@ export const createNote = async (req, res) => {
         mongoose.Types.ObjectId.isValid(id)
       );
       if (couponIds.length === 0) {
-        return res.status(400).json({ success: false, message: "Kam se kam ek batch chunein." });
+        return res.status(400).json({ success: false, message: "Choose at least one batch." });
       }
 
       const exams = new Set();
       for (const couponId of couponIds) {
         const check = await checkCouponAccess(req.teacher, couponId, req.teacher.role === "sub" ? subjectName : null);
         if (!check.allowed) {
-          return res.status(403).json({ success: false, message: check.reason || "Is batch ki permission nahi hai." });
+          return res.status(403).json({ success: false, message: check.reason || "You do not have permission for this batch." });
         }
         exams.add(check.coupon.exam);
         if (check.subject && req.teacher.role === "sub") note.subjectName = check.subject;
@@ -133,10 +133,10 @@ export const createNote = async (req, res) => {
     note.fileBytes = uploaded.bytes || req.file.size;
 
     const saved = await Note.create(note);
-    return res.status(201).json({ success: true, message: "Notes upload ho gaye!", data: saved });
+    return res.status(201).json({ success: true, message: "Notes uploaded!", data: saved });
   } catch (error) {
     console.error("createNote error:", error);
-    return res.status(500).json({ success: false, message: "Notes upload karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while uploading notes." });
   }
 };
 
@@ -167,7 +167,7 @@ export const listManagedNotes = async (req, res) => {
     });
   } catch (error) {
     console.error("listManagedNotes error:", error);
-    return res.status(500).json({ success: false, message: "Notes list nahi ho paye." });
+    return res.status(500).json({ success: false, message: "Could not load the notes list." });
   }
 };
 
@@ -175,30 +175,30 @@ export const setNoteStatus = async (req, res) => {
   try {
     const { status } = req.body;
     if (!["active", "hidden"].includes(status)) {
-      return res.status(400).json({ success: false, message: "Status 'active' ya 'hidden' hona chahiye." });
+      return res.status(400).json({ success: false, message: "Status must be 'active' or 'hidden'." });
     }
     const note = await Note.findById(req.params.noteId);
-    if (!note || !ownsNote(req, note)) return res.status(404).json({ success: false, message: "Notes nahi mile." });
+    if (!note || !ownsNote(req, note)) return res.status(404).json({ success: false, message: "Notes not found." });
 
     note.status = status;
     await note.save();
-    return res.status(200).json({ success: true, message: status === "hidden" ? "Notes chhupa diye." : "Notes dikhne lage." });
+    return res.status(200).json({ success: true, message: status === "hidden" ? "Notes hidden." : "Notes are visible again." });
   } catch (error) {
     console.error("setNoteStatus error:", error);
-    return res.status(500).json({ success: false, message: "Status badal nahi paya." });
+    return res.status(500).json({ success: false, message: "Could not change the status." });
   }
 };
 
 export const deleteNote = async (req, res) => {
   try {
     const note = await Note.findById(req.params.noteId);
-    if (!note || !ownsNote(req, note)) return res.status(404).json({ success: false, message: "Notes nahi mile." });
+    if (!note || !ownsNote(req, note)) return res.status(404).json({ success: false, message: "Notes not found." });
 
     await Note.deleteOne({ _id: note._id });
     await deletePrivateFile(note.filePublicId);
-    return res.status(200).json({ success: true, message: "Notes delete ho gaye." });
+    return res.status(200).json({ success: true, message: "Notes deleted." });
   } catch (error) {
     console.error("deleteNote error:", error);
-    return res.status(500).json({ success: false, message: "Delete nahi ho paya." });
+    return res.status(500).json({ success: false, message: "Could not delete." });
   }
 };

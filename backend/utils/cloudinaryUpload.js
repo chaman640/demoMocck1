@@ -15,7 +15,7 @@ const ensureCloudinary = () => {
   if (cloudinaryReady) return;
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error("Cloudinary env variables set nahi hain.");
+    throw new Error("Cloudinary env variables are not set.");
   }
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
@@ -44,12 +44,12 @@ export const handleImageUpload = async (req, res) => {
   try {
     ensureCloudinary();
     if (!req.file) {
-      return res.status(400).json({ success: false, message: "Koi image nahi mili (field name 'image' hona chahiye)." });
+      return res.status(400).json({ success: false, message: "No image found (field name must be 'image')." });
     }
     const url = await uploadBufferToCloudinary(req.file.buffer, "custom-test-questions");
     return res.status(200).json({ success: true, url });
   } catch (error) {
     console.error("handleImageUpload error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Upload fail ho gaya." });
+    return res.status(500).json({ success: false, message: error.message || "Upload failed." });
   }
 };

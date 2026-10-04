@@ -8,7 +8,7 @@ export const getTeacherCustomTests = async (req, res) => {
     if (!teacher.activeCoupon) {
       return res.status(400).json({
         success: false,
-        message: "Pehle apna active batch select karein!",
+        message: "Select your active batch first!",
       });
     }
 
@@ -32,7 +32,7 @@ export const getTeacherCustomTests = async (req, res) => {
     console.error("getTeacherCustomTests error:", error);
     return res.status(500).json({
       success: false,
-      message: "Custom tests list fetch karte waqt error aaya.",
+      message: "Error while fetching the custom tests list.",
       error: error.message,
     });
   }

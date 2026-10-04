@@ -15,7 +15,7 @@ export const getCustomTest = async (req, res) => {
     const test = await CustomTest.findOne({ _id: testId, isActive: true });
 
     if (!test) {
-      return res.status(404).json({ success: false, message: "Ye test nahi mila." });
+      return res.status(404).json({ success: false, message: "Test not found." });
     }
 
     // Sirf usi batch ka student le sakta hai jiske liye ye test bana hai
@@ -23,7 +23,7 @@ export const getCustomTest = async (req, res) => {
     if (studentCouponId !== test.couponId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Ye test aapki batch ke liye available nahi hai.",
+        message: "This test is not available for your batch.",
       });
     }
 
@@ -59,7 +59,7 @@ export const getCustomTest = async (req, res) => {
     console.error("getCustomTest error:", error);
     return res.status(500).json({
       success: false,
-      message: "Custom Test fetch karte waqt error aaya.",
+      message: "Error while fetching the Custom Test.",
       error: error.message,
     });
   }

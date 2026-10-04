@@ -70,7 +70,7 @@ export const getAllCustomTests = async (req, res) => {
     console.error("getAllCustomTests error:", error);
     return res.status(500).json({
       success: false,
-      message: "Custom Tests list fetch karte waqt error aaya.",
+      message: "Error while fetching the Custom Tests list.",
       error: error.message,
     });
   }

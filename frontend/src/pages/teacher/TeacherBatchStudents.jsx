@@ -93,7 +93,7 @@ const TeacherBatchStudents = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -107,11 +107,11 @@ const TeacherBatchStudents = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <button onClick={() => navigate("/TeacherCoupons")} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-          &larr; Batches Par Wapas
+          &larr; Back to Batches
         </button>
 
         <div>
-          <h1 className="text-2xl font-bold mb-1">Students Manage Karein</h1>
+          <h1 className="text-2xl font-bold mb-1">Manage Students</h1>
           <p className="text-gray-400 text-sm">
             {batchName ? `'${batchName}' ` : "Is batch "}
             {students.length > 0
@@ -121,7 +121,7 @@ const TeacherBatchStudents = () => {
         </div>
 
         <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5 sm:p-6">
-          <h3 className="font-semibold text-sm mb-4">Naya Student Add Karein</h3>
+          <h3 className="font-semibold text-sm mb-4">Add New Student</h3>
 
           {formError && (
             <div className="mb-4 p-3 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">
@@ -134,7 +134,7 @@ const TeacherBatchStudents = () => {
               type="text"
               value={form.name}
               onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-              placeholder="Naam (optional)"
+              placeholder="Name (optional)"
               className={inputClass}
             />
             <input
@@ -153,7 +153,7 @@ const TeacherBatchStudents = () => {
             />
             <p className="text-[11px] text-gray-500">Either phone or email is required — you can provide both.</p>
             <button type="submit" disabled={adding} className="w-full py-2.5 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-              {adding ? "Adding..." : "Student Add Karein"}
+              {adding ? "Adding..." : "Add Student"}
             </button>
           </form>
         </div>
@@ -163,7 +163,7 @@ const TeacherBatchStudents = () => {
             <h3 className="font-semibold text-sm">Allowed Students ({students.length})</h3>
           </div>
           {students.length === 0 ? (
-            <p className="p-6 text-sm text-gray-400 text-center">Abhi koi student add nahi hua.</p>
+            <p className="p-6 text-sm text-gray-400 text-center">No students added yet.</p>
           ) : (
             <div className="divide-y divide-gray-800">
               {students.map((s) => (

@@ -7,13 +7,13 @@ const customTestAttemptSchema = new mongoose.Schema(
     testId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "CustomTest",
-      required: [true, "Test ID zaroori hai"],
+      required: [true, "Test ID is required"],
       index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "User ID zaroori hai"],
+      required: [true, "User ID is required"],
       index: true,
     },
 
@@ -30,7 +30,7 @@ const customTestAttemptSchema = new mongoose.Schema(
         timeTakenInSeconds: {
           type: Number,
           default: null,
-          min: [0, "Time negative nahi ho sakta"],
+          min: [0, "Time cannot be negative"],
         },
       },
     ],

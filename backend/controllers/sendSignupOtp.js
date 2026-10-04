@@ -9,7 +9,7 @@ export const sendSignupOtp = async (req, res) => {
         const { email } = req.body;
 
         if (!email || !/^\S+@\S+\.\S+$/.test(String(email).trim())) {
-            return res.status(400).json({ success: false, message: "Sahi email address dalein!" });
+            return res.status(400).json({ success: false, message: "Enter a valid email address!" });
         }
 
         const normalizedEmail = String(email).toLowerCase().trim();
@@ -18,18 +18,18 @@ export const sendSignupOtp = async (req, res) => {
         if (existingUser) {
             return res.status(400).json({
                 success: false,
-                message: "Is email se account pehle hi bana hua hai!",
+                message: "An account with this email already exists!",
             });
         }
 
         await createAndSendOtp(normalizedEmail, "signup");
 
-        return res.status(200).json({ success: true, message: "OTP email par bhej diya gaya hai!" });
+        return res.status(200).json({ success: true, message: "OTP sent to your email!" });
     } catch (error) {
         console.error("sendSignupOtp error:", error);
         return res.status(error.statusCode || 500).json({
             success: false,
-            message: error.statusCode ? error.message : "OTP bhejte waqt error aaya.",
+            message: error.statusCode ? error.message : "Error while sending the OTP.",
         });
     }
 };

@@ -16,10 +16,10 @@ export const updateUserInfo = async (req, res) => {
         const email = req.body.email ? String(req.body.email).toLowerCase().trim() : "";
         const phone = req.body.phone ? String(req.body.phone).trim() : "";
         if (email && !/^\S+@\S+\.\S+$/.test(email)) {
-            return res.status(400).json({ success: false, message: "Sahi email address dalein!" });
+            return res.status(400).json({ success: false, message: "Enter a valid email address!" });
         }
         if (phone && !/^\d{10}$/.test(phone)) {
-            return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+            return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
         }
 
         const taken = [];
@@ -33,7 +33,7 @@ export const updateUserInfo = async (req, res) => {
             if (existingUser) {
                 return res.status(400).json({
                     success: false,
-                    message: "Ye email ya phone number pehle se kisi aur account me registered hai!"
+                    message: "This email or phone number is already registered to another account!"
                 });
             }
         }
@@ -59,7 +59,7 @@ export const updateUserInfo = async (req, res) => {
         // 5. Success response
         res.status(200).json({
             success: true,
-            message: "Profile successfully update ho gayi!",
+            message: "Profile updated successfully!",
             data: updatedUser
         });
 

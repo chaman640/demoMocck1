@@ -11,11 +11,11 @@ export const getCurrentAffairAttemptDetail = async (req, res) => {
       CurrentAffairAttempt.findOne({ userId, examName, date }),
     ]);
 
-    if (!quiz) return res.status(404).json({ success: false, message: "Quiz nahi mila." });
+    if (!quiz) return res.status(404).json({ success: false, message: "Quiz not found." });
     if (!attempt) {
       return res.status(404).json({
         success: false,
-        message: "Aapne abhi tak ye quiz attempt nahi kiya hai.",
+        message: "You have not attempted this quiz yet.",
       });
     }
 
@@ -62,7 +62,7 @@ export const getCurrentAffairAttemptDetail = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Detail fetch karte waqt error aaya.",
+      message: "Error while fetching details.",
       error: error.message,
     });
   }

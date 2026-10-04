@@ -18,7 +18,7 @@ export const createPreviousYearPaperShell = async (req, res) => {
     if (req.teacher.role !== "main") {
       return res.status(403).json({
         success: false,
-        message: "Sirf Main Teacher hi naya paper-shell bana sakta hai!",
+        message: "Only a Main Teacher can create a new paper shell!",
       });
     }
 
@@ -39,18 +39,18 @@ export const createPreviousYearPaperShell = async (req, res) => {
     if (!couponId || !testName || !year || !Array.isArray(blueprint) || blueprint.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "couponId, testName, year aur blueprint (kam se kam ek subject) zaroori hain!",
+        message: "couponId, testName, year and blueprint (at least one subject) are required!",
       });
     }
     if (!durationMinutes) {
-      return res.status(400).json({ success: false, message: "durationMinutes zaroori hai!" });
+      return res.status(400).json({ success: false, message: "durationMinutes is required!" });
     }
 
     for (const b of blueprint) {
       if (!normalizeSubject(b.subjectName) || !b.questionCount || b.questionCount <= 0) {
         return res.status(400).json({
           success: false,
-          message: "Blueprint ke har entry mein subjectName aur positive questionCount hona zaroori hai.",
+          message: "Every blueprint entry needs a subjectName and a positive questionCount.",
         });
       }
     }
@@ -60,7 +60,7 @@ export const createPreviousYearPaperShell = async (req, res) => {
     // ─────────────────────────────────────────────
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon nahi mila ya aapka nahi hai!" });
+      return res.status(404).json({ success: false, message: "This coupon was not found or is not yours!" });
     }
 
     // ─────────────────────────────────────────────
@@ -87,8 +87,8 @@ export const createPreviousYearPaperShell = async (req, res) => {
         return res.status(400).json({
           success: false,
           message:
-            `Blueprint mein '${seen.get(k)}' do baar aa gaya hai (aapne '${normalizeSubject(b.subjectName)}' likha hai). ` +
-            `Ek subject sirf ek hi baar aana chahiye — spelling/capital-small alag ho to bhi wo ek hi subject mana jayega.`,
+            `'${seen.get(k)}' appears twice in the blueprint (you wrote '${normalizeSubject(b.subjectName)}'). ` +
+            `Each subject should appear only once — even with different spelling/capitalisation it counts as the same subject.`,
         });
       }
 
@@ -123,14 +123,14 @@ export const createPreviousYearPaperShell = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: `'${newPaper.testName}' ka shell ban gaya! Ab sub-teachers apna-apna subject fill kar sakte hain.`,
+      message: `Shell for '${newPaper.testName}' created! Sub-teachers can now fill in their own subjects.`,
       data: newPaper,
     });
   } catch (error) {
     console.error("createPreviousYearPaperShell error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya paper-shell banate waqt.",
+      message: "Server error while creating the paper shell.",
       error: error.message,
     });
   }

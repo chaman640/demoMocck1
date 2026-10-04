@@ -18,25 +18,25 @@ export const acceptInvite = async (req, res) => {
     if (!token) {
       return res.status(400).json({
         success: false,
-        message: "Invite token zaroori hai!",
+        message: "Invite token is required!",
       });
     }
     if (!name || !email || !password) {
       return res.status(400).json({
         success: false,
-        message: "Naam, email aur password bharna zaroori hai!",
+        message: "Name, email and password are required!",
       });
     }
     if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password kam se kam 6 characters ka hona chahiye!",
+        message: "Password must be at least 6 characters!",
       });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid email!" });
     }
 
     // ─────────────────────────────────────────────
@@ -47,14 +47,14 @@ export const acceptInvite = async (req, res) => {
     if (!teacher) {
       return res.status(400).json({
         success: false,
-        message: "Ye invite link invalid hai.",
+        message: "This invite link is invalid.",
       });
     }
 
     if (teacher.status !== "pending") {
       return res.status(400).json({
         success: false,
-        message: "Ye invite link already use ho chuka hai.",
+        message: "This invite link has already been used.",
       });
     }
 
@@ -63,8 +63,8 @@ export const acceptInvite = async (req, res) => {
         success: false,
         message:
           teacher.role === "main"
-            ? "Ye invite link expire ho chuka hai. Admin se naya link mangwayein."
-            : "Ye invite link expire ho chuka hai. Apne Main Teacher se naya link mangwayein.",
+            ? "This invite link has expired. Ask the admin for a new link."
+            : "This invite link has expired. Ask your Main Teacher for a new link.",
       });
     }
 
@@ -81,7 +81,7 @@ export const acceptInvite = async (req, res) => {
     if (emailTaken) {
       return res.status(400).json({
         success: false,
-        message: "Ye email pehle se kisi aur teacher account se juda hai!",
+        message: "This email is already linked to another teacher account!",
       });
     }
 
@@ -121,7 +121,7 @@ export const acceptInvite = async (req, res) => {
       .cookie("teacherToken", jwtToken, authCookieOptions())
       .json({
         success: true,
-        message: "Account activate ho gaya! Aap login ho chuke hain.",
+        message: "Account activated! You are now logged in.",
         data: {
           _id: teacher._id,
           name: teacher.name,
@@ -135,13 +135,13 @@ export const acceptInvite = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Ye email pehle se registered hai.",
+        message: "This email is already registered.",
       });
     }
     console.error("acceptInvite error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya account activate karte waqt.",
+      message: "Server error while activating the account.",
       ...errorDetail(error),
     });
   }

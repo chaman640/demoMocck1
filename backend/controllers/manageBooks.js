@@ -18,20 +18,20 @@ export const createBook = async (req, res) => {
     const { title, description, type, isFree, coinCost, stockQuantity, coverImageUrl, digitalFilePublicId } = req.body;
 
     if (!title || !type) {
-      return res.status(400).json({ success: false, message: "Title aur type zaroori hain!" });
+      return res.status(400).json({ success: false, message: "Title and type are required!" });
     }
     if (!["digital", "physical"].includes(type)) {
-      return res.status(400).json({ success: false, message: "type 'digital' ya 'physical' hona chahiye." });
+      return res.status(400).json({ success: false, message: "type must be 'digital' or 'physical'." });
     }
 
     const free = parseBoolean(isFree);
     const cost = free ? 0 : Number(coinCost) || 0;
     if (!free && cost <= 0) {
-      return res.status(400).json({ success: false, message: "Paid book ke liye coin cost 0 se zyada hona chahiye." });
+      return res.status(400).json({ success: false, message: "Coin cost must be more than 0 for a paid book." });
     }
 
     if (type === "digital" && !digitalFilePublicId) {
-      return res.status(400).json({ success: false, message: "Digital book ke liye file upload karna zaroori hai." });
+      return res.status(400).json({ success: false, message: "A file upload is required for a digital book." });
     }
 
     const book = new Book({
@@ -50,10 +50,10 @@ export const createBook = async (req, res) => {
     });
     await book.save();
 
-    return res.status(201).json({ success: true, message: "Book add ho gayi!", data: book });
+    return res.status(201).json({ success: true, message: "Book added!", data: book });
   } catch (error) {
     console.error("createBook error:", error);
-    return res.status(500).json({ success: false, message: "Book add karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while adding the book." });
   }
 };
 
@@ -63,7 +63,7 @@ export const listBooksForManage = async (req, res) => {
     return res.status(200).json({ success: true, data: books });
   } catch (error) {
     console.error("listBooksForManage error:", error);
-    return res.status(500).json({ success: false, message: "Books list nahi ho payi." });
+    return res.status(500).json({ success: false, message: "Could not load the books list." });
   }
 };
 
@@ -74,7 +74,7 @@ export const updateBook = async (req, res) => {
 
     const book = await Book.findOne({ _id: bookId, ...bookScopeFor(req) });
     if (!book) {
-      return res.status(404).json({ success: false, message: "Book nahi mili!" });
+      return res.status(404).json({ success: false, message: "Book not found!" });
     }
 
     if (title) book.title = String(title).trim();
@@ -97,14 +97,14 @@ export const updateBook = async (req, res) => {
     }
 
     if (!book.isFree && !(book.coinCost > 0)) {
-      return res.status(400).json({ success: false, message: "Paid book ke liye coin cost 0 se zyada hona chahiye." });
+      return res.status(400).json({ success: false, message: "Coin cost must be more than 0 for a paid book." });
     }
 
     await book.save();
-    return res.status(200).json({ success: true, message: "Book update ho gayi!", data: book });
+    return res.status(200).json({ success: true, message: "Book updated!", data: book });
   } catch (error) {
     console.error("updateBook error:", error);
-    return res.status(500).json({ success: false, message: "Book update karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while updating the book." });
   }
 };
 
@@ -114,21 +114,21 @@ export const setBookStatus = async (req, res) => {
     const { status } = req.body;
 
     if (!["active", "hidden"].includes(status)) {
-      return res.status(400).json({ success: false, message: "status 'active' ya 'hidden' hona chahiye." });
+      return res.status(400).json({ success: false, message: "status must be 'active' or 'hidden'." });
     }
 
     const book = await Book.findOneAndUpdate({ _id: bookId, ...bookScopeFor(req) }, { status }, { new: true });
     if (!book) {
-      return res.status(404).json({ success: false, message: "Book nahi mili!" });
+      return res.status(404).json({ success: false, message: "Book not found!" });
     }
 
     return res.status(200).json({
       success: true,
-      message: status === "hidden" ? "Book hide kar di gayi." : "Book active kar di gayi.",
+      message: status === "hidden" ? "Book hidden." : "Book activated.",
       data: book,
     });
   } catch (error) {
     console.error("setBookStatus error:", error);
-    return res.status(500).json({ success: false, message: "Status badalte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while changing status." });
   }
 };

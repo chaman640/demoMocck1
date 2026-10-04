@@ -209,7 +209,7 @@ app.use("/api", questionRouter);
 app.use("/api", (req, res) => {
   res.status(404).json({
     success: false,
-    message: `API route nahi mila: ${req.method} ${req.originalUrl}`,
+    message: `API route not found: ${req.method} ${req.originalUrl}`,
   });
 });
 
@@ -281,8 +281,8 @@ app.get(/^(?!\/api(?:\/|$)|\/\.well-known(?:\/|$)).*/, (req, res) => {
     return res
       .status(503)
       .send(
-        "Frontend build nahi mila. Pehle `cd frontend && npm run build` chalayein, " +
-          "ya dev mein frontend alag se `npm run dev` se chalayein."
+        "Frontend build not found. Run `cd frontend && npm run build` first, " +
+          "or in dev run the frontend separately with `npm run dev`."
       );
   }
   res.setHeader("Cache-Control", "no-cache");
@@ -293,8 +293,8 @@ app.get(/^(?!\/api(?:\/|$)|\/\.well-known(?:\/|$)).*/, (req, res) => {
   // user ka bheja hua nahi — isliye ye bilkul safe hai.
   res.sendFile("index.html", { root: distPath, dotfiles: "allow" }, (err) => {
     if (err && !res.headersSent) {
-      console.error("index.html bhejne mein error:", err.message);
-      res.status(500).send("Frontend load nahi ho paya.");
+      console.error("Error while sending index.html:", err.message);
+      res.status(500).send("Could not load the frontend.");
     }
   });
 });
@@ -311,18 +311,18 @@ app.use((err, req, res, next) => {
 
   // Kharab JSON body (typing mistake / galat Postman request)
   if (err?.type === "entity.parse.failed") {
-    return res.status(400).json({ success: false, message: "Request ka JSON format galat hai." });
+    return res.status(400).json({ success: false, message: "The request JSON format is invalid." });
   }
   // Body limit se bada payload
   if (err?.type === "entity.too.large") {
     return res.status(413).json({
       success: false,
-      message: `Data bahut bada hai (limit ${BODY_LIMIT}). Thode-thode karke bhejein.`,
+      message: `Data is too large (limit ${BODY_LIMIT}). Send it in smaller parts.`,
     });
   }
   // Multer (file upload) ki galtiyan
   if (err?.code === "LIMIT_FILE_SIZE") {
-    return res.status(413).json({ success: false, message: "Image 10MB se badi hai." });
+    return res.status(413).json({ success: false, message: "Image is larger than 10MB." });
   }
 
   console.error("Unhandled error:", err?.stack || err);
@@ -332,8 +332,8 @@ app.use((err, req, res, next) => {
     success: false,
     message:
       isProduction && status >= 500
-        ? "Server mein kuch gadbad ho gayi. Thodi der baad try karein."
-        : err.message || "Server mein unexpected error aa gaya.",
+        ? "Something went wrong on the server. Try again in a little while."
+        : err.message || "Unexpected server error.",
   });
 });
 
@@ -354,7 +354,7 @@ const server = app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
   console.log(`   NODE_ENV = ${process.env.NODE_ENV || "development"}`);
   console.log(`   Security = helmet ✓  rate-limit ✓  sanitize ✓  compression ✓`);
-  console.log(`   Database = connect ho raha hai...`);
+  console.log(`   Database = connecting...`);
 });
 
 // Render ke load balancer ke saath keep-alive race condition se bachne ke liye
@@ -370,7 +370,7 @@ const onDbReady = () => {
   if (dbEverConnected) return;
   dbEverConnected = true;
   clearTimeout(dbWatchdog);
-  console.log("✅ Database ready — ab site poori tarah chalu hai");
+  console.log("✅ Database ready — the site is now fully running");
 
   // ⚡ Round 2: database ke index maujood hain ya nahi, background mein check.
   //   • Jo index pehle se hai uspar kuch nahi hota (millisecond ka kaam)
@@ -381,22 +381,22 @@ const onDbReady = () => {
   if (String(process.env.AUTO_INDEX || "").toLowerCase() !== "false") {
     ensureIndexes({ silent: true })
       .then((r) => {
-        if (r.created.length) console.log(`⚡ ${r.created.length} naye database index bane`);
+        if (r.created.length) console.log(`⚡ ${r.created.length} new database indexes created`);
         if (r.failed.length) {
           console.warn(
-            `⚠️  ${r.failed.length} index nahi ban paye — detail ke liye ` +
-              `'node scripts/create-indexes.js' chalayein`
+            `⚠️  ${r.failed.length} indexes could not be created — for details ` +
+              `run 'node scripts/create-indexes.js'`
           );
         }
       })
-      .catch((e) => console.warn("⚠️  Index check fail hua:", e.message));
+      .catch((e) => console.warn("⚠️  Index check failed:", e.message));
   }
 };
 
 // 🐛 FIX (pehle wale round se): agar connection is file ke chalne se PEHLE hi
 // ban gaya ho, to `once("connected")` kabhi fire nahi hota tha.
 if (dbEverConnected) {
-  console.log("✅ Database pehle se connected");
+  console.log("✅ Database already connected");
 } else {
   rowQuestionConnection.once("connected", onDbReady);
 }
@@ -404,9 +404,9 @@ if (dbEverConnected) {
 // Startup watchdog — database bilkul na jude to latke rehne ka koi fayda nahi
 dbWatchdog = setTimeout(() => {
   if (!dbEverConnected) {
-    console.error("❌ 90 second me database connect nahi hua. Exit kar rahe hain");
-    console.error("   (Render naya container start karega. Logs me upar wali");
-    console.error("    'Database connection error' line dekhein.)");
+    console.error("❌ Database did not connect within 90 seconds. Exiting");
+    console.error("   (Render will start a new container. Check the");
+    console.error("    'Database connection error' line above in the logs.)");
     process.exit(1);
   }
 }, 90_000);
@@ -429,13 +429,13 @@ const shutdown = async (signal, exitCode = 0) => {
   if (shuttingDown) {
     // Shutdown ke beech me hi crash ho gaya — chup-chaap nigalna theek nahi
     if (exitCode !== 0) {
-      console.error("Shutdown ke dauraan crash — turant exit.");
+      console.error("Crash during shutdown — exiting immediately.");
       process.exit(exitCode);
     }
     return;
   }
   shuttingDown = true;
-  console.log(`\n${signal} mila — server band kar rahe hain (chal rahi requests poori hone denge)...`);
+  console.log(`\n${signal} received — shutting down the server (letting in-flight requests finish)...`);
 
   // Agar 15 second mein saaf-safai poori na ho to zabardasti band
   const force = setTimeout(() => {
@@ -452,7 +452,7 @@ const shutdown = async (signal, exitCode = 0) => {
     await rowQuestionConnection.close(false);
     console.log("   ✔ Database connection band");
   } catch (e) {
-    console.error("   Shutdown ke waqt error:", e.message);
+    console.error("   Error during shutdown:", e.message);
   }
 
   clearTimeout(force);

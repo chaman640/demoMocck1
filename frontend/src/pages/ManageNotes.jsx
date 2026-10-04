@@ -36,12 +36,12 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (!form.title.trim() || !form.subjectName.trim()) return setError("Title aur subject zaroori hain.");
-    if (isAdmin && !form.examName) return setError("Exam chunein.");
-    if (!isAdmin && batchIds.length === 0) return setError("Kam se kam ek batch chunein.");
-    if (!file) return setError("PDF file chunein.");
-    if (file.type && file.type !== "application/pdf") return setError("Sirf PDF file upload karein.");
-    if (file.size > 25 * 1024 * 1024) return setError("PDF 25 MB se chhoti honi chahiye.");
+    if (!form.title.trim() || !form.subjectName.trim()) return setError("Title and subject are required.");
+    if (isAdmin && !form.examName) return setError("Select an exam.");
+    if (!isAdmin && batchIds.length === 0) return setError("Select at least one batch.");
+    if (!file) return setError("Choose a PDF file.");
+    if (file.type && file.type !== "application/pdf") return setError("Please upload a PDF file only.");
+    if (file.size > 25 * 1024 * 1024) return setError("PDF must be smaller than 25 MB.");
 
     const fd = new FormData();
     Object.entries(form).forEach(([k, v]) => fd.append(k, v.trim()));
@@ -51,9 +51,9 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
     setSaving(true);
     try {
       const res = await api.post("/manage/notes", fd, { timeout: 180000 });
-      onSaved(res.data.message || "Notes upload ho gaye!");
+      onSaved(res.data.message || "Notes uploaded!");
     } catch (err) {
-      setError(err.response?.data?.message || "Upload nahi ho paya.");
+      setError(err.response?.data?.message || "Upload failed.");
     } finally {
       setSaving(false);
     }
@@ -66,7 +66,7 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
         onSubmit={submit}
         className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-[#111827] border border-gray-800 rounded-t-3xl sm:rounded-3xl p-5 space-y-4"
       >
-        <h2 className="text-lg font-bold">Naye Notes Upload Karein</h2>
+        <h2 className="text-lg font-bold">Upload New Notes</h2>
 
         <div>
           <label className={labelCls}>Title *</label>
@@ -77,18 +77,18 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
           <div>
             <label className={labelCls}>Exam *</label>
             <select className={inputCls} value={form.examName} onChange={set("examName")}>
-              <option value="">Exam chunein</option>
+              <option value="">Select exam</option>
               {(options.exams || []).map((e) => (
                 <option key={e} value={e}>{e}</option>
               ))}
             </select>
-            <p className="text-[11px] text-gray-500 mt-1">Is exam ke sabhi students ko dikhenge.</p>
+            <p className="text-[11px] text-gray-500 mt-1">All students of this exam will see it.</p>
           </div>
         ) : (
           <div>
             <label className={labelCls}>Batches *</label>
             {batches.length === 0 ? (
-              <p className="text-xs text-gray-500">Aapke paas abhi koi batch nahi hai.</p>
+              <p className="text-xs text-gray-500">You don't have any batch yet.</p>
             ) : (
               <div className="space-y-2">
                 {batches.map((b) => (
@@ -108,7 +108,7 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
             <label className={labelCls}>Subject *</label>
             {subjectChoices ? (
               <select className={inputCls} value={form.subjectName} onChange={set("subjectName")}>
-                <option value="">Chunein</option>
+                <option value="">Select</option>
                 {subjectChoices.map((s) => (
                   <option key={s} value={s}>{s}</option>
                 ))}
@@ -133,8 +133,8 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
           <label className="flex items-center gap-3 p-3 border border-dashed border-gray-700 hover:border-[#7C3AED] rounded-xl cursor-pointer">
             <span className="text-2xl">📄</span>
             <div className="min-w-0">
-              <p className="text-sm truncate">{file ? file.name : "PDF chunein"}</p>
-              <p className="text-[11px] text-gray-500">{file ? formatBytes(file.size) : "25 MB tak · students sirf app mein padh payenge"}</p>
+              <p className="text-sm truncate">{file ? file.name : "Choose PDF"}</p>
+              <p className="text-[11px] text-gray-500">{file ? formatBytes(file.size) : "Up to 25 MB · students can read it only inside the app"}</p>
             </div>
             <input type="file" accept="application/pdf,.pdf" className="hidden" onChange={(e) => setFile(e.target.files?.[0] || null)} />
           </label>
@@ -147,7 +147,7 @@ const NoteForm = ({ options, onSaved, onCancel }) => {
             Cancel
           </button>
           <button type="submit" disabled={saving} className="flex-1 py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-50">
-            {saving ? "Upload ho raha hai..." : "Upload Karein"}
+            {saving ? "Uploading..." : "Upload"}
           </button>
         </div>
       </form>
@@ -187,21 +187,21 @@ const ManageNotes = () => {
       await api.post(`/manage/notes/${note._id}/status`, { status: note.status === "hidden" ? "active" : "hidden" });
       await load();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Status badal nahi paya.");
+      setMessage(err.response?.data?.message || "Could not change the status.");
     } finally {
       setBusyId(null);
     }
   };
 
   const remove = async (note) => {
-    if (!window.confirm(`"${note.title}" delete karein? Students ke phone se bhi hat jayenge.`)) return;
+    if (!window.confirm(`Delete "${note.title}"? It will also be removed from students' phones.`)) return;
     setBusyId(note._id);
     try {
       const res = await api.delete(`/manage/notes/${note._id}`);
       setMessage(res.data.message);
       await load();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Delete nahi ho paya.");
+      setMessage(err.response?.data?.message || "Could not delete.");
     } finally {
       setBusyId(null);
     }
@@ -212,7 +212,7 @@ const ManageNotes = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="w-full max-w-sm bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center space-y-4">
           <div className="text-4xl">🔒</div>
-          <p className="text-sm text-gray-300">Notes manage karne ke liye Admin ya Teacher login zaroori hai.</p>
+          <p className="text-sm text-gray-300">Admin or Teacher login is required to manage notes.</p>
           <div className="space-y-2">
             <Link to="/AdminLogin" className="block py-2.5 rounded-xl bg-[#7C3AED] text-sm font-semibold">Admin Login</Link>
             <Link to="/TeacherLogin" className="block py-2.5 rounded-xl border border-gray-700 text-sm text-gray-300">Teacher Login</Link>
@@ -242,20 +242,19 @@ const ManageNotes = () => {
           disabled={!options}
           className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#7C3AED] to-[#6D28D9] font-semibold text-sm disabled:opacity-50"
         >
-          + Naye Notes Upload Karein
+          + Upload New Notes
         </button>
 
         <p className="text-[11px] text-gray-500 leading-relaxed">
-          Students notes ko sirf app ke andar padh sakte hain (15 din tak offline bhi). Har page par unka naam aur phone
-          watermark mein chhapta hai, aur ek account 2 phones par hi chalta hai.
+          Students can read notes only inside the app (offline for up to 15 days). Their name and phone are printed as a watermark on every page, and one account works on only 2 phones.
         </p>
 
         {phase === "loading" && [1, 2, 3].map((i) => <div key={i} className="w-full h-24 rounded-2xl bg-gray-800/70 animate-pulse" />)}
-        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Notes load nahi ho paye.</p>}
+        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Could not load notes.</p>}
         {phase === "ready" && notes.length === 0 && (
           <div className="text-center py-14 space-y-2">
             <p className="text-4xl">📝</p>
-            <p className="text-sm text-gray-500">Abhi tak koi notes upload nahi hue hain.</p>
+            <p className="text-sm text-gray-500">No notes uploaded yet.</p>
           </div>
         )}
 
@@ -271,7 +270,7 @@ const ManageNotes = () => {
                   </p>
                   <p className="text-[11px] text-gray-400 mt-1">
                     {note.visibility === "public"
-                      ? `Sabhi ${note.examName} students`
+                      ? `All ${note.examName} students`
                       : `Batch: ${note.batches.map((b) => b.name).join(", ") || "—"}`}
                     {note.createdBy?.actorType === "teacher" && note.createdBy.name ? ` · by ${note.createdBy.name}` : ""}
                   </p>
@@ -286,7 +285,7 @@ const ManageNotes = () => {
                   disabled={busyId === note._id}
                   className="flex-1 py-2 rounded-lg border border-gray-700 text-xs font-semibold text-gray-300 disabled:opacity-50"
                 >
-                  {note.status === "hidden" ? "Dikhayein" : "Chhupayein"}
+                  {note.status === "hidden" ? "Show" : "Hide"}
                 </button>
                 <button
                   onClick={() => remove(note)}

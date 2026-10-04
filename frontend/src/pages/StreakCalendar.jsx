@@ -108,14 +108,14 @@ const StreakCalendar = () => {
             <SkeletonBlock className="w-full h-72 rounded-2xl" />
           </>
         ) : phase === "error" ? (
-          <p className="text-sm text-gray-500 text-center py-10">Streak load nahi ho payi.</p>
+          <p className="text-sm text-gray-500 text-center py-10">Could not load the streak.</p>
         ) : (
           data && (
             <>
               <div className="flex flex-col items-center gap-1">
                 <div className="text-6xl">🔥</div>
                 <p className="text-4xl font-extrabold text-orange-400">{data.currentStreak}</p>
-                <p className="text-sm text-gray-400">din ki streak!</p>
+                <p className="text-sm text-gray-400">day streak!</p>
               </div>
 
               <div className="bg-[#111827] border border-gray-800 rounded-2xl p-4">
@@ -155,7 +155,7 @@ const StreakCalendar = () => {
               </div>
 
               <p className="text-[11px] text-gray-600 text-center px-4">
-                1-2 din miss karne par streak freeze ho jaati hai — usse zyada miss karne par reset ho jaati hai.
+                Missing 1-2 days freezes your streak — missing more than that resets it.
               </p>
             </>
           )

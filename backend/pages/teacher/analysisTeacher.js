@@ -16,16 +16,16 @@ const verifyStudentAccess = async (teacher, studentId) => {
     return { allowed: false, status: 400, message: "Invalid Student ID." };
   }
   if (!teacher.activeCoupon) {
-    return { allowed: false, status: 400, message: "Pehle apna active group/coupon select karein." };
+    return { allowed: false, status: 400, message: "Select your active group/coupon first." };
   }
 
   const student = await User.findById(studentId).select("name phone exam activeCoupon");
   if (!student) {
-    return { allowed: false, status: 404, message: "Student nahi mila." };
+    return { allowed: false, status: 404, message: "Student not found." };
   }
 
   if (!student.activeCoupon || student.activeCoupon.toString() !== teacher.activeCoupon.toString()) {
-    return { allowed: false, status: 403, message: "Ye student aapke active batch mein nahi hai." };
+    return { allowed: false, status: 403, message: "This student is not in your active batch." };
   }
 
   return { allowed: true, student };
@@ -102,7 +102,7 @@ export const getStudentOverview = async (req, res) => {
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Is student ne abhi tak koi mock nahi diya hai.",
+        message: "This student has not taken any mock yet.",
         studentName: check.student.name,
         data: { mockDataAvailable: false, testTypeComparison, pyqHistory, customTestHistory },
       });
@@ -214,10 +214,10 @@ export const getStudentOverview = async (req, res) => {
           averageTimePerQuestion: avgTime,
           weaknessScore: t.wrong * 2 + avgTime / 30,
           reason: t.wrong > 0 && avgTime > 30
-            ? "Galat bhi kar raha/rahi hai aur time bhi zyada lag raha hai"
+            ? "Getting answers wrong and also taking too much time"
             : t.wrong > 0
-            ? "Is topic mein galat answers zyada hain"
-            : "Is topic mein time zyada lag raha hai",
+            ? "Too many wrong answers in this topic"
+            : "Taking too much time in this topic",
         };
       })
       .sort((a, b) => b.weaknessScore - a.weaknessScore)
@@ -273,12 +273,12 @@ export const getStudentMockDetail = async (req, res) => {
     });
 
     if (!performance) {
-      return res.status(404).json({ success: false, message: "Performance nahi mila." });
+      return res.status(404).json({ success: false, message: "Performance not found." });
     }
 
     const blueprint = await Blueprint.findOne({ blueprintName: performance.blueprintName, examName: performance.examName });
     if (!blueprint) {
-      return res.status(404).json({ success: false, message: "Blueprint nahi mila." });
+      return res.status(404).json({ success: false, message: "Blueprint not found." });
     }
 
     const totalQuestions = blueprint.totalQuestions;
@@ -530,7 +530,7 @@ export const getStudentSubjectAnalysis = async (req, res) => {
     if (!last3Tests || last3Tests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Is student ne abhi tak koi mock nahi diya hai.",
+        message: "This student has not taken any mock yet.",
         studentName: check.student.name,
         data: null,
       });
@@ -604,10 +604,10 @@ export const getStudentSubjectAnalysis = async (req, res) => {
         wrongCount: t.wrongCount,
         averageTimePerQuestion: t.averageTimePerQuestion,
         reason: t.wrongCount > 0 && t.averageTimePerQuestion > 30
-          ? "Galat bhi kar raha/rahi hai aur time bhi zyada lag raha hai"
+          ? "Getting answers wrong and also taking too much time"
           : t.wrongCount > 0
-          ? "Is topic mein galat answers zyada hain"
-          : "Is topic mein time zyada lag raha hai",
+          ? "Too many wrong answers in this topic"
+          : "Taking too much time in this topic",
       }));
 
     return res.status(200).json({
@@ -617,7 +617,7 @@ export const getStudentSubjectAnalysis = async (req, res) => {
     });
   } catch (error) {
     console.error("getStudentSubjectAnalysis error:", error);
-    return res.status(500).json({ success: false, message: "Subject analysis fetch karte waqt error aaya.", error: error.message });
+    return res.status(500).json({ success: false, message: "Error while fetching subject analysis.", error: error.message });
   }
 };
 
@@ -640,7 +640,7 @@ export const getStudentTopicAnalysis = async (req, res) => {
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Is student ne abhi tak koi mock nahi diya hai.",
+        message: "This student has not taken any mock yet.",
         studentName: check.student.name,
         data: null,
       });
@@ -714,6 +714,6 @@ export const getStudentTopicAnalysis = async (req, res) => {
     });
   } catch (error) {
     console.error("getStudentTopicAnalysis error:", error);
-    return res.status(500).json({ success: false, message: "Topic analysis fetch karte waqt error aaya.", error: error.message });
+    return res.status(500).json({ success: false, message: "Error while fetching topic analysis.", error: error.message });
   }
 };

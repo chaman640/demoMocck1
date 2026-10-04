@@ -94,7 +94,7 @@ export const getRankPredictorData = async (req, res) => {
     console.error("getRankPredictorData error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya rank predictor data fetch karte waqt.",
+      message: "Server error while fetching rank predictor data.",
       error: error.message,
     });
   }

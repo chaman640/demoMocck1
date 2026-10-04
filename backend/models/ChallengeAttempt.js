@@ -8,7 +8,7 @@ const challengeAttemptSchema = new mongoose.Schema(
     challengeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Challenge",
-      required: [true, "Challenge ID zaroori hai"],
+      required: [true, "Challenge ID is required"],
       index: true, // leaderboard fetch karte waqt is field pe query hogi baar-baar
     },
 
@@ -16,7 +16,7 @@ const challengeAttemptSchema = new mongoose.Schema(
     userId: {
   type: mongoose.Schema.Types.ObjectId,
   ref: "User",
-  required: [true, "User ID zaroori hai"],
+  required: [true, "User ID is required"],
   index: true,   // 👈 naya
 },
 
@@ -26,7 +26,7 @@ const challengeAttemptSchema = new mongoose.Schema(
     // le baad mein, purana attempt ka naam consistent rahega.
     userName: {
       type: String,
-      required: [true, "User ka naam zaroori hai"],
+      required: [true, "User name is required"],
     },
 
     attemptedQuestions: [
@@ -46,7 +46,7 @@ const challengeAttemptSchema = new mongoose.Schema(
         timeTakenInSeconds: {
           type: Number,
           default: null,
-          min: [0, "Time negative nahi ho sakta"],
+          min: [0, "Time cannot be negative"],
         },
       },
     ],

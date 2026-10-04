@@ -251,7 +251,7 @@ const CustomTest = () => {
       });
       setRevealed((prev) => new Set(prev).add(qId));
     } catch (err) {
-      setCheckError(err.response?.data?.message || "Answer check nahi ho paya. Internet check karke dobara try karein.");
+      setCheckError(err.response?.data?.message || "Could not check the answer. Check your internet and try again.");
     } finally {
       setChecking(false);
     }

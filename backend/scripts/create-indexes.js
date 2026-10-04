@@ -27,32 +27,32 @@ const totalPlanned = INDEX_PLAN.reduce((n, g) => n + g.indexes.length, 0);
 
 const main = async () => {
   console.log(`\n${C.b}${"═".repeat(60)}${C.x}`);
-  console.log(`${C.b}  Database Index — ${totalPlanned} index banaye ja rahe hain${C.x}`);
+  console.log(`${C.b}  Database Index — creating ${totalPlanned} indexes${C.x}`);
   console.log(`${C.b}${"═".repeat(60)}${C.x}\n`);
 
-  console.log("Database se jud rahe hain...");
+  console.log("Connecting to the database...");
   await rowQuestionConnection.asPromise();
-  console.log(`${C.g}✔ Jud gaye${C.x}  (database: ${rowQuestionConnection.name})\n`);
+  console.log(`${C.g}✔ Connected${C.x}  (database: ${rowQuestionConnection.name})\n`);
 
   const startedAt = Date.now();
   const res = await ensureIndexes();
   const totalMs = Date.now() - startedAt;
 
   console.log(`\n${C.b}${"─".repeat(60)}${C.x}`);
-  console.log(`${C.g}✔ Naye bane      : ${res.created.length}${C.x}`);
-  console.log(`${C.d}~ Pehle se the   : ${res.existing.length}${C.x}`);
+  console.log(`${C.g}✔ Newly created : ${res.created.length}${C.x}`);
+  console.log(`${C.d}~ Already existed : ${res.existing.length}${C.x}`);
   if (res.failed.length) {
-    console.log(`${C.r}✘ Fail hue       : ${res.failed.length}${C.x}`);
+    console.log(`${C.r}✘ Failed          : ${res.failed.length}${C.x}`);
     for (const f of res.failed) console.log(`${C.r}   • ${f.name} — ${f.error}${C.x}`);
     console.log(
-      `\n${C.y}Agar "already exists with a different name" likha hai, to matlab wahi` +
-        `\nindex kisi aur naam se pehle se maujood hai — koi dikkat nahi hai.${C.x}`
+      `\n${C.y}If it says "already exists with a different name", it means the same` +
+        `\nindex already exists under another name — that is not a problem.${C.x}`
     );
   }
-  console.log(`\nKul time: ${(totalMs / 1000).toFixed(1)} second`);
+  console.log(`\nTotal time: ${(totalMs / 1000).toFixed(1)} second`);
 
   // ── Ab har collection ke saare index dikhate hain ──
-  console.log(`\n${C.b}Har collection mein ab kitne index hain:${C.x}`);
+  console.log(`\n${C.b}How many indexes each collection has now:${C.x}`);
   for (const group of INDEX_PLAN) {
     try {
       const list = await group.model.collection.indexes();
@@ -65,7 +65,7 @@ const main = async () => {
     }
   }
 
-  console.log(`\n${C.g}Ho gaya!${C.x} Ab teacher wale analysis page bahut tez khulenge.\n`);
+  console.log(`\n${C.g}Done!${C.x} The teacher analysis pages will now open much faster.\n`);
   await rowQuestionConnection.close();
   process.exit(res.failed.length ? 1 : 0);
 };
@@ -73,8 +73,8 @@ const main = async () => {
 main().catch(async (err) => {
   console.error(`\n${C.r}❌ Error:${C.x}`, err.message);
   console.error(
-    `\n${C.y}Sabse aam wajah: ROWQUESTION_URI galat hai, ya Atlas mein aapka IP` +
-      `\nwhitelist nahi hai (Atlas → Network Access).${C.x}\n`
+    `\n${C.y}Most common cause: ROWQUESTION_URI is wrong, or your IP is not` +
+      `\nwhitelisted in Atlas (Atlas → Network Access).${C.x}\n`
   );
   try {
     await rowQuestionConnection.close();

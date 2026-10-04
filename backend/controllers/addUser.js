@@ -17,20 +17,20 @@ export const addUser = async (req, res) => {
     if (!name || !email || !phone || !password || !address || !otp) {
       return res.status(400).json({
         success: false,
-        message: "Sabhi fields bharna zaroori hai!",
+        message: "All fields are required!",
       });
     }
     if (!exam && !rawCode) {
       return res.status(400).json({
         success: false,
-        message: "Exam chunein ya code dalein!",
+        message: "Choose an exam or enter a code!",
       });
     }
 
     if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password kam se kam 6 characters ka hona chahiye!",
+        message: "Password must be at least 6 characters!",
       });
     }
 
@@ -40,7 +40,7 @@ export const addUser = async (req, res) => {
     if (!/^\d{10}$/.test(normalizedPhone)) {
       return res.status(400).json({
         success: false,
-        message: "Phone number bilkul 10 anko ka hona chahiye!",
+        message: "Phone number must be exactly 10 digits!",
       });
     }
 
@@ -50,7 +50,7 @@ export const addUser = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: "Is email ya phone number se account pehle hi bana hua hai!",
+        message: "An account with this email or phone number already exists!",
       });
     }
 
@@ -73,7 +73,7 @@ export const addUser = async (req, res) => {
         if (!accessCheck.allowed) {
           return res.status(403).json({
             success: false,
-            message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
+            message: "You are not in this batch. Contact your teacher.",
           });
         }
       } else {
@@ -85,13 +85,13 @@ export const addUser = async (req, res) => {
         if (!promoterDoc && !referrerDoc) {
           return res.status(404).json({
             success: false,
-            message: "Ye code sahi nahi hai. Sahi teacher, promoter ya dost ka referral code check karein.",
+            message: "This code is not valid. Check the teacher, promoter or friend's referral code.",
           });
         }
         if (!exam) {
           return res.status(400).json({
             success: false,
-            message: "Exam ka naam dalna zaroori hai!",
+            message: "Exam name is required!",
           });
         }
         resolvedExam = exam;
@@ -138,7 +138,7 @@ export const addUser = async (req, res) => {
       .json({
         success: true,
         message: coupon
-          ? `Account ban gaya aur '${coupon.name}' batch mein enroll ho gaye!`
+          ? `Account created and enrolled in batch '${coupon.name}'!`
           : "User successfully registered & logged in!",
         data: {
           _id: newUser._id,
@@ -153,7 +153,7 @@ export const addUser = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Is email ya phone se account pehle hi maujood hai.",
+        message: "An account with this email or phone already exists.",
       });
     }
     console.error("Signup Error:", error);

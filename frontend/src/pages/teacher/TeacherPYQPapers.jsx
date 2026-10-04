@@ -65,7 +65,7 @@ const TeacherPYQPapers = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Papers load nahi ho paaye.");
+      setErrorMsg(err.response?.data?.message || "Could not load papers.");
       setPhase("error");
     }
   }, [navigate]);
@@ -88,7 +88,7 @@ const TeacherPYQPapers = () => {
     setFormError("");
 
     if (!formData.testName.trim() || !formData.year || !formData.durationMinutes) {
-      setFormError("Test naam, saal aur duration zaroori hain!");
+      setFormError("Test name, year and duration are required!");
       return;
     }
 
@@ -97,7 +97,7 @@ const TeacherPYQPapers = () => {
       .map((r) => ({ subjectName: r.subjectName.trim(), questionCount: Number(r.questionCount) }));
 
     if (cleanBlueprint.length === 0) {
-      setFormError("Kam se kam ek subject ka blueprint dena zaroori hai!");
+      setFormError("A blueprint for at least one subject is required!");
       return;
     }
 
@@ -117,7 +117,7 @@ const TeacherPYQPapers = () => {
       setShowForm(false);
       await load();
     } catch (err) {
-      setFormError(err.response?.data?.message || "Paper-shell nahi ban paaya.");
+      setFormError(err.response?.data?.message || "Could not create the paper shell.");
     } finally {
       setCreating(false);
     }
@@ -131,7 +131,7 @@ const TeacherPYQPapers = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -147,14 +147,14 @@ const TeacherPYQPapers = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold mb-1">Previous Year Papers</h1>
-            <p className="text-gray-400 text-sm">Batch-specific papers ka blueprint aur fill-status</p>
+            <p className="text-gray-400 text-sm">Blueprint and fill status of batch-specific papers</p>
           </div>
           {role === "main" && teacher?.activeCoupon && (
             <button
               onClick={() => setShowForm((s) => !s)}
               className="text-xs px-3 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-medium flex-shrink-0"
             >
-              {showForm ? "Cancel" : "+ Naya Paper"}
+              {showForm ? "Cancel" : "+ New Paper"}
             </button>
           )}
         </div>
@@ -163,7 +163,7 @@ const TeacherPYQPapers = () => {
 
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Papers dekhne ke liye pehle active batch select karein.</p>
+            <p className="text-sm text-gray-400">Select an active batch first to see papers.</p>
           </div>
         ) : (
           <>
@@ -178,7 +178,7 @@ const TeacherPYQPapers = () => {
                 <form onSubmit={handleCreateShell} className="space-y-4">
                   <div>
                     <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                      Test Naam
+                      Test Name
                     </label>
                     <input
                       type="text"
@@ -191,7 +191,7 @@ const TeacherPYQPapers = () => {
 
                   <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Saal</label>
+                      <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Year</label>
                       <input type="number" value={formData.year} onChange={(e) => setFormData((p) => ({ ...p, year: e.target.value }))} className={inputClass} />
                     </div>
                     <div>
@@ -211,7 +211,7 @@ const TeacherPYQPapers = () => {
 
                   <div>
                     <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                      Blueprint (kis subject ke kitne questions)
+                      Blueprint (how many questions per subject)
                     </label>
                     <div className="space-y-2">
                       {blueprintRows.map((row, idx) => (
@@ -241,7 +241,7 @@ const TeacherPYQPapers = () => {
                       ))}
                     </div>
                     <button type="button" onClick={addBlueprintRow} className="text-xs text-[#A78BFA] mt-2 hover:underline">
-                      + Ek aur subject add karein
+                      + Add another subject
                     </button>
                   </div>
 
@@ -250,7 +250,7 @@ const TeacherPYQPapers = () => {
                     disabled={creating}
                     className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
                   >
-                    {creating ? "Ban raha hai..." : "Paper-Shell Banayein"}
+                    {creating ? "Creating..." : "Create Paper Shell"}
                   </button>
                 </form>
               </div>
@@ -259,7 +259,7 @@ const TeacherPYQPapers = () => {
             {/* Papers List */}
             {papers.length === 0 ? (
               <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-                <p className="text-sm text-gray-400">Is batch ke liye abhi koi paper nahi bana.</p>
+                <p className="text-sm text-gray-400">No papers created for this batch yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -305,11 +305,11 @@ const TeacherPYQPapers = () => {
                                 }
                                 className="text-[11px] text-[#A78BFA] hover:underline"
                               >
-                                Questions Fill Karein →
+                                Fill Questions →
                               </button>
                             )}
                             {!sp.filled && !sp.canFill && (
-                              <p className="text-[11px] text-gray-600">Aap is subject ke liye authorized nahi hain</p>
+                              <p className="text-[11px] text-gray-600">You are not authorized for this subject</p>
                             )}
                           </div>
                         );

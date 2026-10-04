@@ -23,7 +23,7 @@ export const inviteSubTeacher = async (req, res) => {
     if (req.teacher.role !== "main") {
       return res.status(403).json({
         success: false,
-        message: "Sirf Main Teacher hi naya sub-teacher invite kar sakta hai!",
+        message: "Only a Main Teacher can invite a new sub-teacher!",
       });
     }
 
@@ -33,11 +33,11 @@ export const inviteSubTeacher = async (req, res) => {
     const { phone, assignments } = req.body;
 
     if (!phone) {
-      return res.status(400).json({ success: false, message: "Phone number zaroori hai!" });
+      return res.status(400).json({ success: false, message: "Phone number is required!" });
     }
     const cleanPhone = String(phone).trim();
     if (!/^\d{10}$/.test(cleanPhone)) {
-      return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
     }
 
     // ─────────────────────────────────────────────
@@ -48,19 +48,19 @@ export const inviteSubTeacher = async (req, res) => {
 
     if (assignments !== undefined) {
       if (!Array.isArray(assignments)) {
-        return res.status(400).json({ success: false, message: "assignments ek array hona chahiye!" });
+        return res.status(400).json({ success: false, message: "assignments must be an array!" });
       }
 
       for (const a of assignments) {
         if (!a || !a.couponId || !Array.isArray(a.subjects) || a.subjects.length === 0) {
           return res.status(400).json({
             success: false,
-            message: "Har assignment mein couponId aur kam se kam ek subject hona zaroori hai!",
+            message: "Every assignment needs a couponId and at least one subject!",
           });
         }
 
         if (!mongoose.Types.ObjectId.isValid(a.couponId)) {
-          return res.status(400).json({ success: false, message: "couponId ka format galat hai." });
+          return res.status(400).json({ success: false, message: "Invalid couponId format." });
         }
 
         const cleanSubjects = a.subjects
@@ -68,7 +68,7 @@ export const inviteSubTeacher = async (req, res) => {
           .filter(Boolean);
 
         if (cleanSubjects.length === 0) {
-          return res.status(400).json({ success: false, message: "Subject naam khali nahi ho sakta!" });
+          return res.status(400).json({ success: false, message: "Subject name cannot be empty!" });
         }
 
         normalizedAssignments.push({ couponId: a.couponId, subjects: cleanSubjects });
@@ -90,7 +90,7 @@ export const inviteSubTeacher = async (req, res) => {
       if (validCoupons.length !== couponIds.length) {
         return res.status(404).json({
           success: false,
-          message: "Ek ya zyada coupons nahi mile ya aapke nahi hain!",
+          message: "One or more coupons were not found or are not yours!",
         });
       }
     }
@@ -106,13 +106,13 @@ export const inviteSubTeacher = async (req, res) => {
       if (teacher.role === "main") {
         return res.status(400).json({
           success: false,
-          message: "Ye phone number ek Main Teacher account ka hai — use sub-teacher nahi banaya ja sakta.",
+          message: "This phone number belongs to a Main Teacher account — it cannot be made a sub-teacher.",
         });
       }
       if (teacher.status === "active") {
         return res.status(400).json({
           success: false,
-          message: "Is phone number se ek active teacher account pehle se maujood hai!",
+          message: "An active teacher account with this phone number already exists!",
         });
       }
 
@@ -124,7 +124,7 @@ export const inviteSubTeacher = async (req, res) => {
       ) {
         return res.status(403).json({
           success: false,
-          message: "Ye phone number pehle se kisi aur Main Teacher ke pending invite mein hai.",
+          message: "This phone number is already in another Main Teacher's pending invite.",
         });
       }
     }
@@ -201,13 +201,13 @@ export const inviteSubTeacher = async (req, res) => {
     // ─────────────────────────────────────────────
     const warning =
       notInBlueprintAll.length > 0
-        ? `⚠️ ${notInBlueprintAll.join(", ")} — ye subject Mock Test blueprint mein nahi hai. ` +
-          `In subjects ke sawaal auto-generate hone wale Mock Test mein nahi aayenge.`
+        ? `⚠️ ${notInBlueprintAll.join(", ")} — this subject is not in the Mock Test blueprint. ` +
+          `Questions from these subjects will not appear in auto-generated Mock Tests.`
         : null;
 
     return res.status(201).json({
       success: true,
-      message: "Invite ready hai! Link copy karke sub-teacher ko bhej dijiye.",
+      message: "Invite ready! Copy the link and send it to the sub-teacher.",
       warning,
       data: {
         teacherId: teacher._id,
@@ -221,13 +221,13 @@ export const inviteSubTeacher = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Is phone/email se pehle se koi account maujood hai.",
+        message: "An account with this phone/email already exists.",
       });
     }
     console.error("inviteSubTeacher error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya invite bhejte waqt.",
+      message: "Server error while sending the invite.",
       error: error.message,
     });
   }

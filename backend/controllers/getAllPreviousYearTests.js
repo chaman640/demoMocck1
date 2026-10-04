@@ -138,7 +138,7 @@ export const getAllPreviousYearTests = async (req, res) => {
     console.error("getAllPreviousYearTests error:", error);
     return res.status(500).json({
       success: false,
-      message: "Previous Year Tests list fetch karte waqt error aaya.",
+      message: "Error while fetching the Previous Year Tests list.",
       error: error.message,
     });
   }

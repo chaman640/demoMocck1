@@ -19,7 +19,7 @@ export const userInfo = async (req, res, next) => {
     if (!token) {
       return res.status(401).json({
         success: false,
-        message: "Aap logged in nahi hain. Kripya pehle login karein!",
+        message: "You are not logged in. Please log in first!",
       });
     }
 
@@ -32,14 +32,14 @@ export const userInfo = async (req, res, next) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Account nahi mila ya delete ho chuka hai!",
+        message: "Account not found or has been deleted!",
       });
     }
 
     if (issuedBeforePasswordChange(decoded, user)) {
       return res.status(401).json({
         success: false,
-        message: "Password badal diya gaya hai. Kripya naye password se login karein.",
+        message: "Your password has been changed. Please log in with the new password.",
         code: "TOKEN_EXPIRED",
       });
     }
@@ -53,14 +53,14 @@ export const userInfo = async (req, res, next) => {
     if (error?.name === "TokenExpiredError") {
       return res.status(401).json({
         success: false,
-        message: "Session khatam ho gaya hai. Kripya phir se login karein.",
+        message: "Your session has expired. Please log in again.",
         code: "TOKEN_EXPIRED",
       });
     }
     if (error?.name === "JsonWebTokenError") {
       return res.status(401).json({
         success: false,
-        message: "Login token galat hai. Kripya phir se login karein.",
+        message: "Invalid login token. Please log in again.",
         code: "TOKEN_INVALID",
       });
     }
@@ -69,7 +69,7 @@ export const userInfo = async (req, res, next) => {
     console.error("Auth middleware error:", error?.message);
     return res.status(500).json({
       success: false,
-      message: "Login check karne mein dikkat aa gayi. Thodi der baad try karein.",
+      message: "Problem checking login. Try again in a little while.",
     });
   }
 };

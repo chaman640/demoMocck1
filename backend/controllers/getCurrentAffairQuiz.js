@@ -8,7 +8,7 @@ export const getCurrentAffairQuiz = async (req, res) => {
 
     const quiz = await CurrentAffairQuiz.findOne({ examName, date });
     if (!quiz) {
-      return res.status(404).json({ success: false, message: "Is din ka quiz abhi available nahi hai." });
+      return res.status(404).json({ success: false, message: "The quiz for this day is not available yet." });
     }
 
     const existingAttempt = await CurrentAffairAttempt.findOne({ userId, examName, date });
@@ -35,7 +35,7 @@ export const getCurrentAffairQuiz = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Quiz fetch karte waqt error aaya.",
+      message: "Error while fetching the quiz.",
       error: error.message,
     });
   }

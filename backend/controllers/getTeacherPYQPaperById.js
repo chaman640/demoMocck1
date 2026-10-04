@@ -13,7 +13,7 @@ export const getTeacherPYQPaperById = async (req, res) => {
 
     const paper = await PreviousYearTest.findById(paperId);
     if (!paper || !paper.couponId) {
-      return res.status(404).json({ success: false, message: "Paper nahi mila." });
+      return res.status(404).json({ success: false, message: "Paper not found." });
     }
 
     const { allowed, reason } = await checkCouponAccess(req.teacher, paper.couponId, null);
@@ -45,7 +45,7 @@ export const getTeacherPYQPaperById = async (req, res) => {
     console.error("getTeacherPYQPaperById error:", error);
     return res.status(500).json({
       success: false,
-      message: "Paper fetch karte waqt error aaya.",
+      message: "Error while fetching the paper.",
       error: error.message,
     });
   }

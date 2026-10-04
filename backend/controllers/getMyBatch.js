@@ -34,7 +34,7 @@ export const getMyBatch = async (req, res) => {
         success: true,
         enrolled: false,
         data: null,
-        message: "Aapka pehle wala batch ab available nahi hai.",
+        message: "Your previous batch is no longer available.",
       });
     }
 
@@ -80,7 +80,7 @@ export const getMyBatch = async (req, res) => {
     console.error("getMyBatch error:", error);
     return res.status(500).json({
       success: false,
-      message: "Batch details fetch karte waqt error aaya.",
+      message: "Error while fetching batch details.",
       error: error.message,
     });
   }

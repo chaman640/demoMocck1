@@ -90,14 +90,14 @@ const CoinRewardListener = () => {
             <div className="text-5xl mb-2">⚡</div>
             <p className="text-2xl font-extrabold text-white mb-1">2x Boost ON!</p>
             <p className="text-sm text-purple-200 font-medium">
-              {popup.minutes ? `Agle ${popup.minutes} minute tak double coins` : "Double coins active"}
+              {popup.minutes ? `Double coins for the next ${popup.minutes} minutes` : "Double coins active"}
             </p>
           </>
         ) : (
           <>
             <div className="text-5xl mb-2">🪙</div>
             <p className="text-3xl font-extrabold text-white mb-1">+{popup.amount}</p>
-            <p className="text-sm text-purple-200 font-medium">Coins mile!</p>
+            <p className="text-sm text-purple-200 font-medium">Coins earned!</p>
             {popup.isStreakBonus && (
               <div className="mt-3 inline-flex items-center gap-1.5 bg-orange-500/20 border border-orange-400/40 rounded-full px-3 py-1">
                 <span className="text-base">🔥</span>

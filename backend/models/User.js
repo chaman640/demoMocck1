@@ -6,37 +6,37 @@ const userSchema = new mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, "Name zaroori hai"],
+      required: [true, "Name is required"],
       trim: true,
     },
     email: {
       type: String,
-      required: [true, "Email zaroori hai"],
+      required: [true, "Email is required"],
       unique: true,
       trim: true,
       lowercase: true,
     },
     phone: {
       type: String,
-      required: [true, "Phone number zaroori hai"],
+      required: [true, "Phone number is required"],
       unique: true,
       trim: true,
     },
     password: {
       type: String,
-      required: [true, "Password zaroori hai"],
-      minlength: [6, "Password kam se kam 6 characters ka hona chahiye"],
+      required: [true, "Password is required"],
+      minlength: [6, "Password must be at least 6 characters"],
     },
     // Password badalne ka waqt — isse pehle bane login tokens reject hote hain
     passwordChangedAt: { type: Date, default: null },
     address: {
       type: String,
-      required: [true, "Address zaroori hai"],
+      required: [true, "Address is required"],
       trim: true,
     },
     exam: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
+      required: [true, "Exam name is required"],
       trim: true,
     },
 

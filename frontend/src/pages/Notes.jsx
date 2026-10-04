@@ -68,14 +68,14 @@ const Notes = () => {
       <main className="px-4 py-4 max-w-2xl mx-auto space-y-5">
         {offline && (
           <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-300 text-xs">
-            Aap offline hain — sirf phone mein save kiye notes dikh rahe hain.
+            You are offline — showing only notes saved on this phone.
           </div>
         )}
 
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Notes search karein..."
+          placeholder="Search notes..."
           className="w-full px-4 py-2.5 text-sm bg-[#111827] border border-gray-800 focus:border-[#7C3AED] rounded-xl outline-none placeholder-gray-600"
         />
 
@@ -85,7 +85,7 @@ const Notes = () => {
           <div className="text-center py-16 space-y-2">
             <p className="text-4xl">📝</p>
             <p className="text-sm text-gray-500">
-              {query ? "Kuch nahi mila." : "Abhi aapke exam ya batch ke liye koi notes nahi hain."}
+              {query ? "Nothing found." : "No notes for your exam or batch yet."}
             </p>
           </div>
         )}
@@ -116,7 +116,7 @@ const Notes = () => {
                         Offline ✓
                       </span>
                     ) : (
-                      <span className="text-[#A78BFA] text-sm">Padhein →</span>
+                      <span className="text-[#A78BFA] text-sm">Read →</span>
                     )}
                   </button>
                 );

@@ -20,15 +20,15 @@ const PromoterChangePassword = () => {
     setError("");
 
     if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
-      setError("Sabhi fields bharna zaroori hai!");
+      setError("All fields are required!");
       return;
     }
     if (form.newPassword.length < 6) {
-      setError("Naya password kam se kam 6 characters ka hona chahiye!");
+      setError("The new password must be at least 6 characters!");
       return;
     }
     if (form.newPassword !== form.confirmPassword) {
-      setError("Naya password aur confirm password match nahi kar rahe!");
+      setError("New password and confirm password do not match!");
       return;
     }
 
@@ -42,7 +42,7 @@ const PromoterChangePassword = () => {
         navigate("/PromoterLogin");
         return;
       }
-      setError(err.response?.data?.message || "Password badalne mein error aaya.");
+      setError(err.response?.data?.message || "Error while changing the password.");
     } finally {
       setLoading(false);
     }
@@ -52,9 +52,9 @@ const PromoterChangePassword = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold">Naya Password Set Karein</h1>
+          <h1 className="text-2xl font-bold">Set a New Password</h1>
           <p className="text-gray-400 text-sm mt-1">
-            Pehli baar login kiya hai — aage badhne se pehle apna password badal lein
+            This is your first login — change your password before continuing
           </p>
         </div>
 
@@ -75,14 +75,14 @@ const PromoterChangePassword = () => {
                 name="currentPassword"
                 value={form.currentPassword}
                 onChange={handleChange}
-                placeholder="Jo password email mein mila tha"
+                placeholder="The password you received by email"
                 className="w-full px-4 py-2.5 text-sm bg-[#0A0D14] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none transition-colors text-white placeholder-gray-600"
               />
             </div>
 
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                Naya Password
+                New Password
               </label>
               <input
                 type="password"
@@ -96,7 +96,7 @@ const PromoterChangePassword = () => {
 
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                Naya Password (Confirm)
+                New Password (Confirm)
               </label>
               <input
                 type="password"
@@ -113,7 +113,7 @@ const PromoterChangePassword = () => {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50 mt-2"
             >
-              {loading ? "Save ho raha hai..." : "Password Badlein"}
+              {loading ? "Saving..." : "Change Password"}
             </button>
           </form>
         </div>

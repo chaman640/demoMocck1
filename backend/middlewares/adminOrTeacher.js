@@ -22,7 +22,7 @@ export const adminOrTeacher = async (req, res, next) => {
   if (!hasAdminCred && !hasTeacherCred) {
     return res.status(401).json({
       success: false,
-      message: "Admin ya Teacher login zaroori hai.",
+      message: "Admin or Teacher login required.",
     });
   }
 
@@ -38,6 +38,6 @@ export const adminOrTeacher = async (req, res, next) => {
 
   return res.status(401).json({
     success: false,
-    message: "Session expire ho gaya hai. Admin ya Teacher login dobara karein.",
+    message: "Session has expired. Log in again as Admin or Teacher.",
   });
 };

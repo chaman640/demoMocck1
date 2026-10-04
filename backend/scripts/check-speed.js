@@ -56,25 +56,25 @@ const report = (label, exp) => {
 
   let verdict, colour;
   if (isCollScan) {
-    verdict = "❌ POORI COLLECTION SCAN — index nahi laga";
+    verdict = "❌ FULL COLLECTION SCAN — no index used";
     colour = C.r;
   } else if (examined > returned * 20 && examined > 500) {
-    verdict = "🟡 index laga, lekin zaroorat se zyada record padhe";
+    verdict = "🟡 index used, but more records read than needed";
     colour = C.y;
   } else {
-    verdict = "✅ theek";
+    verdict = "✅ OK";
     colour = C.g;
   }
 
   console.log(`\n${C.b}${label}${C.x}`);
   console.log(
     `  ${colour}${verdict}${C.x}` +
-      `\n  ${C.d}record padhe: ${examined}   ·   index se mile: ${keysExamined}   ·   jawab: ${returned}   ·   time: ${ms}ms${C.x}`
+      `\n  ${C.d}records read: ${examined}   ·   found via index: ${keysExamined}   ·   returned: ${returned}   ·   time: ${ms}ms${C.x}`
   );
   if (idxNames.length) console.log(`  ${C.d}index: ${idxNames.join(", ")}${C.x}`);
   if (hasSortInMemory) {
     console.log(
-      `  ${C.y}⚠ RAM mein sort ho raha hai — bahut data hone par ye query FAIL ho sakti hai${C.x}`
+      `  ${C.y}⚠ Sorting in RAM — this query may FAIL when there is a lot of data${C.x}`
     );
   }
 };
@@ -83,7 +83,7 @@ const safe = async (label, fn) => {
   try {
     const exp = await fn();
     if (!exp) {
-      console.log(`\n${C.b}${label}${C.x}\n  ${C.d}(is query ke liye data nahi mila — skip)${C.x}`);
+      console.log(`\n${C.b}${label}${C.x}\n  ${C.d}(no data found for this query — skip)${C.x}`);
       return;
     }
     report(label, exp);
@@ -110,16 +110,16 @@ const main = async () => {
     Question: await Question.estimatedDocumentCount(),
   };
   console.log(
-    `\n${C.d}Abhi ka data — Performance: ${counts.Performance} · User: ${counts.User} · Question: ${counts.Question}${C.x}`
+    `\n${C.d}Current data — Performance: ${counts.Performance} · User: ${counts.User} · Question: ${counts.Question}${C.x}`
   );
   if (counts.Performance < 200) {
     console.log(
-      `${C.y}\n⚠ Abhi data bahut kam hai. Kam data par to bina index ke bhi sab tez lagta hai.` +
-        `\n  Asli farak "record padhe" wale number se dekhein, time se nahi.${C.x}`
+      `${C.y}\n⚠ There is very little data right now. With little data everything looks fast even without an index.` +
+        `\n  Look at the real difference in the "records read" number, not the time.${C.x}`
     );
   }
 
-  await safe("1. Student ki analysis (Performance)", () =>
+  await safe("1. Student analysis (Performance)", () =>
     anyPerf
       ? Performance.find({ userId: anyPerf.userId, examName: anyPerf.examName })
           .sort({ createdAt: -1 })
@@ -127,13 +127,13 @@ const main = async () => {
       : null
   );
 
-  await safe("2. Batch ke students ki list (User)", () =>
+  await safe("2. List of a batch's students (User)", () =>
     anyCoupon
       ? User.find({ activeCoupon: anyCoupon._id }).select("_id name").explain("executionStats")
       : null
   );
 
-  await safe("3. Phone se student dhoondhna (User)", () =>
+  await safe("3. Finding a student by phone (User)", () =>
     anyCoupon
       ? User.find({ activeCoupon: anyCoupon._id, phone: { $regex: "^99" } })
           .limit(20)
@@ -141,14 +141,14 @@ const main = async () => {
       : null
   );
 
-  await safe("4. Mock test ke liye sawaal chunna (Question)", () =>
+  await safe("4. Picking questions for a mock test (Question)", () =>
     anyQ
       ? Question.find({ examName: { $in: [anyQ.examName?.[0] ?? anyQ.examName] }, subjectName: anyQ.subjectName })
           .explain("executionStats")
       : null
   );
 
-  await safe("5. Teacher ke batches (Coupon)", () =>
+  await safe("5. Teacher's batches (Coupon)", () =>
     anyCoupon
       ? Coupon.find({ mainTeacher: anyCoupon.mainTeacher })
           .sort({ createdAt: -1 })
@@ -164,14 +164,14 @@ const main = async () => {
       : null
   );
 
-  await safe("7. 'Ye test pehle diya hai?' (CustomTestAttempt)", () =>
+  await safe("7. 'Has this test been taken before?' (CustomTestAttempt)", () =>
     anyCTA
       ? CustomTestAttempt.find({ userId: anyCTA.userId, testId: { $in: [anyCTA.testId] } })
           .explain("executionStats")
       : null
   );
 
-  await safe("8. Sabse naya OTP dhoondhna (Otp)", () =>
+  await safe("8. Finding the newest OTP (Otp)", () =>
     anyOtp
       ? Otp.find({ phone: anyOtp.phone, purpose: anyOtp.purpose })
           .sort({ createdAt: -1 })
@@ -182,7 +182,7 @@ const main = async () => {
 
   console.log(
     `\n${C.b}${"─".repeat(60)}${C.x}\n` +
-      `Koi bhi ${C.r}❌${C.x} dikhe to mujhe wo hissa bhej dijiye.\n`
+      `If you see any ${C.r}❌${C.x}, send me that part.\n`
   );
   await rowQuestionConnection.close();
   process.exit(0);

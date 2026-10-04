@@ -15,17 +15,17 @@ export const adminCreateMainTeacher = async (req, res) => {
     const { name, email, phone, examName } = req.body;
 
     if (!name || !email || !phone) {
-      return res.status(400).json({ success: false, message: "Naam, email aur phone zaroori hain!" });
+      return res.status(400).json({ success: false, message: "Name, email and phone are required!" });
     }
 
     const normalizedEmail = String(email).toLowerCase().trim();
     const normalizedPhone = String(phone).trim();
 
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid email!" });
     }
     if (!/^\d{10}$/.test(normalizedPhone)) {
-      return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
     }
 
     const examNames = Array.isArray(examName)
@@ -40,7 +40,7 @@ export const adminCreateMainTeacher = async (req, res) => {
     if (existingTeacher) {
       return res.status(400).json({
         success: false,
-        message: "Is email ya phone number se teacher account (ya pending invite) pehle hi maujood hai!",
+        message: "A teacher account (or pending invite) with this email or phone number already exists!",
       });
     }
 
@@ -76,15 +76,15 @@ export const adminCreateMainTeacher = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: emailSent
-        ? "Main Teacher invite email bhej diya gaya hai!"
-        : "Teacher ban gaya, lekin email nahi ja paya — neeche diya invite link teacher ko khud bhej dein.",
+        ? "Main Teacher invite email sent!"
+        : "Teacher created, but the email could not be sent — send the invite link below to the teacher yourself.",
       data: { teacherId: newTeacher._id, email: normalizedEmail, inviteLink: link, emailSent },
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ success: false, message: "Is email ya phone se account pehle hi maujood hai." });
+      return res.status(409).json({ success: false, message: "An account with this email or phone already exists." });
     }
     console.error("adminCreateMainTeacher error:", error);
-    return res.status(500).json({ success: false, message: "Main Teacher banate waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while creating the Main Teacher." });
   }
 };

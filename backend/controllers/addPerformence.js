@@ -29,7 +29,7 @@ export const addPerformence = async (req, res) => {
     // Ab route pe userInfo middleware hai aur ID session se aati hai.
     // ─────────────────────────────────────────────
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
+      return res.status(401).json({ success: false, message: "Login required!" });
     }
     const userId = req.user._id;
 
@@ -37,14 +37,14 @@ export const addPerformence = async (req, res) => {
     if (!examName || !blueprintName || !attemptedQuestions) {
       return res.status(400).json({
         success: false,
-        message: "examName, blueprintName aur attemptedQuestions bharna zaroori hai!",
+        message: "examName, blueprintName and attemptedQuestions are required!",
       });
     }
 
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions me kam se kam ek question hona chahiye!",
+        message: "attemptedQuestions must contain at least one question!",
       });
     }
 
@@ -55,7 +55,7 @@ export const addPerformence = async (req, res) => {
       if (!q.questionId) {
         return res.status(400).json({
           success: false,
-          message: "Har attempted question ka questionId zaroori hai.",
+          message: "Every attempted question needs a questionId.",
         });
       }
 
@@ -66,7 +66,7 @@ export const addPerformence = async (req, res) => {
       ) {
         return res.status(400).json({
           success: false,
-          message: `Question ${q.questionId} ka timeTakenInSeconds invalid hai.`,
+          message: `timeTakenInSeconds for question ${q.questionId} is invalid.`,
         });
       }
     }
@@ -77,7 +77,7 @@ export const addPerformence = async (req, res) => {
     if (!blueprint) {
       return res.status(404).json({
         success: false,
-        message: `'${blueprintName}' ka Blueprint nahi mila '${examName}' exam ke liye!`,
+        message: `Blueprint '${blueprintName}' not found for exam '${examName}'!`,
       });
     }
 
@@ -92,7 +92,7 @@ export const addPerformence = async (req, res) => {
     if (attemptedQuestions.length > maxQuestions) {
       return res.status(400).json({
         success: false,
-        message: "Is mock mein itne questions nahi ho sakte.",
+        message: "This mock cannot have this many questions.",
       });
     }
 
@@ -110,7 +110,7 @@ export const addPerformence = async (req, res) => {
     if (duplicate) {
       return res.status(200).json({
         success: true,
-        message: "Ye mock pehle hi submit ho chuka hai.",
+        message: "This mock has already been submitted.",
         data: {
           performanceId: duplicate._id,
           coinsEarned: 0,
@@ -223,7 +223,7 @@ export const addPerformence = async (req, res) => {
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Koi valid question match nahi hua is mock test ke sath.",
+        message: "No valid question matched this mock test.",
       });
     }
 
@@ -278,7 +278,7 @@ export const addPerformence = async (req, res) => {
     // 9. Response
     return res.status(201).json({
       success: true,
-      message: "User Performance Successfully Save Ho Gayi.",
+      message: "User performance saved successfully.",
       data: {
         performanceId: newPerformance._id,
         coinsEarned,
@@ -296,7 +296,7 @@ export const addPerformence = async (req, res) => {
     console.error("addPerformence error:", error);
     return res.status(500).json({
       success: false,
-      message: "Performance save karte waqt server error aaya.",
+      message: "Server error while saving performance.",
       error: error.message,
     });
   }

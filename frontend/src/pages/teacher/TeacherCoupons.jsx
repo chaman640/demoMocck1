@@ -77,7 +77,7 @@ const TeacherCoupons = () => {
       return;
     }
     if (codeStatusBlocksSubmit(formData.code, codeStatus)) {
-      setFormError("Ye code available nahi hai — koi suggestion chunein ya code khaali chhod dein.");
+      setFormError("This code is not available — choose a suggestion or leave the code empty.");
       return;
     }
     setCreating(true);
@@ -148,7 +148,7 @@ const TeacherCoupons = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -164,20 +164,20 @@ const TeacherCoupons = () => {
       <div className="max-w-2xl mx-auto">
         <div className="flex items-center justify-between mb-1">
           <h1 className="text-2xl font-bold">
-            {isMain ? "Aapke Batches" : "Authorized Batches"}
+            {isMain ? "Your Batches" : "Authorized Batches"}
           </h1>
           {isMain && (
             <button
               onClick={() => setShowForm((s) => !s)}
               className="text-xs px-3 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-medium"
             >
-              {showForm ? "Cancel" : "+ Naya Batch"}
+              {showForm ? "Cancel" : "+ New Batch"}
             </button>
           )}
         </div>
         <p className="text-gray-400 text-sm mb-4">
           {isMain
-            ? "Har batch ek unique coupon code se students ko join hone dega"
+            ? "Each batch lets students join with a unique coupon code"
             : "These batches were assigned to you by the Main Teacher"}
         </p>
 
@@ -189,7 +189,7 @@ const TeacherCoupons = () => {
             className="w-full mb-6 flex items-center gap-3 bg-[#111827] border border-gray-800 hover:border-[#7C3AED]/40 rounded-xl px-4 py-3 text-left transition-colors"
           >
             <span className="text-lg">👥</span>
-            <span className="text-sm font-medium flex-1">Team (Sub-Teachers) Manage Karein</span>
+            <span className="text-sm font-medium flex-1">Manage Team (Sub-Teachers)</span>
             <span className="text-gray-600">→</span>
           </button>
         )}
@@ -204,7 +204,7 @@ const TeacherCoupons = () => {
             <form onSubmit={handleCreate} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                  Batch Naam
+                  Batch Name
                 </label>
                 <input
                   type="text"
@@ -230,7 +230,7 @@ const TeacherCoupons = () => {
                 </select>
               </div>
               <CodePicker
-                label="Batch code (optional) — students isi code se join karenge"
+                label="Batch code (optional) — students will join with this code"
                 value={formData.code}
                 onChange={(code) => setFormData((p) => ({ ...p, code }))}
                 exam={formData.exam}
@@ -241,7 +241,7 @@ const TeacherCoupons = () => {
                 disabled={creating}
                 className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
               >
-                {creating ? "Creating..." : "Batch Banayein"}
+                {creating ? "Creating..." : "Create Batch"}
               </button>
             </form>
           </div>
@@ -294,7 +294,7 @@ const TeacherCoupons = () => {
                     onClick={() => copySignupLink(c.code)}
                     className="flex items-center gap-2 bg-[#0A0D14] border border-gray-700 rounded-lg px-3 py-2 mb-3 hover:border-gray-500 transition-colors w-full"
                   >
-                    <span className="text-xs text-gray-400">Signup Link (bina code ke)</span>
+                    <span className="text-xs text-gray-400">Signup Link (without code)</span>
                     <span className="text-[11px] text-gray-500 ml-auto flex-shrink-0">
                       {copiedLink === c.code ? "Copied ✓" : "Copy"}
                     </span>
@@ -302,7 +302,7 @@ const TeacherCoupons = () => {
 
                   {!isMain && c.subjects && c.subjects.length > 0 && (
                     <p className="text-xs text-[#A78BFA] mb-3">
-                      Aapke subjects: {c.subjects.join(", ")}
+                      Your subjects: {c.subjects.join(", ")}
                     </p>
                   )}
 
@@ -312,7 +312,7 @@ const TeacherCoupons = () => {
                       disabled={switchingId === c._id}
                       className="w-full py-2 rounded-lg border border-[#7C3AED]/40 text-[#A78BFA] hover:bg-[#7C3AED]/10 text-sm font-medium disabled:opacity-50"
                     >
-                      {switchingId === c._id ? "Switching..." : "Ise Active Batch Banayein"}
+                      {switchingId === c._id ? "Switching..." : "Make This the Active Batch"}
                     </button>
                   )}
 
@@ -322,7 +322,7 @@ const TeacherCoupons = () => {
                       onClick={() => navigate(`/TeacherBatchStudents/${c._id}`, { state: { batchName: c.name } })}
                       className="w-full mt-2 py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-sm font-medium"
                     >
-                      👥 Students Manage Karein
+                      👥 Manage Students
                     </button>
                   )}
 

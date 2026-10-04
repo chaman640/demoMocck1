@@ -70,10 +70,11 @@ const Login = () => {
       const errorMessage = err.response?.data?.message || "Login failed.";
       setError(errorMessage);
       
-      const errorMsgLower = errorMessage.toLowerCase();
-      if (errorMsgLower.includes("account nahi mila")) {
+      // Status code se field highlight — message ka text badalne par bhi chale
+      const status = err.response?.status;
+      if (status === 404) {
         setFieldErrors({ phone: true });
-      } else if (errorMsgLower.includes("galat password")) {
+      } else if (status === 401) {
         setFieldErrors({ password: true });
       }
     } finally {

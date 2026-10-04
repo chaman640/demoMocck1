@@ -20,7 +20,7 @@ import {
 export const assignCouponAccess = async (req, res) => {
   try {
     if (req.teacher.role !== "main") {
-      return res.status(403).json({ success: false, message: "Sirf Main Teacher hi access assign kar sakta hai!" });
+      return res.status(403).json({ success: false, message: "Only a Main Teacher can assign access!" });
     }
 
     const { subTeacherId, couponId, subjects } = req.body;
@@ -28,7 +28,7 @@ export const assignCouponAccess = async (req, res) => {
     if (!subTeacherId || !couponId || !Array.isArray(subjects) || subjects.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "subTeacherId, couponId aur kam se kam ek subject zaroori hai!",
+        message: "subTeacherId, couponId and at least one subject are required!",
       });
     }
 
@@ -42,18 +42,18 @@ export const assignCouponAccess = async (req, res) => {
       role: "sub",
     });
     if (!subTeacher) {
-      return res.status(404).json({ success: false, message: "Ye sub-teacher nahi mila ya aapka nahi hai!" });
+      return res.status(404).json({ success: false, message: "This sub-teacher was not found or is not yours!" });
     }
     if (subTeacher.status === "removed") {
       return res.status(400).json({
         success: false,
-        message: "Ye sub-teacher remove ho chuka hai, pehle use dobara invite karein.",
+        message: "This sub-teacher has been removed, invite them again first.",
       });
     }
 
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon nahi mila ya aapka nahi hai!" });
+      return res.status(404).json({ success: false, message: "This coupon was not found or is not yours!" });
     }
 
     // ─────────────────────────────────────────────
@@ -78,7 +78,7 @@ export const assignCouponAccess = async (req, res) => {
     }
 
     if (cleanSubjects.length === 0) {
-      return res.status(400).json({ success: false, message: "Subject naam khali nahi ho sakta!" });
+      return res.status(400).json({ success: false, message: "Subject name cannot be empty!" });
     }
 
     for (const subject of cleanSubjects) {
@@ -101,24 +101,24 @@ export const assignCouponAccess = async (req, res) => {
 
     const warning =
       notInBlueprint.length > 0
-        ? `⚠️ ${notInBlueprint.join(", ")} — ye subject '${coupon.exam}' ke Mock Test blueprint mein nahi hai. ` +
-          `Is subject ke sawaal auto-generate hone wale Mock Test mein nahi aayenge.`
+        ? `⚠️ ${notInBlueprint.join(", ")} — this subject is not in the '${coupon.exam}' Mock Test blueprint. ` +
+          `Questions from this subject will not appear in auto-generated Mock Tests.`
         : null;
 
     return res.status(200).json({
       success: true,
-      message: `${subTeacher.name} ko '${coupon.name}' ke liye ${cleanSubjects.join(", ")} access mil gaya.`,
+      message: `${subTeacher.name} now has ${cleanSubjects.join(", ")} access for '${coupon.name}'.`,
       warning,
       subjects: cleanSubjects,
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(200).json({ success: true, message: "Access pehle se maujood hai." });
+      return res.status(200).json({ success: true, message: "Access already exists." });
     }
     console.error("assignCouponAccess error:", error);
     return res.status(500).json({
       success: false,
-      message: "Access assign karte waqt error aaya.",
+      message: "Error while assigning access.",
       error: error.message,
     });
   }
@@ -131,7 +131,7 @@ export const assignCouponAccess = async (req, res) => {
 export const revokeCouponAccess = async (req, res) => {
   try {
     if (req.teacher.role !== "main") {
-      return res.status(403).json({ success: false, message: "Sirf Main Teacher hi access revoke kar sakta hai!" });
+      return res.status(403).json({ success: false, message: "Only a Main Teacher can revoke access!" });
     }
 
     const { subTeacherId, couponId, subject } = req.body;
@@ -139,7 +139,7 @@ export const revokeCouponAccess = async (req, res) => {
     if (!subTeacherId || !couponId || !normalizeSubject(subject)) {
       return res.status(400).json({
         success: false,
-        message: "subTeacherId, couponId aur subject zaroori hain!",
+        message: "subTeacherId, couponId and subject are required!",
       });
     }
 
@@ -149,7 +149,7 @@ export const revokeCouponAccess = async (req, res) => {
 
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon nahi mila ya aapka nahi hai!" });
+      return res.status(404).json({ success: false, message: "This coupon was not found or is not yours!" });
     }
 
     // 🐛 FIX: pehle exact `subject.trim()` par delete hota tha — agar record
@@ -162,18 +162,18 @@ export const revokeCouponAccess = async (req, res) => {
     });
 
     if (!deleted) {
-      return res.status(404).json({ success: false, message: "Ye access record nahi mila." });
+      return res.status(404).json({ success: false, message: "Access record not found." });
     }
 
     return res.status(200).json({
       success: true,
-      message: `'${deleted.subject}' ka access revoke ho gaya.`,
+      message: `Access to '${deleted.subject}' revoked.`,
     });
   } catch (error) {
     console.error("revokeCouponAccess error:", error);
     return res.status(500).json({
       success: false,
-      message: "Access revoke karte waqt error aaya.",
+      message: "Error while revoking access.",
       error: error.message,
     });
   }

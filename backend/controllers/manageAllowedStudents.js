@@ -13,11 +13,11 @@ const verifyCouponOwnership = async (teacher, couponId) => {
     return { allowed: false, status: 400, message: "Invalid batch ID." };
   }
   if (teacher.role !== "main") {
-    return { allowed: false, status: 403, message: "Sirf Main Teacher students manage kar sakta hai." };
+    return { allowed: false, status: 403, message: "Only a Main Teacher can manage students." };
   }
   const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: teacher._id });
   if (!coupon) {
-    return { allowed: false, status: 404, message: "Ye batch nahi mila ya aapka nahi hai." };
+    return { allowed: false, status: 404, message: "This batch was not found or is not yours." };
   }
   return { allowed: true, coupon };
 };
@@ -34,13 +34,13 @@ export const addAllowedStudent = async (req, res) => {
     const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
 
     if (!normalizedPhone && !normalizedEmail) {
-      return res.status(400).json({ success: false, message: "Phone ya email mein se ek zaroori hai!" });
+      return res.status(400).json({ success: false, message: "Either phone or email is required!" });
     }
     if (normalizedPhone && !/^\d{10}$/.test(normalizedPhone)) {
-      return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
     }
     if (normalizedEmail && !/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid email!" });
     }
 
     // Isi batch mein ye phone/email pehle se to nahi hai
@@ -49,7 +49,7 @@ export const addAllowedStudent = async (req, res) => {
     if (normalizedEmail) dupConditions.push({ email: normalizedEmail });
     const existing = await AllowedStudent.findOne({ coupon: couponId, $or: dupConditions });
     if (existing) {
-      return res.status(409).json({ success: false, message: "Ye student is batch mein pehle se add hai!" });
+      return res.status(409).json({ success: false, message: "This student is already added to this batch!" });
     }
 
     const created = await AllowedStudent.create({
@@ -60,10 +60,10 @@ export const addAllowedStudent = async (req, res) => {
       addedBy: req.teacher._id,
     });
 
-    return res.status(201).json({ success: true, message: "Student add ho gaya!", data: created });
+    return res.status(201).json({ success: true, message: "Student added!", data: created });
   } catch (error) {
     console.error("addAllowedStudent error:", error);
-    return res.status(500).json({ success: false, message: "Student add karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while adding the student." });
   }
 };
 
@@ -89,7 +89,7 @@ export const listAllowedStudents = async (req, res) => {
     });
   } catch (error) {
     console.error("listAllowedStudents error:", error);
-    return res.status(500).json({ success: false, message: "List fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching the list." });
   }
 };
 
@@ -102,15 +102,15 @@ export const deleteAllowedStudent = async (req, res) => {
     }
 
     const entry = await AllowedStudent.findById(id);
-    if (!entry) return res.status(404).json({ success: false, message: "Ye entry nahi mili." });
+    if (!entry) return res.status(404).json({ success: false, message: "Entry not found." });
 
     const check = await verifyCouponOwnership(req.teacher, entry.coupon);
     if (!check.allowed) return res.status(check.status).json({ success: false, message: check.message });
 
     await AllowedStudent.deleteOne({ _id: id });
-    return res.status(200).json({ success: true, message: "Student hata diya gaya." });
+    return res.status(200).json({ success: true, message: "Student removed." });
   } catch (error) {
     console.error("deleteAllowedStudent error:", error);
-    return res.status(500).json({ success: false, message: "Delete karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while deleting." });
   }
 };

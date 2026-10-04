@@ -14,7 +14,7 @@ const clean = (v) => String(v || "").toUpperCase().replace(/[^A-Z0-9]/g, "").sli
  * onStatusChange    — "idle" | "checking" | "available" | "unavailable" | "invalid" | "error"
  * currentCode       — promoter ka abhi wala code (wahi dobara likhne par "aapka hi hai")
  */
-const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = "", label = "Apna code (optional)", optional = true, dark = true }) => {
+const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = "", label = "Your code (optional)", optional = true, dark = true }) => {
   // Server ka jawab — kis code ke liye tha, taaki purana jawab naye code par na dikhe
   const [remote, setRemote] = useState({ code: "", status: "", message: "", suggestions: [] });
   const code = clean(value);
@@ -22,8 +22,8 @@ const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = 
   // Jo bina server ke pata hai (khaali, chhota, apna hi code)
   const local = useMemo(() => {
     if (!code) return { status: "idle", message: "" };
-    if (currentCode && code === currentCode) return { status: "available", message: "Ye aapka abhi wala code hai." };
-    if (code.length < 4) return { status: "invalid", message: "Kam se kam 4 akshar." };
+    if (currentCode && code === currentCode) return { status: "available", message: "This is your current code." };
+    if (code.length < 4) return { status: "invalid", message: "At least 4 characters." };
     return null;
   }, [code, currentCode]);
 
@@ -42,7 +42,7 @@ const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = 
           setRemote({ code, status: d.available ? "available" : "unavailable", message: d.message, suggestions: d.suggestions || [] });
         }
       } catch (err) {
-        if (!cancelled) setRemote({ code, status: "error", message: err.response?.data?.message || "Check nahi ho paya.", suggestions: [] });
+        if (!cancelled) setRemote({ code, status: "error", message: err.response?.data?.message || "Could not check.", suggestions: [] });
       }
     }, 450);
     return () => {
@@ -72,7 +72,7 @@ const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = 
         <input
           value={value}
           onChange={(e) => onChange(clean(e.target.value))}
-          placeholder={optional ? "Jaise RAHULSSC — khaali chhodein to apne aap banega" : "Jaise RAHUL2026"}
+          placeholder={optional ? "e.g. RAHULSSC — leave empty to generate one automatically" : "e.g. RAHUL2026"}
           className={`w-full px-4 py-2.5 pr-10 text-sm font-mono tracking-wider rounded-xl outline-none border ${border} ${dark ? "bg-[#0A0D14] text-white placeholder-gray-600" : "bg-white text-gray-900"}`}
           autoCapitalize="characters"
           spellCheck={false}
@@ -86,7 +86,7 @@ const CodePicker = ({ value, onChange, exam = "", onStatusChange, currentCode = 
       {message && <p className={`text-[11px] mt-1.5 ${tone}`}>{message}</p>}
       {status === "unavailable" && suggestions.length > 0 && (
         <div className="mt-2">
-          <p className="text-[11px] text-gray-400 mb-1.5">Ye available hain — tap karke chunein:</p>
+          <p className="text-[11px] text-gray-400 mb-1.5">These are available — tap to choose:</p>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((s) => (
               <button

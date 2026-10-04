@@ -25,13 +25,13 @@ export const getTeacherSubjects = async (req, res) => {
     if (!teacher.activeCoupon) {
       return res.status(200).json({
         success: true,
-        data: { exam: null, subjects: [], message: "Pehle apna active batch select karein." },
+        data: { exam: null, subjects: [], message: "Select your active batch first." },
       });
     }
 
     const coupon = await Coupon.findById(teacher.activeCoupon).select("exam name");
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Active coupon nahi mila." });
+      return res.status(404).json({ success: false, message: "Active coupon not found." });
     }
 
     const { blueprintSubjects, usedSubjects } = await getKnownSubjects(coupon._id, coupon.exam);
@@ -67,7 +67,7 @@ export const getTeacherSubjects = async (req, res) => {
     console.error("getTeacherSubjects error:", error);
     return res.status(500).json({
       success: false,
-      message: "Subject list fetch karte waqt error aaya.",
+      message: "Error while fetching the subject list.",
       error: error.message,
     });
   }

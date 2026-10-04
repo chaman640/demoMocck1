@@ -82,12 +82,12 @@ async function cleanup() {
   await Coupon.deleteMany({ _id: { $in: couponIds } });
   await Teacher.deleteMany({ _id: { $in: teacherIds } });
   await User.deleteMany({ _id: { $in: userIds } });
-  console.log("Purani demo data saaf kar di gayi (agar thi).");
+  console.log("Old demo data cleared (if any).");
 }
 
 async function run() {
   await rowQuestionConnection.asPromise();
-  console.log("DB se connect ho gaya, seeding shuru...");
+  console.log("Connected to DB, starting seeding...");
   await cleanup();
 
   // ── 1. Teachers ──────────────────────────────────────────
@@ -197,25 +197,25 @@ async function run() {
 
   // ── 4. Question pool (global — dono exams ke liye) ──────
   const reasoningQs = [
-    mcq("Series: 2, 4, 8, 16, ? — agla number kya hoga?", ["24", "32", "30", "20"], 2, "Reasoning", "Number Series", "Har term pichle se double hai, isliye 32."),
-    mcq("Yadi 'PEN' ko 'NEP' likha jata hai, to 'BOOK' ko kaise likhenge?", ["KOOB", "BOOK", "OBOK", "KBOO"], 1, "Reasoning", "Coding-Decoding", "Letters ko reverse order mein likha jata hai."),
-    mcq("Odd one out chunein:", ["Dog", "Cat", "Lion", "Table"], 4, "Reasoning", "Classification", "Table ek jaanwar nahi hai."),
-    mcq("A ka bhai B hai. B ki behan C hai. C, A se kya rishta rakhti hai?", ["Behan", "Bhai", "Maa", "Beti"], 1, "Reasoning", "Blood Relations", "C, A ki behan hai."),
-    mcq("Clock mein 3:15 baje ghanta aur minute ki suiyon ke beech approx kitna angle banega?", ["0°", "7.5°", "15°", "30°"], 2, "Reasoning", "Clock", "3:15 par angle approx 7.5 degree hota hai."),
+    mcq("Series: 2, 4, 8, 16, ? — what is the next number?", ["24", "32", "30", "20"], 2, "Reasoning", "Number Series", "Each term is double the previous one, so 32."),
+    mcq("If 'PEN' is written as 'NEP', how will 'BOOK' be written?", ["KOOB", "BOOK", "OBOK", "KBOO"], 1, "Reasoning", "Coding-Decoding", "The letters are written in reverse order."),
+    mcq("Choose the odd one out:", ["Dog", "Cat", "Lion", "Table"], 4, "Reasoning", "Classification", "Table is not an animal."),
+    mcq("B is A's brother. C is B's sister. How is C related to A?", ["Behan", "Bhai", "Maa", "Beti"], 1, "Reasoning", "Blood Relations", "C is A's sister."),
+    mcq("At 3:15, approximately what angle is formed between the hour and minute hands of a clock?", ["0°", "7.5°", "15°", "30°"], 2, "Reasoning", "Clock", "At 3:15 the angle is approx 7.5 degrees."),
   ];
   const mathsQs = [
-    mcq("15 ka 20% kitna hota hai?", ["2", "3", "4", "5"], 2, "Maths", "Percentage", "15 x 20/100 = 3."),
-    mcq("Ek train 60 km/h ki speed se 2 ghante chale to kitni doori tay karegi?", ["100 km", "110 km", "120 km", "130 km"], 3, "Maths", "Speed-Distance", "60 x 2 = 120 km."),
+    mcq("What is 20% of 15?", ["2", "3", "4", "5"], 2, "Maths", "Percentage", "15 x 20/100 = 3."),
+    mcq("If a train runs at 60 km/h for 2 hours, what distance will it cover?", ["100 km", "110 km", "120 km", "130 km"], 3, "Maths", "Speed-Distance", "60 x 2 = 120 km."),
     mcq("(12 + 8) ÷ 4 = ?", ["4", "5", "6", "7"], 2, "Maths", "Simplification", "20 ÷ 4 = 5."),
-    mcq("Agar ek number ka 25% 50 hai, to number kya hoga?", ["150", "175", "200", "225"], 3, "Maths", "Percentage", "50 x 4 = 200."),
-    mcq("Principal 1000, Rate 10%, Time 2 years — Simple Interest kitna hoga?", ["100", "150", "200", "250"], 3, "Maths", "Simple Interest", "SI = (1000 x 10 x 2)/100 = 200."),
+    mcq("If 25% of a number is 50, what is the number?", ["150", "175", "200", "225"], 3, "Maths", "Percentage", "50 x 4 = 200."),
+    mcq("Principal 1000, Rate 10%, Time 2 years — what will the Simple Interest be?", ["100", "150", "200", "250"], 3, "Maths", "Simple Interest", "SI = (1000 x 10 x 2)/100 = 200."),
   ];
   const gkQs = [
-    mcq("Bharat ka rashtriya pashu kaun sa hai?", ["Sher", "Bagh", "Hathi", "Mor"], 2, "GK", "Static GK", "Bagh (Tiger) Bharat ka rashtriya pashu hai."),
-    mcq("Bharat ka sansad bhawan kis shehar mein hai?", ["Mumbai", "Kolkata", "Nai Dilli", "Chennai"], 3, "GK", "Static GK", "Sansad Bhawan Nai Dilli mein hai."),
-    mcq("RBI ki sthapna kis varsh hui thi?", ["1935", "1947", "1950", "1969"], 1, "GK", "Economy", "RBI 1935 mein sthapit hui thi."),
-    mcq("Bharat ki sabse lambi nadi kaun si hai?", ["Yamuna", "Ganga", "Godavari", "Brahmaputra"], 2, "GK", "Geography", "Ganga Bharat ki sabse lambi nadi hai."),
-    mcq("Bharatiya samvidhan kab lagu hua tha?", ["15 Aug 1947", "26 Jan 1950", "26 Nov 1949", "2 Oct 1950"], 2, "GK", "Polity", "Samvidhan 26 January 1950 ko lagu hua tha."),
+    mcq("What is the national animal of India?", ["Sher", "Bagh", "Hathi", "Mor"], 2, "GK", "Static GK", "The Tiger is the national animal of India."),
+    mcq("In which city is the Parliament House of India?", ["Mumbai", "Kolkata", "New Delhi", "Chennai"], 3, "GK", "Static GK", "The Parliament House is in New Delhi."),
+    mcq("In which year was the RBI established?", ["1935", "1947", "1950", "1969"], 1, "GK", "Economy", "The RBI was established in 1935."),
+    mcq("Which is the longest river in India?", ["Yamuna", "Ganga", "Godavari", "Brahmaputra"], 2, "GK", "Geography", "The Ganga is the longest river in India."),
+    mcq("When did the Indian Constitution come into force?", ["15 Aug 1947", "26 Jan 1950", "26 Nov 1949", "2 Oct 1950"], 2, "GK", "Polity", "The Constitution came into force on 26 January 1950."),
   ];
   const englishQs = [
     mcq("Choose the correct synonym of 'Happy':", ["Sad", "Joyful", "Angry", "Tired"], 2, "English", "Vocabulary", "'Joyful' means happy."),
@@ -231,8 +231,8 @@ async function run() {
   }
 
   // Batch-exclusive (teacher-added) questions
-  await new Question({ ...mcq("Batch-exclusive: '20' ka square root?", ["4", "4.47", "5", "20"], 1, "Reasoning", "Batch Special", "√20 ≈ 4.47, lekin option match sirf approx."), examName: ["UPSC"], coupon: couponA._id, addedByTeacher: mainTeacher._id }).save();
-  await new Question({ ...mcq("Batch-exclusive: SSC CGL Tier-1 mein kitne sections hote hain?", ["2", "3", "4", "5"], 3, "GK", "Batch Special", "SSC CGL Tier-1 mein 4 sections hote hain."), examName: ["SSC CGL"], coupon: couponB._id, addedByTeacher: mainTeacher._id }).save();
+  await new Question({ ...mcq("Batch-exclusive: square root of '20'?", ["4", "4.47", "5", "20"], 1, "Reasoning", "Batch Special", "√20 ≈ 4.47, but the option match is only approx."), examName: ["UPSC"], coupon: couponA._id, addedByTeacher: mainTeacher._id }).save();
+  await new Question({ ...mcq("Batch-exclusive: How many sections are there in SSC CGL Tier-1?", ["2", "3", "4", "5"], 3, "GK", "Batch Special", "SSC CGL Tier-1 has 4 sections."), examName: ["SSC CGL"], coupon: couponB._id, addedByTeacher: mainTeacher._id }).save();
 
   // ── 5. Blueprints ────────────────────────────────────────
   await new Blueprint({
@@ -303,7 +303,7 @@ async function run() {
     examName: "UPSC",
     testName: "[Demo] UPSC Prelims 2023",
     year: 2023,
-    description: "UPSC Prelims 2023 ka sample paper.",
+    description: "Sample paper of UPSC Prelims 2023.",
     subjects: [
       { subjectName: "Reasoning", questions: reasoningQs.slice(0, 3) },
       { subjectName: "GK", questions: gkQs.slice(0, 3) },
@@ -360,9 +360,9 @@ async function run() {
     date,
     title: "[Demo] Daily Current Affairs",
     items: [
-      { headline: "RBI ne repo rate stable rakhi", content: "Monetary Policy Committee ne repo rate mein koi badlav nahi kiya.", category: "Economy", source: "PIB" },
-      { headline: "ISRO ka naya satellite launch", content: "ISRO ne ek naya communication satellite safaltapoorvak launch kiya.", category: "Science", source: "ISRO" },
-      { headline: "Nayi rashtriya shiksha neeti par charcha", content: "Sarkar ne shiksha sudhar par ek naya panel banaya.", category: "Polity", source: "PIB" },
+      { headline: "RBI keeps the repo rate stable", content: "The Monetary Policy Committee made no change to the repo rate.", category: "Economy", source: "PIB" },
+      { headline: "ISRO launches a new satellite", content: "ISRO successfully launched a new communication satellite.", category: "Science", source: "ISRO" },
+      { headline: "Discussion on the new National Education Policy", content: "The government formed a new panel on education reform.", category: "Polity", source: "PIB" },
     ],
   }).save();
 
@@ -371,7 +371,7 @@ async function run() {
     date,
     title: "[Demo] Daily Current Affairs",
     items: [
-      { headline: "SSC ne naya exam calendar jaari kiya", content: "SSC ne agle saal ke exams ka calendar release kiya.", category: "Exam Update", source: "SSC" },
+      { headline: "SSC releases new exam calendar", content: "SSC released the exam calendar for next year.", category: "Exam Update", source: "SSC" },
     ],
   }).save();
 
@@ -379,8 +379,8 @@ async function run() {
     examName: "UPSC",
     date,
     questions: [
-      { question: "RBI ne repo rate ke saath kya kiya?", option1: "Badhaya", option2: "Ghataya", option3: "Stable rakha", option4: "Khatam kiya", correctOption: 3, answerExplain: "Repo rate stable rakhi gayi." },
-      { question: "ISRO ne kis tarah ka satellite launch kiya?", option1: "Weather", option2: "Communication", option3: "Military", option4: "Navigation", correctOption: 2, answerExplain: "Communication satellite launch hua." },
+      { question: "What did the RBI do with the repo rate?", option1: "Increased it", option2: "Decreased it", option3: "Kept it stable", option4: "Scrapped it", correctOption: 3, answerExplain: "The repo rate was kept stable." },
+      { question: "What type of satellite did ISRO launch?", option1: "Weather", option2: "Communication", option3: "Military", option4: "Navigation", correctOption: 2, answerExplain: "A communication satellite was launched." },
     ],
   }).save();
 
@@ -498,18 +498,18 @@ async function run() {
   // ── 12. Hidden Question (student ne ek question hide kiya) ─
   await new HiddenQuestion({ userId: karan._id, questionId: poolDocs[3]._id }).save();
 
-  console.log("\n✅ Demo data seed ho gaya!\n");
+  console.log("\n✅ Demo data seeded!\n");
   console.log("── Teacher login ──");
   console.log("Main teacher   : rahul.teacher@demo.mocktest.local / Teacher@123");
   console.log("Sub teacher    : priya.subteacher@demo.mocktest.local / Teacher@123 (active)");
   console.log("Sub teacher    : aman.subteacher@demo.mocktest.local / Teacher@123 (active)");
-  console.log("Sub teacher    : sanjay.subteacher@demo.mocktest.local (status: pending, login nahi hoga)");
+  console.log("Sub teacher    : sanjay.subteacher@demo.mocktest.local (status: pending, cannot log in)");
   console.log("\n── Student login ──");
   console.log("Aditi Singh    : 9888800001 / Student@123 (batch: UPSC27A)");
   console.log("Karan Mehta    : 9888800002 / Student@123 (batch: UPSC27A)");
   console.log("Neha Joshi     : 9888800003 / Student@123 (batch: SSCEV)");
   console.log("Vikas Kumar    : 9888800004 / Student@123 (batch: SSCEV)");
-  console.log("Simran Kaur    : 9888800005 / Student@123 (koi batch nahi)");
+  console.log("Simran Kaur    : 9888800005 / Student@123 (no batch)");
   console.log("\nBatch codes: UPSC27A (UPSC), SSCEV (SSC CGL)");
   console.log("Challenge code to test: DEMO01");
 }
@@ -518,6 +518,6 @@ run()
   .then(() => rowQuestionConnection.close())
   .then(() => process.exit(0))
   .catch((err) => {
-    console.error("❌ Seeding fail ho gayi:", err);
+    console.error("❌ Seeding failed:", err);
     rowQuestionConnection.close().finally(() => process.exit(1));
   });

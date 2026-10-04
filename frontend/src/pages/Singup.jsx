@@ -196,7 +196,7 @@ const Singup = () => {
       {/* ───────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#1E3A8A] to-[#2563EB] text-white flex-col justify-center px-16">
         <img src="/logo.svg" alt="AntimPrayash.in" className="w-14 h-14 object-contain mb-6" />
-        <h1 className="text-3xl font-bold mb-3">AntimPrayash.in mein Swagat Hai</h1>
+        <h1 className="text-3xl font-bold mb-3">Welcome to AntimPrayash.in</h1>
         <p className="text-blue-100 text-sm leading-relaxed max-w-md mb-8">
           The best mock tests, previous year papers, and detailed performance analysis for government exam preparation — all in one place.
         </p>
@@ -213,7 +213,7 @@ const Singup = () => {
           </h2>
           <p className="text-xs text-[#64748B] mb-6">
             {step === "details"
-              ? "Apni details bharein, email pe OTP bheja jayega"
+              ? "Fill in your details; an OTP will be sent to your email"
               : `Enter the 6-digit code sent to ${formData.email}`}
           </p>
 
@@ -303,7 +303,7 @@ const Singup = () => {
 
               {/* 🆕 Exam ↔ Coupon toggle */}
               <div>
-                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-[#475569]">Kaise Join Karna Hai?</label>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-[#475569]">How do you want to join?</label>
                 {!refKind && (
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <button
@@ -330,7 +330,7 @@ const Singup = () => {
                 {refKind && (
                   <p className="text-[11px] text-green-600 font-medium mb-2">
                     {refKind === "student"
-                      ? "✓ Dost ka referral code laga diya gaya — apna exam chunein"
+                      ? "✓ Friend's referral code applied — choose your exam"
                       : "✓ Referral code applied automatically"}
                   </p>
                 )}
@@ -366,7 +366,7 @@ const Singup = () => {
                           name="couponCode"
                           value={formData.couponCode}
                           onChange={(e) => setFormData((prev) => ({ ...prev, couponCode: e.target.value.toUpperCase() }))}
-                          placeholder="Teacher, Promoter ya dost ka code"
+                          placeholder="Teacher, Promoter or friend's code"
                           className={getInputClass('couponCode')}
                         />
                       </div>
@@ -378,7 +378,7 @@ const Singup = () => {
                         </span>
                         <select name="exam" value={formData.exam} onChange={handleChange} className={`${getInputClass('exam')} appearance-none cursor-pointer`}>
                           <option value="" disabled={refKind === "promoter" || refKind === "student"}>
-                            {refKind === "promoter" || refKind === "student" ? "Select Exam" : "Exam (Promoter ya dost ke code ke liye zaroori)"}
+                            {refKind === "promoter" || refKind === "student" ? "Select Exam" : "Exam (required for a Promoter or friend's code)"}
                           </option>
                           {examList.map((examName, index) => (
                             <option key={index} value={examName}>{examName}</option>
@@ -392,7 +392,7 @@ const Singup = () => {
                   </div>
                 )}
                 {joinMode === "coupon" && !refKind && (
-                  <p className="text-[11px] text-[#64748B] mt-1.5">Teacher/batch ka code ho to exam automatically set ho jayega. Promoter ya dost ka code ho to upar exam bhi select karein.</p>
+                  <p className="text-[11px] text-[#64748B] mt-1.5">With a teacher/batch code the exam is set automatically. With a Promoter or friend's code, also select the exam above.</p>
                 )}
               </div>
 

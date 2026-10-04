@@ -29,7 +29,7 @@ const AcceptInvite = () => {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      setError("Kripya highlighted fields sahi se bharein.");
+      setError("Please fill in the highlighted fields correctly.");
       return;
     }
 
@@ -65,7 +65,7 @@ const AcceptInvite = () => {
               Sub-Teacher (Main Teacher invite) dono ke liye use hota hai */}
           <h1 className="text-2xl font-bold">Teacher Invite</h1>
           <p className="text-gray-400 text-sm mt-1">
-            Apna account activate karne ke liye details bharein
+            Fill in the details to activate your account
           </p>
         </div>
 
@@ -81,7 +81,7 @@ const AcceptInvite = () => {
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
                 Full Name
               </label>
-              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Aapka naam" className={getInputClass("name")} />
+              <input type="text" name="name" value={formData.name} onChange={handleChange} placeholder="Your name" className={getInputClass("name")} />
             </div>
 
             <div>
@@ -93,7 +93,7 @@ const AcceptInvite = () => {
 
             <div>
               <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
-                Password Set Karein
+                Set Password
               </label>
               <input type="password" name="password" value={formData.password} onChange={handleChange} placeholder="••••••" className={getInputClass("password")} />
             </div>
@@ -110,7 +110,7 @@ const AcceptInvite = () => {
               disabled={loading}
               className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50 mt-2"
             >
-              {loading ? "Activating..." : "Account Activate Karein"}
+              {loading ? "Activating..." : "Activate Account"}
             </button>
           </form>
         </div>

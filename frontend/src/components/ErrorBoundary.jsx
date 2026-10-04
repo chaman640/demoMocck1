@@ -33,15 +33,15 @@ class ErrorBoundary extends Component {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-sm w-full text-center space-y-4">
           <div className="text-4xl">⚠️</div>
-          <p className="text-base font-semibold">Kuch galat ho gaya</p>
+          <p className="text-base font-semibold">Something went wrong</p>
           <p className="text-sm text-gray-400">
-            Ye page abhi khul nahi paya. Reload karke dekhein — aapka data surakshit hai.
+            This page could not be opened. Try reloading — your data is safe.
           </p>
           <button
             onClick={() => window.location.reload()}
             className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold"
           >
-            Reload karein
+            Reload
           </button>
           <button
             onClick={() => {
@@ -50,7 +50,7 @@ class ErrorBoundary extends Component {
             }}
             className="w-full py-3 rounded-xl border border-gray-700 text-sm text-gray-300"
           >
-            Home par jaayein
+            Go to Home
           </button>
         </div>
       </div>

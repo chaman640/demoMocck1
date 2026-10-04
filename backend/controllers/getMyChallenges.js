@@ -27,7 +27,7 @@ export const getMyChallenges = async (req, res) => {
     console.error("getMyChallenges error:", error);
     return res.status(500).json({
       success: false,
-      message: "Challenges list fetch karte waqt error aaya.",
+      message: "Error while fetching the challenges list.",
       error: error.message,
     });
   }

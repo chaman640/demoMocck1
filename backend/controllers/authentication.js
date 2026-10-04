@@ -14,7 +14,7 @@ export const loginUser = async (req, res) => {
     if (!phone || !password) {
       return res.status(400).json({
         success: false,
-        message: "Phone number aur password dono bharna zaroori hai!",
+        message: "Phone number and password are both required!",
       });
     }
 
@@ -27,7 +27,7 @@ export const loginUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Is number se koi account nahi mila. Kripya pehle signup karein.",
+        message: "No account found with this number. Please sign up first.",
       });
     }
 
@@ -36,7 +36,7 @@ export const loginUser = async (req, res) => {
     if (!user.password) {
       return res.status(400).json({
         success: false,
-        message: "Is account ka password set nahi hai. 'Password bhool gaye?' se reset karein.",
+        message: "This account has no password set. Reset it with 'Forgot password?'.",
       });
     }
 
@@ -44,7 +44,7 @@ export const loginUser = async (req, res) => {
     if (!isPasswordCorrect) {
       return res.status(401).json({
         success: false,
-        message: "Galat password! Kripya sahi password darj karein.",
+        message: "Wrong password! Please enter the correct password.",
       });
     }
 

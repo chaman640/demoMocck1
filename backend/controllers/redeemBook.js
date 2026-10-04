@@ -39,10 +39,10 @@ export const redeemBook = async (req, res) => {
 
   try {
     const book = await Book.findOne({ _id: bookId, status: "active" });
-    if (!book) return fail(404, "Ye book available nahi hai.");
+    if (!book) return fail(404, "This book is not available.");
 
     if (await BookRedemption.exists({ user: userId, book: book._id })) {
-      return fail(400, "Aap ye book pehle hi le chuke hain.");
+      return fail(400, "You have already taken this book.");
     }
 
     const cost = book.isFree ? 0 : book.coinCost;
@@ -51,10 +51,10 @@ export const redeemBook = async (req, res) => {
     if (book.type === "physical") {
       address = readAddress(req.body?.shippingAddress);
       if (!address) {
-        return fail(400, "Physical book ke liye poora address (naam, phone, address, city, state, pincode) bharna zaroori hai.");
+        return fail(400, "A full address (name, phone, address, city, state, pincode) is required for a physical book.");
       }
-      if (!/^\d{6}$/.test(address.pincode)) return fail(400, "Pincode 6 anko ka hona chahiye.");
-      if (!/^\d{10}$/.test(address.phone)) return fail(400, "Phone number 10 anko ka hona chahiye.");
+      if (!/^\d{6}$/.test(address.pincode)) return fail(400, "Pincode must be 6 digits.");
+      if (!/^\d{10}$/.test(address.phone)) return fail(400, "Phone number must be 10 digits.");
 
       if (book.isFree) {
         const claimed = await User.findOneAndUpdate(
@@ -69,7 +69,7 @@ export const redeemBook = async (req, res) => {
           { new: true, projection: { freePhysicalClaims: 1 } }
         );
         if (!claimed) {
-          return fail(400, `Free physical book sirf ${COIN_CONFIG.FREE_PHYSICAL_BOOK_LIMIT} baar li ja sakti hai.`);
+          return fail(400, `A free physical book can be taken only ${COIN_CONFIG.FREE_PHYSICAL_BOOK_LIMIT} time(s).`);
         }
         undo.freeClaim = true;
       }
@@ -80,7 +80,7 @@ export const redeemBook = async (req, res) => {
           { $inc: { stockQuantity: -1 } },
           { new: true, projection: { stockQuantity: 1 } }
         );
-        if (!reserved) return fail(400, "Ye book stock mein nahi hai.");
+        if (!reserved) return fail(400, "This book is out of stock.");
         undo.stock = true;
       }
     }
@@ -92,7 +92,7 @@ export const redeemBook = async (req, res) => {
         { $inc: { coins: -cost } },
         { new: true, projection: { coins: 1 } }
       );
-      if (!charged) return fail(400, "Aapke paas itne coins nahi hain.");
+      if (!charged) return fail(400, "You do not have enough coins.");
       undo.coins = cost;
       balanceAfter = charged.coins;
     }
@@ -109,7 +109,7 @@ export const redeemBook = async (req, res) => {
     try {
       await redemption.save();
     } catch (saveError) {
-      if (saveError?.code === 11000) return fail(400, "Aap ye book pehle hi le chuke hain.");
+      if (saveError?.code === 11000) return fail(400, "You have already taken this book.");
       throw saveError;
     }
 
@@ -129,7 +129,7 @@ export const redeemBook = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: book.type === "digital" ? "Book unlock ho gayi!" : "Order place ho gaya!",
+      message: book.type === "digital" ? "Book unlocked!" : "Order placed!",
       data: {
         _id: redemption._id,
         status: redemption.status,
@@ -141,6 +141,6 @@ export const redeemBook = async (req, res) => {
   } catch (error) {
     console.error("redeemBook error:", error);
     await rollback();
-    return res.status(500).json({ success: false, message: "Redeem karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while redeeming." });
   }
 };

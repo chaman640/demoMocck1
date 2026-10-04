@@ -12,10 +12,10 @@ const verifyTestAccess = async (teacher, testId) => {
     return { allowed: false, status: 400, message: "Invalid Test ID." };
   }
   const test = await CustomTest.findById(testId);
-  if (!test) return { allowed: false, status: 404, message: "Test nahi mila." };
+  if (!test) return { allowed: false, status: 404, message: "Test not found." };
 
   if (!teacher.activeCoupon || test.couponId.toString() !== teacher.activeCoupon.toString()) {
-    return { allowed: false, status: 403, message: "Ye test aapke active batch ka nahi hai." };
+    return { allowed: false, status: 403, message: "This test does not belong to your active batch." };
   }
   return { allowed: true, test };
 };

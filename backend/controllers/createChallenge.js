@@ -42,7 +42,7 @@ export const createChallenge = async (req, res) => {
     if (!examName || !blueprintName) {
       return res.status(400).json({
         success: false,
-        message: "examName aur blueprintName dono zaroori hain!",
+        message: "examName and blueprintName are both required!",
       });
     }
 
@@ -54,7 +54,7 @@ export const createChallenge = async (req, res) => {
     if (!blueprint) {
       return res.status(404).json({
         success: false,
-        message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!`,
+        message: `Blueprint '${blueprintName}' not found for exam '${examName}'!`,
       });
     }
 
@@ -117,7 +117,7 @@ export const createChallenge = async (req, res) => {
     if (totalActualQuestions === 0) {
       return res.status(404).json({
         success: false,
-        message: "Is blueprint ke liye koi questions available nahi hain!",
+        message: "No questions are available for this blueprint!",
       });
     }
 
@@ -139,7 +139,7 @@ export const createChallenge = async (req, res) => {
     if (!isUnique) {
       return res.status(500).json({
         success: false,
-        message: "Challenge code generate karne mein dikkat aa rahi hai, dobara try karein.",
+        message: "Problem generating the challenge code, please try again.",
       });
     }
 
@@ -178,7 +178,7 @@ export const createChallenge = async (req, res) => {
     // ─────────────────────────────────────────────
     return res.status(201).json({
       success: true,
-      message: "Challenge successfully ban gaya! Ab dosto ko share karo.",
+      message: "Challenge created successfully! Now share it with your friends.",
       data: {
         challengeCode: newChallenge.challengeCode,
         examName: newChallenge.examName,
@@ -192,7 +192,7 @@ export const createChallenge = async (req, res) => {
     console.error("createChallenge error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya challenge banate waqt.",
+      message: "Server error while creating the challenge.",
       error: error.message,
     });
   }

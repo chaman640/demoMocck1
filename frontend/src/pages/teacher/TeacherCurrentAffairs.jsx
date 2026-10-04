@@ -126,7 +126,7 @@ const TeacherCurrentAffairs = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
-          <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Dobara Try Karein</button>
+          <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Try Again</button>
         </div>
         <TeacherBottomNav />
       </div>
@@ -137,7 +137,7 @@ const TeacherCurrentAffairs = () => {
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
         <button onClick={() => navigate("/TeacherContent")} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">
-          &larr; Content Par Wapas
+          &larr; Back to Content
         </button>
 
         <div>
@@ -164,7 +164,7 @@ const TeacherCurrentAffairs = () => {
                   <input value={title} onChange={(e) => setTitle(e.target.value)} className={inputClass} />
                 </div>
               </div>
-              {loadingExisting && <p className="text-[11px] text-gray-500">Is din ka data check ho raha hai...</p>}
+              {loadingExisting && <p className="text-[11px] text-gray-500">Checking this day's data...</p>}
             </div>
 
             {message && (
@@ -181,20 +181,20 @@ const TeacherCurrentAffairs = () => {
                     <button type="button" onClick={() => removeItemRow(idx)} className="text-gray-600 hover:text-red-400 text-xs">✕</button>
                   </div>
                   <input value={it.headline} onChange={(e) => updateItem(idx, "headline", e.target.value)} placeholder="Headline" className={tinyInputClass + " w-full"} />
-                  <textarea value={it.content} onChange={(e) => updateItem(idx, "content", e.target.value)} rows={3} placeholder="Poora detail" className={tinyInputClass + " w-full"} />
+                  <textarea value={it.content} onChange={(e) => updateItem(idx, "content", e.target.value)} rows={3} placeholder="Full detail" className={tinyInputClass + " w-full"} />
                   <div className="grid grid-cols-2 gap-2">
-                    <input value={it.category} onChange={(e) => updateItem(idx, "category", e.target.value)} placeholder="Category (jaise: National)" className={tinyInputClass} />
+                    <input value={it.category} onChange={(e) => updateItem(idx, "category", e.target.value)} placeholder="Category (e.g. National)" className={tinyInputClass} />
                     <input value={it.source} onChange={(e) => updateItem(idx, "source", e.target.value)} placeholder="Source (optional)" className={tinyInputClass} />
                   </div>
                 </div>
               ))}
             </div>
             <button type="button" onClick={addItemRow} className="w-full py-2 rounded-lg bg-[#1F2937] border border-gray-700 text-gray-300 hover:border-gray-500 text-xs font-medium">
-              + Aur Item Jodein
+              + Add Another Item
             </button>
 
             <button type="submit" disabled={saving} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50">
-              {saving ? "Saving..." : "Save Karein"}
+              {saving ? "Saving..." : "Save"}
             </button>
           </form>
         )}

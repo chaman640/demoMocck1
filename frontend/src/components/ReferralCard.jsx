@@ -15,7 +15,7 @@ const ReferralCard = () => {
       setCopied(which);
       setTimeout(() => setCopied(""), 2000);
     } catch {
-      window.prompt("Copy karein:", text);
+      window.prompt("Copy this:", text);
     }
   };
 
@@ -36,16 +36,16 @@ const ReferralCard = () => {
     <div className="bg-gradient-to-br from-[#7C3AED]/20 to-[#111827] border border-[#7C3AED]/30 rounded-2xl p-4 mb-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-bold text-white">🎁 Dost ko bulao, {ref.bonusCoins} coins pao</p>
+          <p className="text-sm font-bold text-white">🎁 Invite friends, earn {ref.bonusCoins} coins</p>
           <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
-            Dost aapke code se signup kare aur apna pehla test poora kare — aapko {ref.bonusCoins} coins milenge.
+            When a friend signs up with your code and completes their first test, you get {ref.bonusCoins} coins.
           </p>
         </div>
       </div>
 
       <div className="flex items-center gap-2 mt-4">
         <div className="flex-1 px-3 py-2.5 rounded-xl bg-[#0A0D14] border border-gray-700 text-center">
-          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Aapka code</p>
+          <p className="text-[10px] text-gray-500 uppercase tracking-wider">Your code</p>
           <p className="text-lg font-bold font-mono tracking-widest text-[#C4B5FD]">{ref.code}</p>
         </div>
         <button
@@ -61,7 +61,7 @@ const ReferralCard = () => {
           onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(referralShareText(ref))}`, "_blank", "noopener")}
           className="py-2.5 rounded-xl bg-[#25D366] text-black text-xs font-bold"
         >
-          WhatsApp par bhejein
+          Send on WhatsApp
         </button>
         <button onClick={shareNative} className="py-2.5 rounded-xl bg-[#7C3AED] text-white text-xs font-bold">
           Share / Link
@@ -71,21 +71,21 @@ const ReferralCard = () => {
         onClick={() => copy(ref.link, "link")}
         className="w-full mt-2 py-2 rounded-xl text-[11px] text-gray-400 hover:text-gray-200 truncate"
       >
-        {copied === "link" ? "Link copy ho gaya!" : ref.link}
+        {copied === "link" ? "Link copied!" : ref.link}
       </button>
 
       <div className="grid grid-cols-3 gap-2 mt-3 text-center">
         <div className="rounded-xl bg-[#0A0D14]/70 py-2">
           <p className="text-base font-bold text-white">{ref.joinedCount}</p>
-          <p className="text-[10px] text-gray-500">Dost jude</p>
+          <p className="text-[10px] text-gray-500">Friends joined</p>
         </div>
         <div className="rounded-xl bg-[#0A0D14]/70 py-2">
           <p className="text-base font-bold text-amber-300">{ref.pendingCount}</p>
-          <p className="text-[10px] text-gray-500">Test baaki</p>
+          <p className="text-[10px] text-gray-500">Test pending</p>
         </div>
         <div className="rounded-xl bg-[#0A0D14]/70 py-2">
           <p className="text-base font-bold text-green-400">🪙 {ref.coinsEarned}</p>
-          <p className="text-[10px] text-gray-500">Coins mile</p>
+          <p className="text-[10px] text-gray-500">Coins earned</p>
         </div>
       </div>
     </div>

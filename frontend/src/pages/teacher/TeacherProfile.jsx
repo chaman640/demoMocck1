@@ -91,7 +91,7 @@ const TeacherProfile = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -144,7 +144,7 @@ const TeacherProfile = () => {
               <p className="text-xs text-gray-500">{activeCoupon.exam} &middot; {activeCoupon.code}</p>
             </div>
           ) : (
-            <p className="text-sm text-gray-500">Koi active batch nahi hai.</p>
+            <p className="text-sm text-gray-500">No active batch.</p>
           )}
 
           {coupons.length > 1 && (

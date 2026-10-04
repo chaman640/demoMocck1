@@ -23,9 +23,9 @@ const ShippingForm = ({ book, coins, error, onCancel, onConfirm, submitting }) =
 
   const submit = () => {
     const trimmed = Object.fromEntries(Object.entries(form).map(([k, v]) => [k, v.trim()]));
-    if (Object.values(trimmed).some((v) => !v)) return setLocalError("Sabhi fields bharna zaroori hai.");
-    if (!/^\d{10}$/.test(trimmed.phone)) return setLocalError("Phone number 10 anko ka hona chahiye.");
-    if (!/^\d{6}$/.test(trimmed.pincode)) return setLocalError("Pincode 6 anko ka hona chahiye.");
+    if (Object.values(trimmed).some((v) => !v)) return setLocalError("All fields are required.");
+    if (!/^\d{10}$/.test(trimmed.phone)) return setLocalError("Phone number must be 10 digits.");
+    if (!/^\d{6}$/.test(trimmed.pincode)) return setLocalError("Pincode must be 6 digits.");
     onConfirm(trimmed);
   };
 
@@ -36,7 +36,7 @@ const ShippingForm = ({ book, coins, error, onCancel, onConfirm, submitting }) =
       <div className="bg-[#111827] border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md p-5 max-h-[90vh] overflow-y-auto">
         <h3 className="font-bold text-lg mb-1">Delivery Address</h3>
         <p className="text-xs text-gray-500 mb-3">
-          {book.title} &middot; {book.isFree ? "Free" : `🪙 ${book.coinCost} coins kharch honge (aapke paas ${coins})`}
+          {book.title} &middot; {book.isFree ? "Free" : `🪙 ${book.coinCost} coins will be spent (you have ${coins})`}
         </p>
 
         {shownError && (
@@ -46,12 +46,12 @@ const ShippingForm = ({ book, coins, error, onCancel, onConfirm, submitting }) =
         )}
 
         <div className="space-y-3">
-          <input name="name" value={form.name} onChange={handleChange} placeholder="Poora Naam" className={inputCls} />
+          <input name="name" value={form.name} onChange={handleChange} placeholder="Full Name" className={inputCls} />
           <input name="phone" value={form.phone} onChange={handleChange} placeholder="Phone Number" inputMode="numeric" maxLength={10} className={inputCls} />
           <textarea name="addressLine" value={form.addressLine} onChange={handleChange} placeholder="Ghar/Gali/Mohalla" rows={2} className={`${inputCls} resize-none`} />
           <div className="grid grid-cols-2 gap-3">
-            <input name="city" value={form.city} onChange={handleChange} placeholder="Shahar" className={inputCls} />
-            <input name="state" value={form.state} onChange={handleChange} placeholder="Rajya" className={inputCls} />
+            <input name="city" value={form.city} onChange={handleChange} placeholder="City" className={inputCls} />
+            <input name="state" value={form.state} onChange={handleChange} placeholder="State" className={inputCls} />
           </div>
           <input name="pincode" value={form.pincode} onChange={handleChange} placeholder="Pincode" inputMode="numeric" maxLength={6} className={inputCls} />
         </div>
@@ -64,7 +64,7 @@ const ShippingForm = ({ book, coins, error, onCancel, onConfirm, submitting }) =
             disabled={submitting}
             className="flex-1 py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-50"
           >
-            {submitting ? "Bhej rahe hain..." : "Confirm Karein"}
+            {submitting ? "Sending..." : "Confirm"}
           </button>
         </div>
       </div>
@@ -75,19 +75,19 @@ const ShippingForm = ({ book, coins, error, onCancel, onConfirm, submitting }) =
 const ConfirmSheet = ({ book, coins, submitting, onCancel, onConfirm }) => (
   <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/70 px-0 sm:px-4">
     <div className="bg-[#111827] border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-sm p-5">
-      <h3 className="font-bold text-lg mb-1">Redeem karein?</h3>
+      <h3 className="font-bold text-lg mb-1">Redeem this?</h3>
       <p className="text-sm text-gray-300 mb-4">{book.title}</p>
       <div className="bg-[#0A0D14] rounded-xl p-3 text-sm space-y-1.5 mb-4">
-        <div className="flex justify-between"><span className="text-gray-500">Kharch</span><span className="text-amber-300 font-bold">🪙 {book.coinCost}</span></div>
-        <div className="flex justify-between"><span className="text-gray-500">Abhi aapke paas</span><span>🪙 {coins}</span></div>
-        <div className="flex justify-between border-t border-gray-800 pt-1.5"><span className="text-gray-500">Baad mein bachenge</span><span className="font-semibold">🪙 {coins - book.coinCost}</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">Cost</span><span className="text-amber-300 font-bold">🪙 {book.coinCost}</span></div>
+        <div className="flex justify-between"><span className="text-gray-500">You have now</span><span>🪙 {coins}</span></div>
+        <div className="flex justify-between border-t border-gray-800 pt-1.5"><span className="text-gray-500">Left after</span><span className="font-semibold">🪙 {coins - book.coinCost}</span></div>
       </div>
       <div className="flex gap-3">
         <button onClick={onCancel} disabled={submitting} className="flex-1 py-3 rounded-xl border border-gray-700 text-gray-300 text-sm font-medium disabled:opacity-50">
-          Nahi
+          No
         </button>
         <button onClick={onConfirm} disabled={submitting} className="flex-1 py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-semibold disabled:opacity-50">
-          {submitting ? "Ho raha hai..." : "Haan, Redeem Karein"}
+          {submitting ? "Processing..." : "Yes, Redeem"}
         </button>
       </div>
     </div>
@@ -95,11 +95,11 @@ const ConfirmSheet = ({ book, coins, submitting, onCancel, onConfirm }) => (
 );
 
 const getButtonState = (book, coins) => {
-  if (book.alreadyRedeemed) return { label: "Le Chuke Hain", disabled: true };
+  if (book.alreadyRedeemed) return { label: "Already Taken", disabled: true };
   if (!book.inStock) return { label: "Out of Stock", disabled: true };
-  if (book.freeLimitReached) return { label: "Free limit poori ho gayi", disabled: true };
-  if (!book.isFree && coins < book.coinCost) return { label: `${book.coinCost - coins} coins aur chahiye`, disabled: true };
-  return { label: "Redeem Karein", disabled: false };
+  if (book.freeLimitReached) return { label: "Free limit reached", disabled: true };
+  if (!book.isFree && coins < book.coinCost) return { label: `${book.coinCost - coins} more coins needed`, disabled: true };
+  return { label: "Redeem", disabled: false };
 };
 
 const BookCard = ({ book, coins, onRedeemClick, busy }) => {
@@ -198,11 +198,11 @@ const RewardsStore = () => {
         setDownload({ title: res.data.data.title || book.title, bookId: res.data.data.bookId || book._id });
       } else {
         setDownload(null);
-        setMessage(res.data.message || "Order place ho gaya!");
+        setMessage(res.data.message || "Order placed!");
       }
       await refreshEverywhere();
     } catch (err) {
-      const msg = err.response?.data?.message || "Redeem nahi ho paya.";
+      const msg = err.response?.data?.message || "Could not redeem.";
       if (book.type === "physical") {
         setFormError(msg);
       } else {
@@ -233,7 +233,7 @@ const RewardsStore = () => {
       emitBoostActivated(Math.round((res.data.data?.boostRemainingSeconds || 2700) / 60));
       await refreshEverywhere();
     } catch (err) {
-      setMessage(err.response?.data?.message || "Boost activate nahi ho paya.");
+      setMessage(err.response?.data?.message || "Could not activate the boost.");
     } finally {
       setBoosting(false);
     }
@@ -258,9 +258,9 @@ const RewardsStore = () => {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="text-center space-y-4">
-          <p className="text-gray-300">Kuch galat ho gaya.</p>
+          <p className="text-gray-300">Something went wrong.</p>
           <button onClick={loadAll} className="px-5 py-2 rounded-lg bg-[#7C3AED] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
       </div>
@@ -294,14 +294,14 @@ const RewardsStore = () => {
         {download && (
           <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-2xl flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-green-400">✅ Unlock ho gayi!</p>
-              <p className="text-xs text-gray-400 truncate">{download.title} — My Orders mein bhi milegi</p>
+              <p className="text-sm font-semibold text-green-400">✅ Unlocked!</p>
+              <p className="text-xs text-gray-400 truncate">{download.title} — also available in My Orders</p>
             </div>
             <button
               onClick={() => navigate(`/Reader/book/${download.bookId}`)}
               className="flex-shrink-0 px-4 py-2 rounded-xl bg-green-500 text-black text-xs font-bold"
             >
-              Padhein
+              Read
             </button>
           </div>
         )}
@@ -313,10 +313,10 @@ const RewardsStore = () => {
             <p className="text-sm font-bold text-cyan-300 flex items-center gap-1.5">⚡ 2x Coin Boost</p>
             {summary?.boostActive ? (
               <p className="text-xs text-gray-400 mt-0.5">
-                Active hai — {Math.ceil((summary.boostRemainingSeconds || 0) / 60)} minute baaki
+                Active — {Math.ceil((summary.boostRemainingSeconds || 0) / 60)} min left
               </p>
             ) : (
-              <p className="text-xs text-gray-400 mt-0.5">Agla test double coins dega</p>
+              <p className="text-xs text-gray-400 mt-0.5">Your next test gives double coins</p>
             )}
           </div>
           <button
@@ -324,14 +324,14 @@ const RewardsStore = () => {
             disabled={boosting}
             className="flex-shrink-0 px-4 py-2 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-bold disabled:opacity-50"
           >
-            {boosting ? "..." : summary?.boostActive ? "Aur Badhayein" : "Boost Activate Karein"}
+            {boosting ? "..." : summary?.boostActive ? "Extend" : "Activate Boost"}
           </button>
         </section>
 
         <section>
           <p className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold mb-2.5">Books ({books.length})</p>
           {books.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-10">Abhi koi book available nahi hai.</p>
+            <p className="text-sm text-gray-500 text-center py-10">No books available yet.</p>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               {books.map((book) => (

@@ -12,11 +12,11 @@ export const addUnseenPassage = async (req, res) => {
     if (!examName || !subjectName || !topicName || !language || !passageText || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "examName, subjectName, topicName, language, passageText aur kam se kam ek question zaroori hai.",
+        message: "examName, subjectName, topicName, language, passageText and at least one question are required.",
       });
     }
     if (!["Hindi", "English"].includes(language)) {
-      return res.status(400).json({ success: false, message: "language 'Hindi' ya 'English' hona chahiye." });
+      return res.status(400).json({ success: false, message: "language must be 'Hindi' or 'English'." });
     }
 
     // 🆕 Confirm karo ki kisi Blueprint mein isi exam ke is subject ke
@@ -35,16 +35,16 @@ export const addUnseenPassage = async (req, res) => {
     if (!matchingBlueprint) {
       return res.status(400).json({
         success: false,
-        message: `Koi Blueprint nahi mila jisme '${examName}' → '${subjectName}' subject ke andar '${topicName}' (${language}) Unseen Passage topic bana ho. Pehle Blueprint mein ye topic banayein.`,
+        message: `No Blueprint found with an Unseen Passage topic '${topicName}' (${language}) inside subject '${subjectName}' for '${examName}'. Create this topic in the Blueprint first.`,
       });
     }
 
     const created = await UnseenPassage.create({ examName, subjectName, topicName, language, passageText, questions });
 
-    return res.status(201).json({ success: true, message: "Unseen Passage add ho gaya!", data: created });
+    return res.status(201).json({ success: true, message: "Unseen Passage added!", data: created });
   } catch (error) {
     console.error("addUnseenPassage error:", error);
-    return res.status(500).json({ success: false, message: error.message || "Passage add karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: error.message || "Error while adding the passage." });
   }
 };
 
@@ -65,7 +65,7 @@ export const listUnseenPassages = async (req, res) => {
     });
   } catch (error) {
     console.error("listUnseenPassages error:", error);
-    return res.status(500).json({ success: false, message: "List fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching the list." });
   }
 };
 
@@ -77,10 +77,10 @@ export const deleteUnseenPassage = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid ID" });
     }
     const deleted = await UnseenPassage.findByIdAndDelete(id);
-    if (!deleted) return res.status(404).json({ success: false, message: "Ye passage nahi mila." });
-    return res.status(200).json({ success: true, message: "Passage hata diya gaya." });
+    if (!deleted) return res.status(404).json({ success: false, message: "Passage not found." });
+    return res.status(200).json({ success: true, message: "Passage removed." });
   } catch (error) {
     console.error("deleteUnseenPassage error:", error);
-    return res.status(500).json({ success: false, message: "Delete karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while deleting." });
   }
 };

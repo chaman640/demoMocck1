@@ -52,14 +52,14 @@ export const resolveFilteredStudentIds = async (
   { filter = "all", minPercentile, maxPercentile }
 ) => {
   if (!teacher.activeCoupon) {
-    const err = new Error("Pehle apna active group/coupon select karein.");
+    const err = new Error("Select your active group/coupon first.");
     err.statusCode = 400;
     throw err;
   }
 
   const coupon = await Coupon.findById(teacher.activeCoupon).select("exam name");
   if (!coupon) {
-    const err = new Error("Active coupon nahi mila.");
+    const err = new Error("Active coupon not found.");
     err.statusCode = 404;
     throw err;
   }
@@ -137,7 +137,7 @@ export const resolveFilteredStudentIds = async (
     const min = Math.max(0, Math.min(100, Number(minPercentile) || 0));
     const max = Math.max(0, Math.min(100, Number(maxPercentile) || 100));
     if (min >= max) {
-      const err = new Error("minPercentile, maxPercentile se kam hona chahiye.");
+      const err = new Error("minPercentile must be less than maxPercentile.");
       err.statusCode = 400;
       throw err;
     }
@@ -145,7 +145,7 @@ export const resolveFilteredStudentIds = async (
     const endIdx = Math.ceil((max / 100) * n);
     selected = rankedList.slice(startIdx, endIdx);
   } else {
-    const err = new Error("filter 'all', 'top25', 'bottom25' ya 'custom' hona chahiye.");
+    const err = new Error("filter must be 'all', 'top25', 'bottom25' or 'custom'.");
     err.statusCode = 400;
     throw err;
   }

@@ -23,12 +23,12 @@ export const deleteCoupon = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid batch ID." });
     }
     if (req.teacher.role !== "main") {
-      return res.status(403).json({ success: false, message: "Sirf Main Teacher batch delete kar sakta hai." });
+      return res.status(403).json({ success: false, message: "Only a Main Teacher can delete a batch." });
     }
 
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye batch nahi mila ya aapka nahi hai." });
+      return res.status(404).json({ success: false, message: "This batch was not found or is not yours." });
     }
 
     // ── Cascade cleanup ──
@@ -63,7 +63,7 @@ export const deleteCoupon = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `'${coupon.name}' batch delete ho gaya.`,
+      message: `Batch '${coupon.name}' deleted.`,
       cleanup: {
         customTestsDeleted: deletedTests.deletedCount,
         allowedStudentsDeleted: deletedAllowed.deletedCount,
@@ -72,6 +72,6 @@ export const deleteCoupon = async (req, res) => {
     });
   } catch (error) {
     console.error("deleteCoupon error:", error);
-    return res.status(500).json({ success: false, message: "Batch delete karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while deleting the batch." });
   }
 };

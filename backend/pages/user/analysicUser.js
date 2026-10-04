@@ -30,7 +30,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
     let { userId, examName } = req.params;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      return res.status(401).json({ success: false, message: "User auth token is missing or invalid!" });
     }
     userId = req.user._id;
 
@@ -39,7 +39,7 @@ export const getAllAnalysis1stPage = async (req, res) => {
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
+        message: "The user has not taken any mock yet.",
         data: null,
       });
     }
@@ -175,10 +175,10 @@ export const getAllAnalysis1stPage = async (req, res) => {
           weaknessScore: t.wrong * 2 + avgTime / 30,
           reason:
             t.wrong > 0 && avgTime > 30
-              ? "Galat bhi kar rahe ho aur time bhi zyada lag raha hai"
+              ? "You are getting answers wrong and also taking too much time"
               : t.wrong > 0
-              ? "Is topic mein galat answers zyada hain"
-              : "Is topic mein time zyada lag raha hai",
+              ? "Too many wrong answers in this topic"
+              : "Taking too much time in this topic",
         };
       })
       .sort((a, b) => b.weaknessScore - a.weaknessScore)
@@ -225,7 +225,7 @@ export const getPerformanceAnalysis = async (req, res) => {
     });
 
     if (!performance) {
-      return res.status(404).json({ success: false, message: "Performance nahi mila." });
+      return res.status(404).json({ success: false, message: "Performance not found." });
     }
 
     const blueprint = await Blueprint.findOne({
@@ -234,7 +234,7 @@ export const getPerformanceAnalysis = async (req, res) => {
     });
 
     if (!blueprint) {
-      return res.status(404).json({ success: false, message: "Blueprint nahi mila." });
+      return res.status(404).json({ success: false, message: "Blueprint not found." });
     }
 
     const totalQuestions = blueprint.totalQuestions;
@@ -343,7 +343,7 @@ export const getSubjectAnalysis = async (req, res) => {
     let { userId, examName, subjectName } = req.params;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      return res.status(401).json({ success: false, message: "User auth token is missing or invalid!" });
     }
     userId = req.user._id;
 
@@ -352,7 +352,7 @@ export const getSubjectAnalysis = async (req, res) => {
     if (!last3Tests || last3Tests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
+        message: "The user has not taken any mock yet.",
         data: null,
       });
     }
@@ -451,10 +451,10 @@ export const getSubjectAnalysis = async (req, res) => {
         averageTimePerQuestion: t.averageTimePerQuestion,
         reason:
           t.wrongCount > 0 && t.averageTimePerQuestion > 30
-            ? "Galat bhi kar rahe ho aur time bhi zyada lag raha hai"
+            ? "You are getting answers wrong and also taking too much time"
             : t.wrongCount > 0
-            ? "Is topic mein galat answers zyada hain"
-            : "Is topic mein time zyada lag raha hai",
+            ? "Too many wrong answers in this topic"
+            : "Taking too much time in this topic",
       }));
 
     return res.status(200).json({
@@ -464,7 +464,7 @@ export const getSubjectAnalysis = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Subject analysis fetch karte waqt error aaya.",
+      message: "Error while fetching subject analysis.",
       error: error.message,
     });
   }
@@ -475,7 +475,7 @@ export const getTopicAnalysis = async (req, res) => {
     let { userId, examName, subjectName, topicName } = req.params;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "User auth token missing ya invalid hai!" });
+      return res.status(401).json({ success: false, message: "User auth token is missing or invalid!" });
     }
     userId = req.user._id;
 
@@ -484,7 +484,7 @@ export const getTopicAnalysis = async (req, res) => {
     if (!allTests || allTests.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "User ne abhi tak koi mock nahi diya hai.",
+        message: "The user has not taken any mock yet.",
         data: null,
       });
     }
@@ -597,7 +597,7 @@ export const getTopicAnalysis = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Topic analysis fetch karte waqt error aaya.",
+      message: "Error while fetching topic analysis.",
       error: error.message,
     });
   }
@@ -608,7 +608,7 @@ export const getUserMockTests = async (req, res) => {
     const { examName } = req.params;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
+      return res.status(401).json({ success: false, message: "Login required!" });
     }
     const userId = req.user._id;
 
@@ -633,7 +633,7 @@ export const getUserMockTests = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Mock Test List fetch karte waqt error aaya.",
+      message: "Error while fetching the Mock Test list.",
       error: error.message,
     });
   }

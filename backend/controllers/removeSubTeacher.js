@@ -10,7 +10,7 @@ export const removeSubTeacher = async (req, res) => {
     if (req.teacher.role !== "main") {
       return res.status(403).json({
         success: false,
-        message: "Sirf Main Teacher hi sub-teacher remove kar sakta hai!",
+        message: "Only a Main Teacher can remove a sub-teacher!",
       });
     }
 
@@ -28,14 +28,14 @@ export const removeSubTeacher = async (req, res) => {
     if (!subTeacher) {
       return res.status(404).json({
         success: false,
-        message: "Ye sub-teacher nahi mila ya aapka nahi hai!",
+        message: "This sub-teacher was not found or is not yours!",
       });
     }
 
     if (subTeacher.status === "removed") {
       return res.status(400).json({
         success: false,
-        message: "Ye sub-teacher pehle se hi removed hai.",
+        message: "This sub-teacher is already removed.",
       });
     }
 
@@ -51,13 +51,13 @@ export const removeSubTeacher = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `${subTeacher.name} ko remove kar diya gaya. Unka bana hua content safe hai.`,
+      message: `${subTeacher.name} has been removed. Their content is safe.`,
     });
   } catch (error) {
     console.error("removeSubTeacher error:", error);
     return res.status(500).json({
       success: false,
-      message: "Sub-teacher remove karte waqt error aaya.",
+      message: "Error while removing the sub-teacher.",
       error: error.message,
     });
   }

@@ -24,7 +24,7 @@ export const predictRank = async (req, res) => {
     if (score === undefined || score === "" || isNaN(Number(score))) {
       return res.status(400).json({
         success: false,
-        message: "Valid score query parameter zaroori hai! (e.g. ?score=145)",
+        message: "A valid score query parameter is required! (e.g. ?score=145)",
       });
     }
 
@@ -35,7 +35,7 @@ export const predictRank = async (req, res) => {
     if (!rankData || !Array.isArray(rankData.dataPoints) || rankData.dataPoints.length < 2) {
       return res.status(404).json({
         success: false,
-        message: "Is exam ke liye rank predictor data abhi available nahi hai.",
+        message: "Rank predictor data is not available for this exam yet.",
       });
     }
 
@@ -112,7 +112,7 @@ export const predictRank = async (req, res) => {
     console.error("predictRank error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya rank predict karte waqt.",
+      message: "Server error while predicting rank.",
       error: error.message,
     });
   }

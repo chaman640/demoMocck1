@@ -22,19 +22,19 @@
 // ─────────────────────────────────────────────
 
 const REQUIRED = [
-  ["ROWQUESTION_URI", "MongoDB ka connection string — iske bina kuch nahi chalega"],
-  ["JWT_SECRET", "Login token banane ka secret (utils/jwtSecret.js dekhein)"],
+  ["ROWQUESTION_URI", "MongoDB connection string — nothing works without it"],
+  ["JWT_SECRET", "Secret for creating login tokens (see utils/jwtSecret.js)"],
 ];
 
 const OPTIONAL = [
-  ["CLOUDINARY_CLOUD_NAME", "image wale questions upload nahi honge"],
-  ["CLOUDINARY_API_KEY", "image wale questions upload nahi honge"],
-  ["CLOUDINARY_API_SECRET", "image wale questions upload nahi honge"],
-  ["BREVO_API_KEY", "🚨 OTP / admin login link / teacher invite — KOI BHI EMAIL NAHI JAYEGA"],
-  ["BREVO_SENDER_EMAIL", "🚨 OTP / admin login link / teacher invite — KOI BHI EMAIL NAHI JAYEGA"],
-  ["ADMIN_SECRET", "admin seeding/scripts (x-admin-secret header) band rahenge"],
-  ["ADMIN_EMAIL", "browser se admin panel access band rahega"],
-  ["FRONTEND_URL", "CORS mein sirf hardcoded origins allowed rahenge, email links mein galat domain jaa sakta hai"],
+  ["CLOUDINARY_CLOUD_NAME", "questions with images will not upload"],
+  ["CLOUDINARY_API_KEY", "questions with images will not upload"],
+  ["CLOUDINARY_API_SECRET", "questions with images will not upload"],
+  ["BREVO_API_KEY", "🚨 OTP / admin login link / teacher invite — NO EMAILS WILL BE SENT"],
+  ["BREVO_SENDER_EMAIL", "🚨 OTP / admin login link / teacher invite — NO EMAILS WILL BE SENT"],
+  ["ADMIN_SECRET", "admin seeding/scripts (x-admin-secret header) will stay disabled"],
+  ["ADMIN_EMAIL", "admin panel access from the browser will stay disabled"],
+  ["FRONTEND_URL", "CORS will only allow hardcoded origins, email links may point to the wrong domain"],
 ];
 
 export const checkEnv = () => {
@@ -50,32 +50,32 @@ export const checkEnv = () => {
   }
 
   if (missingOptional.length) {
-    console.warn("\n⚠️  Ye env variables set nahi hain (server chalega, feature band rahega):");
+    console.warn("\n⚠️  These env variables are not set (the server will run, the feature stays off):");
     for (const [key, why] of missingOptional) console.warn(`   • ${key.padEnd(24)} → ${why}`);
     console.warn("");
   } else {
     // 🆕 Positive confirmation bhi print karo — taaki "sab sahi hai" bhi
     // saaf dikhe, sirf missing hone par hi warning na aaye
-    console.log("✅ Saari optional env variables (Cloudinary, Brevo, Admin, Frontend URL) set hain.\n");
+    console.log("✅ All optional env variables (Cloudinary, Brevo, Admin, Frontend URL) are set.\n");
   }
 
   if (missingRequired.length) {
     console.error("\n" + "═".repeat(62));
-    console.error("❌ ZAROORI ENV VARIABLES MISSING HAIN:");
+    console.error("❌ REQUIRED ENV VARIABLES ARE MISSING:");
     for (const [key, why] of missingRequired) console.error(`   • ${key.padEnd(24)} → ${why}`);
     console.error("═".repeat(62));
     if (isProduction) {
-      console.error("Production mein inke bina start nahi kar sakte. Render → Environment mein add karein.\n");
+      console.error("Cannot start in production without them. Add them in Render → Environment.\n");
       process.exit(1);
     }
-    console.error("(Development hai isliye chalne de rahe hain, lekin ye theek karna zaroori hai.)\n");
+    console.error("(Allowing it to run because this is development, but this must be fixed.)\n");
   }
 
   // NODE_ENV ki chetavni — Render pe ise set karna sabse zyada bhoola jaata hai
   if (!process.env.NODE_ENV) {
     console.warn(
-      "⚠️  NODE_ENV set nahi hai. Live server pe ise 'production' rakhein —\n" +
-        "    warna secure cookies, HSTS aur error-hiding sab band rahenge.\n"
+      "⚠️  NODE_ENV is not set. On the live server set it to 'production' —\n" +
+        "    otherwise secure cookies, HSTS and error hiding will all stay off.\n"
     );
   }
 

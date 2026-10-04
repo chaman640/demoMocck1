@@ -10,7 +10,7 @@ export const getTeacherPYQPapers = async (req, res) => {
   try {
     const teacher = req.teacher;
     if (!teacher.activeCoupon) {
-      return res.status(400).json({ success: false, message: "Pehle apna active batch select karein!" });
+      return res.status(400).json({ success: false, message: "Select your active batch first!" });
     }
 
     const papers = await PreviousYearTest.find({ couponId: teacher.activeCoupon })
@@ -66,7 +66,7 @@ export const getTeacherPYQPapers = async (req, res) => {
     console.error("getTeacherPYQPapers error:", error);
     return res.status(500).json({
       success: false,
-      message: "Papers list fetch karte waqt error aaya.",
+      message: "Error while fetching the papers list.",
       error: error.message,
     });
   }

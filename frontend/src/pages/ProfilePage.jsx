@@ -264,7 +264,7 @@ const ProfilePage = () => {
                   <span className="text-3xl">🔥</span>
                   <div className="text-left">
                     <p className="text-lg font-bold text-orange-400 leading-tight">{rewardsSummary.currentStreak} din</p>
-                    <p className="text-[11px] text-gray-500">Current Streak &middot; Calendar dekhein →</p>
+                    <p className="text-[11px] text-gray-500">Current Streak &middot; View calendar →</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 bg-amber-500/15 border border-amber-500/30 rounded-full px-3 py-1.5">

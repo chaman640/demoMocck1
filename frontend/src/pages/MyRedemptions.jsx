@@ -44,7 +44,7 @@ const OrderCard = ({ order }) => (
           to={`/Reader/book/${order.bookId}`}
           className="inline-block mt-2 text-xs font-semibold text-[#A78BFA] hover:underline"
         >
-          App mein padhein (offline bhi) →
+          Read in app (offline too) →
         </Link>
       )}
     </div>
@@ -86,18 +86,18 @@ const MyRedemptions = () => {
           [1, 2, 3].map((i) => <SkeletonBlock key={i} className="w-full h-24 rounded-2xl" />)}
 
         {phase === "error" && (
-          <p className="text-sm text-gray-500 text-center py-10">Orders load nahi ho paye.</p>
+          <p className="text-sm text-gray-500 text-center py-10">Could not load orders.</p>
         )}
 
         {phase === "ready" && orders.length === 0 && (
           <div className="text-center py-16 space-y-3">
             <p className="text-4xl">📦</p>
-            <p className="text-sm text-gray-500">Abhi tak koi book redeem nahi ki hai.</p>
+            <p className="text-sm text-gray-500">You have not redeemed any book yet.</p>
             <button
               onClick={() => navigate("/RewardsStore")}
               className="px-5 py-2 rounded-lg bg-[#7C3AED] text-sm font-medium"
             >
-              Rewards Store Kholein
+              Open Rewards Store
             </button>
           </div>
         )}

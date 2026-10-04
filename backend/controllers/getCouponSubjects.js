@@ -16,12 +16,12 @@ export const getCouponSubjects = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid coupon ID" });
     }
     if (req.teacher.role !== "main") {
-      return res.status(403).json({ success: false, message: "Sirf Main Teacher ye dekh sakta hai." });
+      return res.status(403).json({ success: false, message: "Only a Main Teacher can view this." });
     }
 
     const coupon = await Coupon.findOne({ _id: couponId, mainTeacher: req.teacher._id });
     if (!coupon) {
-      return res.status(404).json({ success: false, message: "Ye coupon nahi mila ya aapka nahi hai." });
+      return res.status(404).json({ success: false, message: "This coupon was not found or is not yours." });
     }
 
     const blueprints = await Blueprint.find({ examName: coupon.exam }).select("subjects.subjectName");
@@ -40,6 +40,6 @@ export const getCouponSubjects = async (req, res) => {
     });
   } catch (error) {
     console.error("getCouponSubjects error:", error);
-    return res.status(500).json({ success: false, message: "Subjects fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching subjects." });
   }
 };

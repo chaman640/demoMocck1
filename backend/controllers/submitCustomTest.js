@@ -24,13 +24,13 @@ export const submitCustomTest = async (req, res) => {
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+        message: "attemptedQuestions must contain at least one question!",
       });
     }
 
     const test = await CustomTest.findOne({ _id: testId, isActive: true });
     if (!test) {
-      return res.status(404).json({ success: false, message: "Ye test nahi mila." });
+      return res.status(404).json({ success: false, message: "Test not found." });
     }
 
     // Batch-check yahan bhi — list/get sirf UI-level filtering hai,
@@ -39,7 +39,7 @@ export const submitCustomTest = async (req, res) => {
     if (studentCouponId !== test.couponId.toString()) {
       return res.status(403).json({
         success: false,
-        message: "Ye test aapki batch ke liye available nahi hai.",
+        message: "This test is not available for your batch.",
       });
     }
 
@@ -93,7 +93,7 @@ export const submitCustomTest = async (req, res) => {
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Koi valid question match nahi hua is test ke sath.",
+        message: "No valid question matched this test.",
       });
     }
 
@@ -130,7 +130,7 @@ export const submitCustomTest = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Custom Test submit ho gaya!",
+      message: "Custom Test submitted!",
       data: {
         attemptId: newAttempt._id,
         coinsEarned,
@@ -148,7 +148,7 @@ export const submitCustomTest = async (req, res) => {
     console.error("submitCustomTest error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya test submit karte waqt.",
+      message: "Server error while submitting the test.",
       error: error.message,
     });
   }

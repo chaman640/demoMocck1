@@ -41,7 +41,7 @@ const TeacherStudentSearch = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Data load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the data.");
       setPhase("error");
     }
   }, [navigate]);
@@ -58,7 +58,7 @@ const TeacherStudentSearch = () => {
     e.preventDefault();
     setSearchError("");
     if (phone.trim().length < 3) {
-      setSearchError("Kam se kam 3 digit daalein.");
+      setSearchError("Enter at least 3 digits.");
       return;
     }
     setSearching(true);
@@ -67,7 +67,7 @@ const TeacherStudentSearch = () => {
       const res = await api.get("/teacher/search-student", { params: { phone: phone.trim() } });
       setResults(res.data.data || []);
     } catch (err) {
-      setSearchError(err.response?.data?.message || "Search nahi ho paayi.");
+      setSearchError(err.response?.data?.message || "Search failed.");
       setResults([]);
     } finally {
       setSearching(false);
@@ -82,7 +82,7 @@ const TeacherStudentSearch = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -95,14 +95,14 @@ const TeacherStudentSearch = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         <div>
           <h1 className="text-2xl font-bold mb-1">Student Search</h1>
-          <p className="text-gray-400 text-sm">Apne active batch ke student ka analysis dekhein</p>
+          <p className="text-gray-400 text-sm">See the analysis of a student in your active batch</p>
         </div>
 
         <ActiveCouponSwitcher activeCouponId={teacher?.activeCoupon} onChanged={handleCouponChanged} />
 
         {!teacher?.activeCoupon ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
-            <p className="text-sm text-gray-400">Search karne ke liye pehle active batch select karein.</p>
+            <p className="text-sm text-gray-400">Select an active batch first to search.</p>
           </div>
         ) : (
           <>
@@ -111,7 +111,7 @@ const TeacherStudentSearch = () => {
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, "").slice(0, 10))}
-                placeholder="Phone number (partial bhi chalega)"
+                placeholder="Phone number (partial works too)"
                 className="flex-1 px-4 py-2.5 text-sm bg-[#111827] border border-gray-700 focus:border-[#7C3AED] rounded-xl outline-none text-white placeholder-gray-600"
               />
               <button
@@ -131,7 +131,7 @@ const TeacherStudentSearch = () => {
 
             {searched && !searching && !searchError && (
               results.length === 0 ? (
-                <p className="text-center text-sm text-gray-500 py-6">Koi student nahi mila.</p>
+                <p className="text-center text-sm text-gray-500 py-6">No students found.</p>
               ) : (
                 <div className="space-y-2.5">
                   {results.map((s) => (

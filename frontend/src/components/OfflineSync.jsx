@@ -33,9 +33,9 @@ const OfflineSync = () => {
 
   return (
     <div className="fixed top-0 inset-x-0 z-[60] flex items-center justify-center gap-3 px-4 py-2 bg-amber-500 text-black text-xs font-semibold">
-      <span>Aap offline hain.</span>
+      <span>You are offline.</span>
       <button onClick={() => navigate("/MyDownloads")} className="underline">
-        Saved books & notes padhein →
+        Read saved books & notes →
       </button>
     </div>
   );

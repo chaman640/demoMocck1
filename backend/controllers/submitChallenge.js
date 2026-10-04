@@ -21,14 +21,14 @@ export const submitChallenge = async (req, res) => {
     if (!challengeCode) {
       return res.status(400).json({
         success: false,
-        message: "Challenge code zaroori hai!",
+        message: "Challenge code is required!",
       });
     }
 
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+        message: "attemptedQuestions must contain at least one question!",
       });
     }
 
@@ -40,7 +40,7 @@ export const submitChallenge = async (req, res) => {
     if (!challenge) {
       return res.status(404).json({
         success: false,
-        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
+        message: "Challenge not found. It may have expired or the code may be wrong.",
       });
     }
 
@@ -49,7 +49,7 @@ export const submitChallenge = async (req, res) => {
     if (challenge.expiresAt && challenge.expiresAt < new Date()) {
       return res.status(410).json({
         success: false,
-        message: "Ye challenge expire ho chuka hai.",
+        message: "This challenge has expired.",
       });
     }
 
@@ -65,7 +65,7 @@ export const submitChallenge = async (req, res) => {
     if (existingAttempt) {
       return res.status(409).json({
         success: false,
-        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+        message: "You have already attempted this challenge!",
       });
     }
 
@@ -131,7 +131,7 @@ export const submitChallenge = async (req, res) => {
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Koi valid question match nahi hua is challenge ke sath.",
+        message: "No valid question matched this challenge.",
       });
     }
 
@@ -180,7 +180,7 @@ export const submitChallenge = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Challenge submit ho gaya!",
+      message: "Challenge submitted!",
       data: {
         attemptId: newAttempt._id,
         totalScore,
@@ -198,14 +198,14 @@ export const submitChallenge = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Aap is challenge ko pehle hi attempt kar chuke hain!",
+        message: "You have already attempted this challenge!",
       });
     }
 
     console.error("submitChallenge error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya challenge submit karte waqt.",
+      message: "Server error while submitting the challenge.",
       error: error.message,
     });
   }

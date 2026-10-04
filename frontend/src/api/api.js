@@ -21,7 +21,7 @@ api.interceptors.response.use(
       error.response.data = {
         success: false,
         message:
-          "Server se galat response aaya (API route nahi mila). Backend chal raha hai kya?",
+          "Unexpected response from the server (API route not found). Is the backend running?",
       };
     }
     return Promise.reject(error);

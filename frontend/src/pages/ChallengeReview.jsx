@@ -114,9 +114,9 @@ const QuestionDetailCard = ({ q }) => {
                 {n}
               </span>
               <span className="flex-1">{optText}</span>
-              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
+              {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Correct answer</span>}
               {isUserPick && !isCorrectOpt && (
-                <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>
+                <span className="text-xs flex-shrink-0">❌ Your answer</span>
               )}
             </div>
           );
@@ -124,11 +124,11 @@ const QuestionDetailCard = ({ q }) => {
       </div>
 
       {q.userAnswer == null && (
-        <p className="text-xs text-yellow-500 mb-4">Aapne ye sawaal attempt nahi kiya tha.</p>
+        <p className="text-xs text-yellow-500 mb-4">You did not attempt this question.</p>
       )}
 
       {q.timeTakenInSeconds != null && (
-        <p className="text-xs text-gray-500 mb-4">Time liya gaya: {q.timeTakenInSeconds}s</p>
+        <p className="text-xs text-gray-500 mb-4">Time taken: {q.timeTakenInSeconds}s</p>
       )}
 
       {q.answerExplain && (
@@ -205,13 +205,13 @@ const ChallengeReview = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">
-            {error?.response?.data?.message || "Data load nahi ho paaya."}
+            {error?.response?.data?.message || "Could not load the data."}
           </p>
           <button
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -225,7 +225,7 @@ const ChallengeReview = () => {
           onClick={() => navigate(-1)}
           className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1"
         >
-          &larr; Wapas Jaayein
+          &larr; Go Back
         </button>
 
         <h1 className="text-xl sm:text-2xl font-bold mb-1">Detailed Analysis</h1>
@@ -262,7 +262,7 @@ const ChallengeReview = () => {
                   : "bg-[#111827] border border-gray-800 text-gray-400 hover:text-gray-200"
               }`}
             >
-              Sabhi Subjects
+              All Subjects
             </button>
             {subjects.map((s) => (
               <button
@@ -299,7 +299,7 @@ const ChallengeReview = () => {
 
         {filteredQuestions.length === 0 && (
           <p className="text-gray-400 text-sm py-10 text-center">
-            Is category mein koi sawaal nahi hai.
+            No questions in this category.
           </p>
         )}
 
@@ -331,7 +331,7 @@ const ChallengeReview = () => {
           onClick={() => navigate("/HomePage")}
           className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500"
         >
-          Home Jaayein
+          Go Home
         </button>
           </>
         )}

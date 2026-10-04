@@ -58,7 +58,7 @@ export const requestAdminLogin = async (req, res) => {
     if (!configuredEmail) {
       return res.status(503).json({
         success: false,
-        message: "Admin login configure nahi hai. backend/.env mein ADMIN_EMAIL set karein.",
+        message: "Admin login is not configured. Set ADMIN_EMAIL in backend/.env.",
       });
     }
 
@@ -68,7 +68,7 @@ export const requestAdminLogin = async (req, res) => {
       const secondsSince = (Date.now() - recent.createdAt.getTime()) / 1000;
       if (secondsSince < RESEND_COOLDOWN_SECONDS) {
         const waitMore = Math.ceil(RESEND_COOLDOWN_SECONDS - secondsSince);
-        return res.status(429).json({ success: false, message: `Kripya ${waitMore} second baad dobara try karein.` });
+        return res.status(429).json({ success: false, message: `Please try again after ${waitMore} seconds.` });
       }
     }
 
@@ -87,12 +87,12 @@ export const requestAdminLogin = async (req, res) => {
 
     await sendAdminMagicLinkEmail(configuredEmail, link);
 
-    return res.status(200).json({ success: true, message: "Login link email par bhej diya gaya hai!" });
+    return res.status(200).json({ success: true, message: "Login link sent to your email!" });
   } catch (error) {
     console.error("requestAdminLogin error:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "Login link bhejte waqt error aaya.",
+      message: error.statusCode ? error.message : "Error while sending the login link.",
     });
   }
 };
@@ -104,18 +104,18 @@ export const verifyAdminLogin = async (req, res) => {
   try {
     const { token } = req.body;
     if (!token) {
-      return res.status(400).json({ success: false, message: "Token zaroori hai." });
+      return res.status(400).json({ success: false, message: "Token is required." });
     }
 
     const tokenHash = hashToken(String(token));
     const record = await AdminLoginToken.findOne({ tokenHash });
 
     if (!record) {
-      return res.status(400).json({ success: false, message: "Ye login link invalid hai ya pehle hi use ho chuka hai." });
+      return res.status(400).json({ success: false, message: "This login link is invalid or has already been used." });
     }
     if (record.expiresAt < new Date()) {
       await AdminLoginToken.deleteOne({ _id: record._id });
-      return res.status(410).json({ success: false, message: "Ye login link expire ho chuka hai. Naya link mangwayein." });
+      return res.status(410).json({ success: false, message: "This login link has expired. Request a new link." });
     }
 
     await AdminLoginToken.deleteOne({ _id: record._id }); // ek baar hi chalega
@@ -129,10 +129,10 @@ export const verifyAdminLogin = async (req, res) => {
     return res
       .status(200)
       .cookie("adminToken", adminSessionToken, adminCookieOptions())
-      .json({ success: true, message: "Admin login ho gaya!", data: { email: record.email } });
+      .json({ success: true, message: "Admin logged in!", data: { email: record.email } });
   } catch (error) {
     console.error("verifyAdminLogin error:", error);
-    return res.status(500).json({ success: false, message: "Login verify karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while verifying login." });
   }
 };
 
@@ -162,5 +162,5 @@ export const adminLogout = async (req, res) => {
   return res
     .status(200)
     .clearCookie("adminToken", adminClearCookieOptions())
-    .json({ success: true, message: "Admin logout ho gaya. Dobara login karne ke liye naya email link mangwana hoga." });
+    .json({ success: true, message: "Admin logged out. Request a new email link to log in again." });
 };

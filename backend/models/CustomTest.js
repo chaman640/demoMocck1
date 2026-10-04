@@ -4,13 +4,13 @@ import { rowQuestionConnection } from "../config/rowQuestion.js";
 
 const customTestQuestionSchema = new mongoose.Schema(
   {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
+    question: { type: String, required: [true, "Question text is required"] },
     questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
-    correctOption: { type: Number, required: [true, "Correct option (1-4) zaroori hai"], min: 1, max: 4 },
+    option1: { type: String, required: [true, "Option 1 is required"] },
+    option2: { type: String, required: [true, "Option 2 is required"] },
+    option3: { type: String, required: [true, "Option 3 is required"] },
+    option4: { type: String, required: [true, "Option 4 is required"] },
+    correctOption: { type: Number, required: [true, "Correct option (1-4) is required"], min: 1, max: 4 },
     answerExplain: { type: String, default: "" },
     // 🆕 NAYA — explanation ke saath photo (jaise diagram/chart wali explanation)
     answerExplainWithPhoto: { type: String, default: null },
@@ -25,7 +25,7 @@ const customTestQuestionSchema = new mongoose.Schema(
 
 const customTestSchema = new mongoose.Schema(
   {
-    testName: { type: String, required: [true, "Test ka naam zaroori hai"], trim: true },
+    testName: { type: String, required: [true, "Test name is required"], trim: true },
     examName: { type: String, required: true, trim: true, index: true },
 
     // Hamesha ek specific coupon/group ke liye — Previous Year Paper ke
@@ -33,14 +33,14 @@ const customTestSchema = new mongoose.Schema(
     couponId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Coupon",
-      required: [true, "Custom test hamesha kisi coupon/group se linked hona chahiye"],
+      required: [true, "A custom test must always be linked to a coupon/group"],
       index: true,
     },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Teacher",
-      required: [true, "Kis teacher ne banaya, ye zaroori hai"],
+      required: [true, "The teacher who created it is required"],
     },
 
     // MVP: simple hai — koi blueprint/quota nahi, jo bhi subject/question
@@ -55,13 +55,13 @@ const customTestSchema = new mongoose.Schema(
       ],
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
+        message: "There must be questions for at least one subject",
       },
     },
 
     marksPerQuestion: { type: Number, required: true, default: 1 },
     negativeMarking: { type: Number, required: true, default: 0 },
-    durationMinutes: { type: Number, required: [true, "Duration batana zaroori hai"] },
+    durationMinutes: { type: Number, required: [true, "Duration is required"] },
 
     totalQuestions: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },

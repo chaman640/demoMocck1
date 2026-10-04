@@ -23,7 +23,7 @@ const SettleForm = ({ teacher, onDone }) => {
       await api.post(`/admin/teachers/${teacher._id}/settle-commission`, { amount: Number(amount), note });
       onDone();
     } catch (err) {
-      setMsg(err.response?.data?.message || "Error aaya.");
+      setMsg(err.response?.data?.message || "Something went wrong.");
       setSubmitting(false);
     }
   };
@@ -31,7 +31,7 @@ const SettleForm = ({ teacher, onDone }) => {
   return (
     <form onSubmit={submit} className="mt-3 p-3 bg-[#0A0D14] border border-gray-800 rounded-xl space-y-2">
       <p className="text-[11px] text-gray-500">
-        Pending questions: <span className="text-white font-semibold">{teacher.pendingQuestionsCount}</span> — settle karne par 0 ho jayenge.
+        Pending questions: <span className="text-white font-semibold">{teacher.pendingQuestionsCount}</span> — these become 0 after settling.
       </p>
       <input
         type="number"
@@ -51,7 +51,7 @@ const SettleForm = ({ teacher, onDone }) => {
       />
       {msg && <p className="text-xs text-center text-red-400">{msg}</p>}
       <button type="submit" disabled={submitting} className="w-full py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-xs font-semibold disabled:opacity-50">
-        {submitting ? "Settle ho raha hai..." : "Hisab Settle Karein"}
+        {submitting ? "Settling..." : "Settle Payment"}
       </button>
     </form>
   );
@@ -93,7 +93,7 @@ const TeacherCard = ({ teacher, onChanged }) => {
 
       <div className="flex gap-2 mt-3">
         <button onClick={() => toggle("settle")} className="text-[11px] px-2.5 py-1.5 rounded-lg bg-[#7C3AED]/15 text-[#A78BFA] hover:bg-[#7C3AED]/25">
-          Hisab Settle Karein
+          Settle Payment
         </button>
         <button onClick={() => toggle("history")} className="text-[11px] px-2.5 py-1.5 rounded-lg border border-gray-700 hover:border-gray-500 text-gray-300">
           History ({teacher.paymentHistory.length})
@@ -123,7 +123,7 @@ const TeacherCard = ({ teacher, onChanged }) => {
               </div>
             ))
           ) : (
-            <p className="text-xs text-gray-500 text-center">Abhi tak koi hisab settle nahi hua.</p>
+            <p className="text-xs text-gray-500 text-center">No payments settled yet.</p>
           )}
         </div>
       )}
@@ -167,13 +167,13 @@ const AdminTeacherCommissions = () => {
         </div>
 
         <p className="text-xs text-gray-500">
-          Sirf Main Teachers ko commission milta hai. Amount aap khud daalte hain — settle karte hi pending count 0 ho jata hai aur teacher ko apne dashboard mein history dikhti hai.
+          Only Main Teachers get commission. You enter the amount yourself — settling resets the pending count to 0 and the teacher sees the history on their dashboard.
         </p>
 
         {phase === "checking" && [1, 2].map((i) => <SkeletonBlock key={i} className="w-full h-32 rounded-2xl" />)}
-        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">List load nahi ho payi.</p>}
+        {phase === "error" && <p className="text-sm text-gray-500 text-center py-10">Could not load the list.</p>}
         {phase === "ready" && teachers.length === 0 && (
-          <p className="text-sm text-gray-500 text-center py-10">Abhi koi Main Teacher nahi hai.</p>
+          <p className="text-sm text-gray-500 text-center py-10">No Main Teachers yet.</p>
         )}
         {phase === "ready" && teachers.map((t) => <TeacherCard key={t._id} teacher={t} onChanged={load} />)}
       </div>

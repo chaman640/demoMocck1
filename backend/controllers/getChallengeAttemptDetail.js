@@ -18,7 +18,7 @@ export const getChallengeAttemptDetail = async (req, res) => {
     if (!challenge) {
       return res.status(404).json({
         success: false,
-        message: "Challenge nahi mila ya expire ho gaya.",
+        message: "Challenge not found or expired.",
       });
     }
 
@@ -33,7 +33,7 @@ export const getChallengeAttemptDetail = async (req, res) => {
     if (!attempt) {
       return res.status(404).json({
         success: false,
-        message: "Aapne abhi tak ye challenge attempt nahi kiya hai.",
+        message: "You have not attempted this challenge yet.",
       });
     }
 
@@ -99,7 +99,7 @@ export const getChallengeAttemptDetail = async (req, res) => {
     console.error("getChallengeAttemptDetail error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya detail fetch karte waqt.",
+      message: "Server error while fetching details.",
       error: error.message,
     });
   }

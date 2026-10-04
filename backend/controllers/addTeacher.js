@@ -15,7 +15,7 @@ export const addTeacher = async (req, res) => {
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
-        message: "Sabhi fields bharna zaroori hai!",
+        message: "All fields are required!",
       });
     }
 
@@ -23,7 +23,7 @@ export const addTeacher = async (req, res) => {
     if (String(password).length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Password kam se kam 6 characters ka hona chahiye!",
+        message: "Password must be at least 6 characters!",
       });
     }
 
@@ -31,14 +31,14 @@ export const addTeacher = async (req, res) => {
     const normalizedPhone = String(phone).trim();
 
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid email!" });
     }
     // 🐛 FIX: phone format check — pehle koi bhi string chalti thi, aur baad mein
     // sub-teacher invite (jo 10-digit maangta hai) match hi nahi hota tha
     if (!/^\d{10}$/.test(normalizedPhone)) {
       return res.status(400).json({
         success: false,
-        message: "Phone number bilkul 10 anko ka hona chahiye!",
+        message: "Phone number must be exactly 10 digits!",
       });
     }
 
@@ -54,7 +54,7 @@ export const addTeacher = async (req, res) => {
     if (uniqueExamNames.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Kam se kam ek exam chunna zaroori hai!",
+        message: "Select at least one exam!",
       });
     }
 
@@ -71,13 +71,13 @@ export const addTeacher = async (req, res) => {
         return res.status(400).json({
           success: false,
           message:
-            "Is number/email par ek pending sub-teacher invite maujood hai. " +
-            "Apne Main Teacher se mila hua invite link kholkar account activate karein.",
+            "There is a pending sub-teacher invite for this number/email. " +
+            "Open the invite link from your Main Teacher to activate your account.",
         });
       }
       return res.status(400).json({
         success: false,
-        message: "Is email ya phone number se account pehle hi bana hua hai!",
+        message: "An account with this email or phone number already exists!",
       });
     }
 
@@ -126,7 +126,7 @@ export const addTeacher = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Is email ya phone se account pehle hi maujood hai.",
+        message: "An account with this email or phone already exists.",
       });
     }
     console.error("Teacher Signup Error:", error);

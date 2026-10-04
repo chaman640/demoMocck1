@@ -96,9 +96,9 @@ const throttledWarn = (req, removed) => {
   if (now - warnedAt < 60_000) return; // 1 minute me ek hi line
   warnedAt = now;
   console.warn(
-    `🛡️  Suspicious keys hataye gaye — ${req.method} ${req.originalUrl}: ` +
+    `🛡️  Suspicious keys removed — ${req.method} ${req.originalUrl}: ` +
       `${removed.slice(0, 5).join(", ")}` +
-      (warnedCount > 1 ? `  (pichhle 1 min me ${warnedCount} aisi requests)` : "")
+      (warnedCount > 1 ? `  (${warnedCount} such requests in the last 1 min)` : "")
   );
   warnedCount = 0;
 };
@@ -135,7 +135,7 @@ export const sanitizeRequest = (req, res, next) => {
       if (key.startsWith("$") || DANGEROUS_NAMES.has(key)) {
         return res.status(400).json({
           success: false,
-          message: "Request mein galat parameter naam hai.",
+          message: "The request has an invalid parameter name.",
         });
       }
     }

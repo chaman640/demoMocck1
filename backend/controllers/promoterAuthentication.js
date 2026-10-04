@@ -12,7 +12,7 @@ export const loginPromoter = async (req, res) => {
     if ((!email && !phone) || !password) {
       return res.status(400).json({
         success: false,
-        message: "Login karne ke liye Email ya Phone, aur Password dena zaroori hai!",
+        message: "Email or phone, and password are required to log in!",
       });
     }
 
@@ -25,20 +25,20 @@ export const loginPromoter = async (req, res) => {
     if (!promoter) {
       return res.status(404).json({
         success: false,
-        message: "Is email ya phone se koi promoter account nahi mila.",
+        message: "No promoter account found with this email or phone.",
       });
     }
 
     if (promoter.status !== "active") {
       return res.status(403).json({
         success: false,
-        message: "Aapka account active nahi hai. Admin se sampark karein.",
+        message: "Your account is not active. Contact the admin.",
       });
     }
 
     const isPasswordCorrect = await bcrypt.compare(password, promoter.password);
     if (!isPasswordCorrect) {
-      return res.status(401).json({ success: false, message: "Galat password!" });
+      return res.status(401).json({ success: false, message: "Wrong password!" });
     }
 
     const token = jwt.sign({ promoterId: promoter._id }, JWT_SECRET, { expiresIn: "7d" });
@@ -62,7 +62,7 @@ export const loginPromoter = async (req, res) => {
     console.error("Promoter Login Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya login karte waqt.",
+      message: "Server error while logging in.",
       ...errorDetail(error),
     });
   }
@@ -70,7 +70,7 @@ export const loginPromoter = async (req, res) => {
 
 export const logoutPromoter = async (req, res) => {
   res.clearCookie("promoterToken", clearCookieOptions());
-  return res.status(200).json({ success: true, message: "Logout ho gaye!" });
+  return res.status(200).json({ success: true, message: "Logged out!" });
 };
 
 export const changePromoterPassword = async (req, res) => {
@@ -80,30 +80,30 @@ export const changePromoterPassword = async (req, res) => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: "Current password, naya password aur confirm password sabhi zaroori hain!",
+        message: "Current password, new password and confirm password are all required!",
       });
     }
     if (String(newPassword).length < 6) {
       return res.status(400).json({
         success: false,
-        message: "Naya password kam se kam 6 characters ka hona chahiye!",
+        message: "New password must be at least 6 characters!",
       });
     }
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
         success: false,
-        message: "Naya password aur confirm password match nahi kar rahe!",
+        message: "New password and confirm password do not match!",
       });
     }
 
     const promoter = await Promoter.findById(req.promoter._id);
     if (!promoter) {
-      return res.status(404).json({ success: false, message: "Account nahi mila!" });
+      return res.status(404).json({ success: false, message: "Account not found!" });
     }
 
     const isCurrentCorrect = await bcrypt.compare(currentPassword, promoter.password);
     if (!isCurrentCorrect) {
-      return res.status(401).json({ success: false, message: "Current password galat hai!" });
+      return res.status(401).json({ success: false, message: "Current password is wrong!" });
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -116,13 +116,13 @@ export const changePromoterPassword = async (req, res) => {
     const token = jwt.sign({ promoterId: promoter._id }, JWT_SECRET, { expiresIn: "7d" });
     return res.status(200).cookie("promoterToken", token, authCookieOptions()).json({
       success: true,
-      message: "Password badal diya gaya hai!",
+      message: "Password changed!",
     });
   } catch (error) {
     console.error("changePromoterPassword error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya password badalte waqt.",
+      message: "Server error while changing the password.",
       ...errorDetail(error),
     });
   }

@@ -8,18 +8,18 @@ const challengeSchema = new mongoose.Schema(
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: [true, "Challenge banane wale user ki ID zaroori hai"],
+      required: [true, "The ID of the user creating the challenge is required"],
     },
 
     // Konsa exam aur konsa blueprint (jaise "UP Police Constable" + "Full Mock 1")
     examName: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
+      required: [true, "Exam name is required"],
       trim: true,
     },
     blueprintName: {
       type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
+      required: [true, "Blueprint name is required"],
       trim: true,
     },
 
@@ -71,7 +71,7 @@ const challengeSchema = new mongoose.Schema(
     ],
      createdByName: {
       type: String,
-      required: [true, "Challenge banane wale ka naam zaroori hai"],
+      required: [true, "The name of the challenge creator is required"],
       },
     // Scoring rules bhi freeze kar rahe hain challenge ke waqt
     // (agar baad mein blueprint ke marks/negative marking badal jaye,

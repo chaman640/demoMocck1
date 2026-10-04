@@ -25,7 +25,7 @@ export const listRedemptionOrders = async (req, res) => {
     return res.status(200).json({ success: true, data: orders });
   } catch (error) {
     console.error("listRedemptionOrders error:", error);
-    return res.status(500).json({ success: false, message: "Orders list nahi ho payi." });
+    return res.status(500).json({ success: false, message: "Could not load the orders list." });
   }
 };
 
@@ -35,24 +35,24 @@ export const updateRedemptionStatus = async (req, res) => {
     const { status, trackingInfo } = req.body;
 
     if (!["pending", "shipped", "delivered"].includes(status)) {
-      return res.status(400).json({ success: false, message: "status galat hai." });
+      return res.status(400).json({ success: false, message: "Invalid status." });
     }
 
     const order = await BookRedemption.findOne({ _id: redemptionId, ...(await orderScopeFor(req)) });
     if (!order) {
-      return res.status(404).json({ success: false, message: "Order nahi mila!" });
+      return res.status(404).json({ success: false, message: "Order not found!" });
     }
     if (order.bookSnapshot.type !== "physical") {
-      return res.status(400).json({ success: false, message: "Digital orders ka status badalna zaroori nahi hai." });
+      return res.status(400).json({ success: false, message: "Digital orders do not need a status change." });
     }
 
     order.status = status;
     if (trackingInfo !== undefined) order.trackingInfo = String(trackingInfo).trim();
     await order.save();
 
-    return res.status(200).json({ success: true, message: "Order update ho gaya!", data: order });
+    return res.status(200).json({ success: true, message: "Order updated!", data: order });
   } catch (error) {
     console.error("updateRedemptionStatus error:", error);
-    return res.status(500).json({ success: false, message: "Order update karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while updating the order." });
   }
 };

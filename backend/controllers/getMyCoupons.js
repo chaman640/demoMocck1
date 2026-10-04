@@ -62,7 +62,7 @@ export const getMyCoupons = async (req, res) => {
     console.error("getMyCoupons error:", error);
     return res.status(500).json({
       success: false,
-      message: "Coupons fetch karte waqt error aaya.",
+      message: "Error while fetching coupons.",
       error: error.message,
     });
   }

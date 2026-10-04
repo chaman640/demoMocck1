@@ -58,7 +58,7 @@ const TeacherForgotPassword = () => {
       setStep("reset");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Error while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -72,7 +72,7 @@ const TeacherForgotPassword = () => {
       showToast("OTP has been resent!");
       setResendCooldown(60);
     } catch (err) {
-      showToast(err.response?.data?.message || "OTP bhejte waqt error aaya.");
+      showToast(err.response?.data?.message || "Error while sending the OTP.");
     } finally {
       setSendingOtp(false);
     }
@@ -88,7 +88,7 @@ const TeacherForgotPassword = () => {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      showToast("Kripya highlighted fields sahi se bharein.");
+      showToast("Please fill in the highlighted fields correctly.");
       return;
     }
 
@@ -123,7 +123,7 @@ const TeacherForgotPassword = () => {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src={LOGO_URL} alt="AntimPrayash.in" className="w-12 h-12 mx-auto object-contain rounded-xl mb-4" />
-          <h1 className="text-2xl font-bold">{step === "email" ? "Password Bhool Gaye?" : "Naya Password Set Karein"}</h1>
+          <h1 className="text-2xl font-bold">{step === "email" ? "Forgot Password?" : "Set a New Password"}</h1>
           <p className="text-gray-400 text-sm mt-1">
             {step === "email" ? "Enter your registered email, an OTP will be sent" : `Enter the OTP sent to ${email} and your new password`}
           </p>
@@ -146,7 +146,7 @@ const TeacherForgotPassword = () => {
                 />
               </div>
               <button type="submit" disabled={sendingOtp} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50">
-                {sendingOtp ? "OTP Bheja Ja Raha Hai..." : "OTP Bhejein"}
+                {sendingOtp ? "Sending OTP..." : "Send OTP"}
               </button>
             </form>
           )}
@@ -168,7 +168,7 @@ const TeacherForgotPassword = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">Naya Password</label>
+                <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">New Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -201,27 +201,27 @@ const TeacherForgotPassword = () => {
               </div>
 
               <button type="submit" disabled={resetting} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold transition-colors disabled:opacity-50">
-                {resetting ? "Reset Ho Raha Hai..." : "Password Reset Karein"}
+                {resetting ? "Resetting..." : "Reset Password"}
               </button>
 
               <div className="flex items-center justify-between text-xs pt-1">
-                <button type="button" onClick={changeEmail} className="text-gray-500 hover:text-gray-300">&larr; Email badlein</button>
+                <button type="button" onClick={changeEmail} className="text-gray-500 hover:text-gray-300">&larr; Change email</button>
                 <button
                   type="button"
                   onClick={handleResendOtp}
                   disabled={resendCooldown > 0 || sendingOtp}
                   className={resendCooldown > 0 ? "text-gray-600 cursor-not-allowed" : "text-[#A78BFA] font-medium hover:underline"}
                 >
-                  {resendCooldown > 0 ? `Dobara bhejein (${resendCooldown}s)` : "OTP Dobara Bhejein"}
+                  {resendCooldown > 0 ? `Resend (${resendCooldown}s)` : "Resend OTP"}
                 </button>
               </div>
             </form>
           )}
 
           <p className="text-center text-xs text-gray-500 mt-6">
-            Yaad aa gaya password?{" "}
+            Remembered your password?{" "}
             <Link to="/TeacherLogin" className="text-[#A78BFA] font-medium hover:underline">
-              Login Karein
+              Log In
             </Link>
           </p>
         </div>

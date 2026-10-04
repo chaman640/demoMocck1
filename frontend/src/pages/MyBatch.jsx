@@ -46,7 +46,7 @@ const MyBatch = () => {
         setPhase("not-enrolled");
       }
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Batch details load nahi ho paayi.");
+      setErrorMsg(err.response?.data?.message || "Could not load batch details.");
       setPhase("error");
     }
   };
@@ -59,21 +59,21 @@ const MyBatch = () => {
     e.preventDefault();
     setRedeemError("");
     if (!couponCode.trim()) {
-      setRedeemError("Coupon code zaroori hai!");
+      setRedeemError("Coupon code is required!");
       return;
     }
 
     setRedeemLoading(true);
     try {
       const res = await api.post("/redeem-coupon", { code: couponCode.trim() });
-      setSuccessMsg(res.data.message || "Batch join ho gaya!");
+      setSuccessMsg(res.data.message || "Joined the batch!");
       setCouponCode("");
       setTimeout(async () => {
         setSuccessMsg("");
         await loadBatch();
       }, 1500);
     } catch (err) {
-      setRedeemError(err.response?.data?.message || "Coupon redeem nahi ho paaya.");
+      setRedeemError(err.response?.data?.message || "Could not redeem the coupon.");
     } finally {
       setRedeemLoading(false);
     }
@@ -90,7 +90,7 @@ const MyBatch = () => {
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
         <BottomNav />
@@ -108,11 +108,11 @@ const MyBatch = () => {
           &larr; Home
         </button>
 
-        <h1 className="text-2xl font-bold mb-1">Meri Batch</h1>
+        <h1 className="text-2xl font-bold mb-1">My Batch</h1>
         <p className="text-gray-400 text-sm mb-8">
           {phase === "enrolled"
-            ? "Aap is batch mein enrolled hain"
-            : `${examName} ke liye apni batch/teacher ka coupon code daalein`}
+            ? "You are enrolled in this batch"
+            : `Enter your batch/teacher coupon code for ${examName}`}
         </p>
 
         {successMsg && (
@@ -145,7 +145,7 @@ const MyBatch = () => {
                 )}
                 {batch.joinedAt && (
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Join Kiya</span>
+                    <span className="text-gray-500">Joined</span>
                     <span className="text-gray-200">
                       {new Date(batch.joinedAt).toLocaleDateString("en-IN", {
                         day: "numeric",
@@ -182,13 +182,13 @@ const MyBatch = () => {
                 onClick={() => navigate("/PreviousYearTests")}
                 className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold"
               >
-                Batch Papers Dekhein
+                View Batch Papers
               </button>
               <button
                 onClick={() => setPhase("redeeming")}
                 className="w-full py-3 rounded-lg border border-gray-700 text-gray-300 hover:border-gray-500"
               >
-                Doosri Batch Join Karein
+                Join Another Batch
               </button>
             </div>
           </>
@@ -199,7 +199,7 @@ const MyBatch = () => {
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6">
             {phase === "redeeming" && (
               <p className="text-xs text-yellow-500 mb-4">
-                Naya coupon redeem karne par aapki purani batch se link khatam ho jayega (data safe rahega).
+                Redeeming a new coupon will unlink you from your current batch (your data stays safe).
               </p>
             )}
 
@@ -228,7 +228,7 @@ const MyBatch = () => {
                 disabled={redeemLoading}
                 className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
               >
-                {redeemLoading ? "Join ho raha hai..." : "Batch Join Karein"}
+                {redeemLoading ? "Joining..." : "Join Batch"}
               </button>
 
               {phase === "redeeming" && (

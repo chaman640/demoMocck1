@@ -13,10 +13,10 @@ export const getChallenge = async (req, res) => {
     const challenge = await Challenge.findOne({ challengeCode });
 
     if (!challenge) {
-      return res.status(404).json({ success: false, message: "Challenge nahi mila ya expire ho gaya." });
+      return res.status(404).json({ success: false, message: "Challenge not found or expired." });
     }
     if (challenge.expiresAt < new Date()) {
-      return res.status(410).json({ success: false, message: "Ye challenge expire ho chuka hai." });
+      return res.status(410).json({ success: false, message: "This challenge has expired." });
     }
 
     // Check karo user ne already attempt to nahi kiya

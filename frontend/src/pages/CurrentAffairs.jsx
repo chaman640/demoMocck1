@@ -88,7 +88,7 @@ const CurrentAffairs = () => {
         setPhase("reading");
       } catch (err) {
         if (!cancelled) {
-          setErrorMsg(err.response?.data?.message || "Current affairs load nahi ho paaye.");
+          setErrorMsg(err.response?.data?.message || "Could not load current affairs.");
           setPhase("error");
         }
       }
@@ -111,7 +111,7 @@ const CurrentAffairs = () => {
       submittingRef.current = false;
       setPhase("quiz");
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Quiz load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the quiz.");
       setPhase("error");
     }
   };
@@ -151,7 +151,7 @@ const CurrentAffairs = () => {
       if (res.data.data?.coinsEarned) emitCoinEarned(res.data.data.coinsEarned);
       setResultData(res.data.data);
       // 🐛 BUG FIX: submit ke baad local state update karna zaroori tha.
-      // Pehle review se "wapas" aane par dobara "Quiz Shuru Karein" dikhta tha,
+      // Pehle review se "wapas" aane par dobara "Start Quiz" dikhta tha,
       // aur click karte hi 409 "pehle hi de chuke hain" error aa jata tha.
       setAffair((prev) =>
         prev ? { ...prev, alreadyAttempted: true, attemptSummary: res.data.data } : prev
@@ -163,7 +163,7 @@ const CurrentAffairs = () => {
         setResultData(affair.attemptSummary);
         setPhase("result");
       } else {
-        setErrorMsg(err.response?.data?.message || "Submit fail ho gaya.");
+        setErrorMsg(err.response?.data?.message || "Submit failed.");
         setPhase("error");
       }
     }
@@ -180,7 +180,7 @@ const CurrentAffairs = () => {
       setReviewIdx(0);
       setPhase("review");
     } catch (err) {
-      setErrorMsg(err.response?.data?.message || "Review load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the review.");
       setPhase("error");
     }
   };
@@ -208,7 +208,7 @@ const CurrentAffairs = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={() => navigate("/HomePage")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -221,10 +221,10 @@ const CurrentAffairs = () => {
         <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6">
           <div className="max-w-md text-center space-y-4">
             <div className="text-4xl mb-2">📰</div>
-            <h2 className="text-lg font-semibold">Aaj Ka Current Affairs Abhi Nahi Aaya</h2>
-            <p className="text-gray-400 text-sm">Thodi der baad wapas check karein.</p>
+            <h2 className="text-lg font-semibold">Today's Current Affairs Are Not Up Yet</h2>
+            <p className="text-gray-400 text-sm">Please check back in a while.</p>
             <button onClick={() => navigate("/HomePage")} className="px-5 py-2 rounded-lg border border-gray-700 text-sm text-gray-300">
-              Home Jaayein
+              Go Home
             </button>
           </div>
         </div>
@@ -261,22 +261,22 @@ const CurrentAffairs = () => {
 
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
             {!affair.quizAvailable ? (
-              <p className="text-sm text-gray-400">Is din ka quiz abhi taiyar nahi hai.</p>
+              <p className="text-sm text-gray-400">The quiz for this day is not ready yet.</p>
             ) : affair.alreadyAttempted ? (
               <>
-                <p className="text-sm text-gray-400 mb-1">Aapne ye quiz de diya hai</p>
+                <p className="text-sm text-gray-400 mb-1">You have taken this quiz</p>
                 <p className="text-3xl font-bold text-[#A78BFA] mb-4">
                   {affair.attemptSummary?.correctCount} / {affair.attemptSummary?.correctCount + affair.attemptSummary?.wrongCount + affair.attemptSummary?.unattemptedCount}
                 </p>
                 <button onClick={openReview} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold">
-                  Answers Review Karein
+                  Review Answers
                 </button>
               </>
             ) : (
               <>
-                <p className="text-sm text-gray-400 mb-4">Ab is din ki current affairs par apni understanding test karein</p>
+                <p className="text-sm text-gray-400 mb-4">Now test your understanding of this day's current affairs</p>
                 <button onClick={startQuiz} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold">
-                  Quiz Shuru Karein ({affair.totalQuizQuestions} sawaal)
+                  Start Quiz ({affair.totalQuizQuestions} questions)
                 </button>
               </>
             )}
@@ -329,7 +329,7 @@ const CurrentAffairs = () => {
             </button>
             {isLast ? (
               <button onClick={handleSubmit} className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-                Submit Karein
+                Submit
               </button>
             ) : (
               <button onClick={goNext} className="ml-auto px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
@@ -347,7 +347,7 @@ const CurrentAffairs = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white px-6 py-12">
         <div className="max-w-xl mx-auto text-center">
           <h1 className="text-2xl font-bold mb-1">Quiz Complete! ✅</h1>
-          <p className="text-gray-400 text-sm mb-8">Dekho kitna samjhe aaj ki khabrein</p>
+          <p className="text-gray-400 text-sm mb-8">See how well you understood today's news</p>
 
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-8 mb-6">
             <p className="text-5xl font-bold text-[#A78BFA]">{resultData.totalScore}</p>
@@ -372,10 +372,10 @@ const CurrentAffairs = () => {
           </div>
 
           <button onClick={openReview} className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3">
-            Answers Review Karein
+            Review Answers
           </button>
           <button onClick={() => navigate("/HomePage")} className="w-full py-3 rounded-lg border border-gray-700 text-gray-300">
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>
@@ -395,7 +395,7 @@ const CurrentAffairs = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8">
         <div className="max-w-3xl mx-auto">
           <button onClick={() => setPhase("reading")} className="text-sm text-gray-400 hover:text-white mb-6 flex items-center gap-1">
-            &larr; Wapas
+            &larr; Back
           </button>
 
           <h1 className="text-xl sm:text-2xl font-bold mb-6">Answers Review</h1>
@@ -415,7 +415,7 @@ const CurrentAffairs = () => {
           </div>
 
           {filteredReviewQuestions.length === 0 && (
-            <p className="text-gray-400 text-sm py-10 text-center">Is category mein koi sawaal nahi hai.</p>
+            <p className="text-gray-400 text-sm py-10 text-center">No questions in this category.</p>
           )}
 
           {currentQ && (
@@ -444,8 +444,8 @@ const CurrentAffairs = () => {
                       <div key={n} className={`px-4 py-3 rounded-xl border flex items-center gap-3 ${style}`}>
                         <span className="w-6 h-6 flex-shrink-0 rounded-full border border-current flex items-center justify-center text-xs">{n}</span>
                         <span className="flex-1">{optText}</span>
-                        {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Sahi jawab</span>}
-                        {isUserPick && !isCorrectOpt && <span className="text-xs flex-shrink-0">❌ Aapka jawab</span>}
+                        {isCorrectOpt && <span className="text-xs flex-shrink-0">✅ Correct answer</span>}
+                        {isUserPick && !isCorrectOpt && <span className="text-xs flex-shrink-0">❌ Your answer</span>}
                       </div>
                     );
                   })}
@@ -470,7 +470,7 @@ const CurrentAffairs = () => {
           )}
 
           <button onClick={() => navigate("/HomePage")} className="w-full py-3 mt-8 rounded-lg border border-gray-700 text-gray-300">
-            Home Jaayein
+            Go Home
           </button>
         </div>
       </div>

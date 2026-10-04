@@ -16,20 +16,20 @@ export const submitCurrentAffairQuiz = async (req, res) => {
     if (!Array.isArray(attemptedQuestions) || attemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "attemptedQuestions mein kam se kam ek question hona chahiye!",
+        message: "attemptedQuestions must contain at least one question!",
       });
     }
 
     const quiz = await CurrentAffairQuiz.findOne({ examName, date });
     if (!quiz) {
-      return res.status(404).json({ success: false, message: "Is din ka quiz nahi mila." });
+      return res.status(404).json({ success: false, message: "Quiz for this day not found." });
     }
 
     const existing = await CurrentAffairAttempt.findOne({ userId, examName, date });
     if (existing) {
       return res.status(409).json({
         success: false,
-        message: "Aap is din ka quiz pehle hi de chuke hain!",
+        message: "You have already taken the quiz for this day!",
       });
     }
 
@@ -63,7 +63,7 @@ export const submitCurrentAffairQuiz = async (req, res) => {
     if (finalAttemptedQuestions.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Koi valid question match nahi hua is quiz ke sath.",
+        message: "No valid question matched this quiz.",
       });
     }
 
@@ -93,20 +93,20 @@ export const submitCurrentAffairQuiz = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: "Quiz submit ho gaya!",
+      message: "Quiz submitted!",
       data: { totalScore, correctCount, wrongCount, unattemptedCount, coinsEarned },
     });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Aap is din ka quiz pehle hi de chuke hain!",
+        message: "You have already taken the quiz for this day!",
       });
     }
     console.error("submitCurrentAffairQuiz error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya quiz submit karte waqt.",
+      message: "Server error while submitting the quiz.",
       error: error.message,
     });
   }

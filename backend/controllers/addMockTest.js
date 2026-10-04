@@ -72,13 +72,13 @@ async function selectQuestionsForTopic({ examName, subjectName, topicName, quest
   if (selected.length === 0) {
     const anyForTopic = await Question.countDocuments({ subjectName, topicName });
     const anyForExam = await Question.countDocuments({ examName: { $in: [examName] } });
-    console.log("🔍 [MOCK-DEBUG] Is topic mein bilkul bhi question nahi mila:", JSON.stringify(primaryQuery));
-    console.log(`   → Sirf subjectName+topicName match: ${anyForTopic} mile`);
-    console.log(`   → Sirf examName "${examName}" match (kahin bhi): ${anyForExam} mile`);
+    console.log("🔍 [MOCK-DEBUG] No questions at all found for this topic:", JSON.stringify(primaryQuery));
+    console.log(`   → Only subjectName+topicName match: ${anyForTopic} found`);
+    console.log(`   → Only examName "${examName}" match (anywhere): ${anyForExam} found`);
     if (anyForTopic > 0 && anyForExam === 0) {
-      console.log(`   ⚠️ examName mismatch! Question ka examName array "${examName}" se match nahi kar raha.`);
+      console.log(`   ⚠️ examName mismatch! The question's examName array does not match "${examName}".`);
     } else if (anyForTopic === 0) {
-      console.log(`   ⚠️ subjectName ("${subjectName}") ya topicName ("${topicName}") kahin match nahi ho rahe.`);
+      console.log(`   ⚠️ subjectName ("${subjectName}") or topicName ("${topicName}") does not match anywhere.`);
     }
   }
 
@@ -194,22 +194,22 @@ export const addMocktest = async (req, res) => {
     const { examName, blueprintName } = req.body;
 
     if (!req.user || !req.user._id) {
-      return res.status(401).json({ success: false, message: "Login zaroori hai!" });
+      return res.status(401).json({ success: false, message: "Login required!" });
     }
     const userId = req.user._id;
 
     if (!examName || !blueprintName) {
-      return res.status(400).json({ success: false, message: "examName aur blueprintName dono zaroori hain!" });
+      return res.status(400).json({ success: false, message: "examName and blueprintName are both required!" });
     }
 
     const blueprint = await Blueprint.findOne({ examName, blueprintName });
     if (!blueprint) {
-      return res.status(404).json({ success: false, message: `'${blueprintName}' blueprint nahi mila '${examName}' exam ke liye!` });
+      return res.status(404).json({ success: false, message: `Blueprint '${blueprintName}' not found for exam '${examName}'!` });
     }
 
     const user = await User.findById(userId).select("activeCoupon");
     if (!user) {
-      return res.status(404).json({ success: false, message: "User nahi mila!" });
+      return res.status(404).json({ success: false, message: "User not found!" });
     }
 
     let activeCouponId = null;
@@ -248,7 +248,7 @@ export const addMocktest = async (req, res) => {
       // warna student us khaali tab par jaate hi app crash ho sakta tha
       // (question[0] exist hi nahi karta).
       if (questions.length === 0) {
-        console.log(`🔍 [MOCK-DEBUG] Subject '${subjectConfig.subjectName}' mein ek bhi question nahi mila — is tab ko skip kiya.`);
+        console.log(`🔍 [MOCK-DEBUG] No questions found in subject '${subjectConfig.subjectName}' — skipped this tab.`);
         continue;
       }
 
@@ -265,14 +265,14 @@ export const addMocktest = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: activeCouponId
-          ? "Aapki batch aur global bank — dono mein is exam ke liye abhi questions nahi hain. Apne teacher ya admin se kahein."
-          : "Is exam/blueprint ke liye abhi questions available nahi hain.",
+          ? "Neither your batch nor the global bank has questions for this exam yet. Ask your teacher or the admin."
+          : "No questions are available for this exam/blueprint yet.",
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: isNewUser ? "Naye user ke liye standard mock test ready hai!" : "Aapke performance ke hisaab se personalized mock test ready hai!",
+      message: isNewUser ? "Standard mock test ready for new user!" : "Personalized mock test ready based on your performance!",
       mockTest: {
         examName: blueprint.examName,
         blueprintName: blueprint.blueprintName,
@@ -289,6 +289,6 @@ export const addMocktest = async (req, res) => {
     });
   } catch (error) {
     console.error("addMocktest error:", error);
-    return res.status(500).json({ success: false, message: "Server mein error aa gaya mock test banate waqt.", error: error.message });
+    return res.status(500).json({ success: false, message: "Server error while building the mock test.", error: error.message });
   }
 };

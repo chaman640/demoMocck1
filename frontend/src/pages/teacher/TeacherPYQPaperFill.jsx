@@ -56,7 +56,7 @@ const TeacherPYQPaperFill = () => {
         navigate("/TeacherLogin");
         return;
       }
-      setErrorMsg(err.response?.data?.message || "Paper load nahi ho paaya.");
+      setErrorMsg(err.response?.data?.message || "Could not load the paper.");
       setPhase("error");
     }
   }, [paperId, subjectName, navigate]);
@@ -82,7 +82,7 @@ const TeacherPYQPaperFill = () => {
       !form.option4.trim() ||
       !form.correctOption
     ) {
-      setFormError("Sabhi fields zaroori hain!");
+      setFormError("All fields are required!");
       return;
     }
 
@@ -117,7 +117,7 @@ const TeacherPYQPaperFill = () => {
         await load();
       }
     } catch (err) {
-      setFormError(err.response?.data?.message || "Question save nahi ho paaya.");
+      setFormError(err.response?.data?.message || "Could not save the question.");
     } finally {
       setSubmitting(false);
     }
@@ -134,7 +134,7 @@ const TeacherPYQPaperFill = () => {
             onClick={() => navigate("/TeacherPYQPapers")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Papers List Par Jaayein
+            Go to Papers List
           </button>
         </div>
         <TeacherBottomNav />
@@ -145,7 +145,7 @@ const TeacherPYQPaperFill = () => {
   if (!progress) {
     return (
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
-        <p className="text-gray-300">Ye subject is paper ke blueprint mein nahi mila.</p>
+        <p className="text-gray-300">This subject was not found in this paper's blueprint.</p>
         <TeacherBottomNav />
       </div>
     );
@@ -161,7 +161,7 @@ const TeacherPYQPaperFill = () => {
           onClick={() => navigate("/TeacherPYQPapers")}
           className="text-sm text-gray-400 hover:text-white flex items-center gap-1"
         >
-          &larr; Sabhi Papers
+          &larr; All Papers
         </button>
 
         <div>
@@ -179,14 +179,14 @@ const TeacherPYQPaperFill = () => {
 
         {progress.filled ? (
           <div className="bg-green-500/10 border border-green-500/25 rounded-2xl p-6 text-center">
-            <p className="text-green-400 font-semibold mb-1">✓ Quota Poora Ho Gaya!</p>
+            <p className="text-green-400 font-semibold mb-1">✓ Quota Complete!</p>
             <p className="text-sm text-gray-400">
-              '{subjectName}' ke liye sabhi {progress.required} sawaal add ho chuke hain.
+              All {progress.required} questions for '{subjectName}' have been added.
             </p>
           </div>
         ) : (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
-            <p className="text-xs text-gray-500 mb-4">Baaki {remaining} sawaal chahiye</p>
+            <p className="text-xs text-gray-500 mb-4">{remaining} more questions needed</p>
 
             {formError && (
               <div className="mb-4 p-3 bg-red-500/10 text-red-400 border border-red-500/25 rounded-xl text-sm text-center">
@@ -206,7 +206,7 @@ const TeacherPYQPaperFill = () => {
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
                   Question
                 </label>
-                <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Sawaal yahan likhein..." className={inputClass} />
+                <textarea name="question" value={form.question} onChange={handleChange} rows={3} placeholder="Write the question here..." className={inputClass} />
               </div>
 
               <div className="space-y-3">
@@ -234,7 +234,7 @@ const TeacherPYQPaperFill = () => {
                   </div>
                 ))}
                 <p className="text-[11px] text-gray-500">
-                  Number pe click karke sahi jawab set karein (abhi: {form.correctOption || "koi nahi"})
+                  Click a number to set the correct answer (current: {form.correctOption || "none"})
                 </p>
               </div>
 
@@ -242,7 +242,7 @@ const TeacherPYQPaperFill = () => {
                 <label className="block text-xs font-semibold mb-1.5 uppercase tracking-wide text-gray-400">
                   Explanation (optional)
                 </label>
-                <textarea name="answerExplain" value={form.answerExplain} onChange={handleChange} rows={2} placeholder="Sahi jawab kyun sahi hai..." className={inputClass} />
+                <textarea name="answerExplain" value={form.answerExplain} onChange={handleChange} rows={2} placeholder="Why the correct answer is correct..." className={inputClass} />
               </div>
 
               <button
@@ -250,7 +250,7 @@ const TeacherPYQPaperFill = () => {
                 disabled={submitting}
                 className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
               >
-                {submitting ? "Save ho raha hai..." : "Sawaal Save Karein"}
+                {submitting ? "Saving..." : "Save Question"}
               </button>
             </form>
           </div>
@@ -259,7 +259,7 @@ const TeacherPYQPaperFill = () => {
         {sessionAdded.length > 0 && (
           <div>
             <h3 className="text-sm font-semibold text-gray-300 mb-3">
-              Is session mein add kiye gaye ({sessionAdded.length})
+              Added this session ({sessionAdded.length})
             </h3>
             <div className="space-y-2">
               {sessionAdded.map((q, i) => (

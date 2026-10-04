@@ -9,22 +9,22 @@ import { rowQuestionConnection } from "../config/rowQuestion.js";
 // ─────────────────────────────────────────────
 const pyqQuestionSchema = new mongoose.Schema(
   {
-    question: { type: String, required: [true, "Question likhna zaroori hai"] },
+    question: { type: String, required: [true, "Question text is required"] },
     questionPhoto: { type: String, default: null },
-    option1: { type: String, required: [true, "Option 1 zaroori hai"] },
-    option2: { type: String, required: [true, "Option 2 zaroori hai"] },
-    option3: { type: String, required: [true, "Option 3 zaroori hai"] },
-    option4: { type: String, required: [true, "Option 4 zaroori hai"] },
+    option1: { type: String, required: [true, "Option 1 is required"] },
+    option2: { type: String, required: [true, "Option 2 is required"] },
+    option3: { type: String, required: [true, "Option 3 is required"] },
+    option4: { type: String, required: [true, "Option 4 is required"] },
     correctOption: {
       type: Number,
-      required: [true, "Correct option (1-4) zaroori hai"],
+      required: [true, "Correct option (1-4) is required"],
       min: 1,
       max: 4,
     },
     answerExplain: { type: String, default: "" },
     answerExplainWithPhoto: { type: String, default: null },
     topicName: { type: String, default: "General" },
-    subjectName: { type: String, required: [true, "Subject ka naam zaroori hai"] },
+    subjectName: { type: String, required: [true, "Subject name is required"] },
     questionNumber: { type: Number },
   },
   { _id: true } // har question ki apni _id — attempt track karne ke liye
@@ -45,18 +45,18 @@ const previousYearTestSchema = new mongoose.Schema(
   {
     examName: {
       type: String,
-      required: [true, "Exam ka naam zaroori hai"],
+      required: [true, "Exam name is required"],
       trim: true,
       index: true,
     },
     testName: {
       type: String,
-      required: [true, "Test ka naam zaroori hai"],
+      required: [true, "Test name is required"],
       trim: true,
     },
     year: {
       type: Number,
-      required: [true, "Saal (year) batana zaroori hai"],
+      required: [true, "Year is required"],
     },
     description: {
       type: String,
@@ -68,7 +68,7 @@ const previousYearTestSchema = new mongoose.Schema(
       type: [pyqSubjectSchema],
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject ke questions hone chahiye",
+        message: "There must be questions for at least one subject",
       },
     },
 
@@ -76,7 +76,7 @@ const previousYearTestSchema = new mongoose.Schema(
     negativeMarking: { type: Number, required: true, default: 0 },
     durationMinutes: {
       type: Number,
-      required: [true, "Duration (minutes) batana zaroori hai"],
+      required: [true, "Duration (minutes) is required"],
     },
 
     totalQuestions: { type: Number, default: 0 },

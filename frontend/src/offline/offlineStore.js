@@ -23,7 +23,7 @@ const openDb = () => {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     if (!("indexedDB" in window)) {
-      reject(new Error("Is browser mein offline storage available nahi hai."));
+      reject(new Error("Offline storage is not available in this browser."));
       return;
     }
     const req = indexedDB.open(DB_NAME, DB_VERSION);
@@ -52,7 +52,7 @@ const run = async (stores, mode, fn) => {
     });
     tx.oncomplete = () => resolve(result);
     tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error || new Error("Storage full ya band hai."));
+    tx.onabort = () => reject(tx.error || new Error("Storage is full or blocked."));
   });
 };
 
@@ -151,7 +151,7 @@ export class OfflineError extends Error {
 /** Server se item download karke encrypted form mein save karta hai. */
 export const saveOffline = async (type, id) => {
   if (!crypto?.subtle) {
-    throw new OfflineError("Offline reading ke liye app ko https par kholein.");
+    throw new OfflineError("Open the app over https to use offline reading.");
   }
   const deviceId = await getDeviceId();
 
@@ -164,8 +164,8 @@ export const saveOffline = async (type, id) => {
     );
   } catch (err) {
     const body = parseErrorBody(err);
-    if (!err.response) throw new OfflineError("Internet nahi hai. Pehli baar download ke liye internet chahiye.", { code: "NETWORK" });
-    throw new OfflineError(body.message || "Download nahi ho paya.", {
+    if (!err.response) throw new OfflineError("No internet. You need internet for the first download.", { code: "NETWORK" });
+    throw new OfflineError(body.message || "Download failed.", {
       code: body.code,
       status: err.response.status,
       devices: body.devices,
@@ -196,7 +196,7 @@ export const saveOffline = async (type, id) => {
       tx.objectStore(ITEMS).put(item);
     });
   } catch {
-    throw new OfflineError("Phone mein jagah kam hai. Kuch purani downloads delete karke try karein.", { code: "STORAGE" });
+    throw new OfflineError("Not enough space on your phone. Delete some old downloads and try again.", { code: "STORAGE" });
   }
 
   // Browser ko batao ki ye data zaroori hai — jagah kam hone par na mitaye
@@ -223,8 +223,8 @@ export const readOffline = async (type, id) => {
   const [item, cipher] = await run([ITEMS, FILES], "readonly", (tx) =>
     Promise.all([reqToPromise(tx.objectStore(ITEMS).get(key)), reqToPromise(tx.objectStore(FILES).get(key))])
   );
-  if (!item || !cipher) throw new OfflineError("Ye item phone mein save nahi hai.", { code: "MISSING" });
-  if (isExpired(item)) throw new OfflineError("Offline permission khatam ho gayi hai. Internet on karke dobara kholein.", { code: "EXPIRED" });
+  if (!item || !cipher) throw new OfflineError("This item is not saved on this phone.", { code: "MISSING" });
+  if (isExpired(item)) throw new OfflineError("Offline access has expired. Turn on the internet and open it again.", { code: "EXPIRED" });
 
   const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: item.iv }, item.cryptoKey, cipher);
   return { item, data: new Uint8Array(plain) };

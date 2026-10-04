@@ -334,7 +334,7 @@ const TeacherCustomTests = () => {
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{errorMsg}</p>
           <button onClick={load} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">
-            Dobara Try Karein
+            Try Again
           </button>
         </div>
         <TeacherBottomNav />
@@ -358,7 +358,7 @@ const TeacherCustomTests = () => {
               onClick={() => { setShowBuilder((s) => !s); if (showBuilder) resetBuilder(); }}
               className="text-xs px-3 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-medium flex-shrink-0"
             >
-              {showBuilder ? "Cancel" : "+ Naya Test"}
+              {showBuilder ? "Cancel" : "+ New Test"}
             </button>
           )}
         </div>
@@ -382,10 +382,10 @@ const TeacherCustomTests = () => {
 
                 <div className="flex gap-2">
                   <button type="button" onClick={() => setBuilderMode("form")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${builderMode === "form" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-                    Form Se Banayein
+                    Create with Form
                   </button>
                   <button type="button" onClick={() => setBuilderMode("bulk")} className={`px-4 py-1.5 rounded-full text-xs font-medium ${builderMode === "bulk" ? "bg-[#7C3AED] text-white" : "bg-[#1F2937] text-gray-400"}`}>
-                    Bulk JSON (AI se likhwa ke)
+                    Bulk JSON (written with AI)
                   </button>
                 </div>
 
@@ -397,7 +397,7 @@ const TeacherCustomTests = () => {
                       </div>
                     )}
                     <button type="button" onClick={copyTestDemoForAI} className="w-full py-2.5 rounded-xl bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-sm font-medium hover:bg-[#7C3AED]/10">
-                      📋 Demo JSON + AI Prompt Copy Karein
+                      📋 Copy Demo JSON + AI Prompt
                     </button>
                     <p className="text-[11px] text-gray-500">Tap the button above → paste it into an AI chatbot → paste the resulting test JSON below to create it.</p>
                     <textarea
@@ -408,7 +408,7 @@ const TeacherCustomTests = () => {
                       className={`${inputClass} font-mono`}
                     />
                     <button type="button" onClick={handleBulkCreateTest} disabled={creating || !bulkTestJson.trim()} className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold text-sm disabled:opacity-50">
-                      {creating ? "Creating..." : "Test Banayein"}
+                      {creating ? "Creating..." : "Create Test"}
                     </button>
                   </div>
                 ) : (
@@ -421,7 +421,7 @@ const TeacherCustomTests = () => {
                       type="text"
                       value={meta.testName}
                       onChange={(e) => setMeta((p) => ({ ...p, testName: e.target.value }))}
-                      placeholder="Test naam (e.g. Weekly Test - Week 1)"
+                      placeholder="Test name (e.g. Weekly Test - Week 1)"
                       className={inputClass}
                     />
                     <div className="grid grid-cols-3 gap-2">
@@ -472,7 +472,7 @@ const TeacherCustomTests = () => {
                       <SubjectPicker
                         value={newSubjectName}
                         onChange={setNewSubjectName}
-                        placeholder="Subject naam (e.g. Hindi)"
+                        placeholder="Subject name (e.g. Hindi)"
                         className={`${inputClass} w-full`}
                         wrapperClassName="flex-1 min-w-0"
                         compact
@@ -532,7 +532,7 @@ const TeacherCustomTests = () => {
                         value={qForm.question}
                         onChange={handleQChange}
                         rows={2}
-                        placeholder="Sawaal likhein..."
+                        placeholder="Write the question..."
                         className={inputClass}
                       />
 
@@ -546,7 +546,7 @@ const TeacherCustomTests = () => {
                           onChange={(e) => handlePhotoUpload("questionPhoto", e.target.files?.[0])}
                           className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
                         />
-                        {uploadingPhoto === "question" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
+                        {uploadingPhoto === "question" && <p className="text-[10px] text-[#A78BFA] mt-1">Uploading...</p>}
                         {qForm.questionPhoto && uploadingPhoto !== "question" && <p className="text-[10px] text-green-400 mt-1">✅ Photo attached</p>}
                       </div>
 
@@ -595,7 +595,7 @@ const TeacherCustomTests = () => {
                           onChange={(e) => handlePhotoUpload("answerExplainWithPhoto", e.target.files?.[0])}
                           className="w-full text-xs text-gray-400 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-[#1F2937] file:text-gray-300 file:text-xs"
                         />
-                        {uploadingPhoto === "explain" && <p className="text-[10px] text-[#A78BFA] mt-1">Upload ho raha hai...</p>}
+                        {uploadingPhoto === "explain" && <p className="text-[10px] text-[#A78BFA] mt-1">Uploading...</p>}
                         {qForm.answerExplainWithPhoto && uploadingPhoto !== "explain" && <p className="text-[10px] text-green-400 mt-1">✅ Photo attached</p>}
                       </div>
 
@@ -614,7 +614,7 @@ const TeacherCustomTests = () => {
                         onClick={addQuestionToActiveSubject}
                         className="w-full py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10"
                       >
-                        + Is Subject Mein Question Add Karein
+                        + Add a Question to This Subject
                       </button>
 
                       {/* Already added questions in this subject */}
@@ -642,7 +642,7 @@ const TeacherCustomTests = () => {
                   disabled={creating || totalQuestionsInBuilder === 0}
                   className="w-full py-3 rounded-xl bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold disabled:opacity-50"
                 >
-                  {creating ? "Creating..." : `Test Banayein (${totalQuestionsInBuilder} sawaal)`}
+                  {creating ? "Creating..." : `Create Test (${totalQuestionsInBuilder} questions)`}
                 </button>
                   </>
                 )}
@@ -660,7 +660,7 @@ const TeacherCustomTests = () => {
                   <div key={t.testId} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
                     <h3 className="font-semibold text-sm mb-1">{t.testName}</h3>
                     <p className="text-xs text-gray-500 mb-2">
-                      {t.totalQuestions} sawaal &middot; {t.durationMinutes} min &middot; {t.subjectNames.join(", ")}
+                      {t.totalQuestions} questions &middot; {t.durationMinutes} min &middot; {t.subjectNames.join(", ")}
                     </p>
                     <p className="text-[11px] text-gray-600 mb-3">
                       Banaya by {t.createdByName} &middot;{" "}
@@ -671,7 +671,7 @@ const TeacherCustomTests = () => {
                       onClick={() => navigate(`/TeacherCustomTestResults/${t.testId}`)}
                       className="w-full py-2 rounded-lg bg-[#1F2937] border border-[#7C3AED]/40 text-[#A78BFA] text-xs font-medium hover:bg-[#7C3AED]/10"
                     >
-                      📊 Results Dekhein
+                      📊 View Results
                     </button>
 
                     {/* 🆕 Delete — 2-step confirm */}

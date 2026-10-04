@@ -19,10 +19,10 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
       return res.status(400).json({ success: false, message: "Invalid paperId." });
     }
     if (!normalizeSubject(subjectName)) {
-      return res.status(400).json({ success: false, message: "subjectName zaroori hai!" });
+      return res.status(400).json({ success: false, message: "subjectName is required!" });
     }
     if (!Array.isArray(questions) || questions.length === 0) {
-      return res.status(400).json({ success: false, message: "Kam se kam ek question dena zaroori hai." });
+      return res.status(400).json({ success: false, message: "Add at least one question." });
     }
 
     // ─────────────────────────────────────────────
@@ -30,12 +30,12 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     // ─────────────────────────────────────────────
     const paper = await PreviousYearTest.findById(paperId);
     if (!paper) {
-      return res.status(404).json({ success: false, message: "Ye paper nahi mila." });
+      return res.status(404).json({ success: false, message: "Paper not found." });
     }
     if (!paper.couponId) {
       return res.status(400).json({
         success: false,
-        message: "Ye ek global paper hai, isme is tarah fill nahi kiya ja sakta.",
+        message: "This is a global paper, it cannot be filled this way.",
       });
     }
 
@@ -44,7 +44,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     // ─────────────────────────────────────────────
     const { allowed, reason } = await checkCouponAccess(req.teacher, paper.couponId, subjectName);
     if (!allowed) {
-      return res.status(403).json({ success: false, message: reason || "Aapko is subject ka access nahi hai." });
+      return res.status(403).json({ success: false, message: reason || "You do not have access to this subject." });
     }
 
     // ─────────────────────────────────────────────
@@ -59,7 +59,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (!blueprintEntry) {
       return res.status(400).json({
         success: false,
-        message: `'${normalizeSubject(subjectName)}' is paper ke blueprint mein hai hi nahi.`,
+        message: `'${normalizeSubject(subjectName)}' is not in this paper's blueprint at all.`,
       });
     }
 
@@ -67,14 +67,14 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (!subjectBlock) {
       return res.status(404).json({
         success: false,
-        message: "Subject block paper mein nahi mila (data inconsistency).",
+        message: "Subject block not found in the paper (data inconsistency).",
       });
     }
 
     if (subjectBlock.filled) {
       return res.status(400).json({
         success: false,
-        message: `'${subjectBlock.subjectName}' ka quota pehle hi poora ho chuka hai.`,
+        message: `The quota for '${subjectBlock.subjectName}' is already full.`,
       });
     }
 
@@ -84,19 +84,19 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     const validationErrors = [];
     questions.forEach((q, idx) => {
       if (!q.question || !q.option1 || !q.option2 || !q.option3 || !q.option4) {
-        validationErrors.push(`Question ${idx + 1}: sabhi options aur question text zaroori hain.`);
+        validationErrors.push(`Question ${idx + 1}: all options and the question text are required.`);
         return;
       }
       const correctOpt = Number(q.correctOption);
       if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
-        validationErrors.push(`Question ${idx + 1}: correctOption 1 se 4 ke beech hona chahiye.`);
+        validationErrors.push(`Question ${idx + 1}: correctOption must be between 1 and 4.`);
       }
     });
 
     if (validationErrors.length > 0) {
       return res.status(400).json({
         success: false,
-        message: "Kuch questions mein validation errors hain, koi bhi save nahi hua:",
+        message: "Some questions have validation errors, nothing was saved:",
         errors: validationErrors,
       });
     }
@@ -108,7 +108,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     if (questions.length > remainingSlots) {
       return res.status(400).json({
         success: false,
-        message: `Sirf ${remainingSlots} aur question(s) add kar sakte hain '${subjectBlock.subjectName}' ke liye (quota: ${blueprintEntry.questionCount}, already filled: ${subjectBlock.questions.length}).`,
+        message: `You can add only ${remainingSlots} more question(s) for '${subjectBlock.subjectName}' (quota: ${blueprintEntry.questionCount}, already filled: ${subjectBlock.questions.length}).`,
       });
     }
 
@@ -140,7 +140,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: `'${subjectBlock.subjectName}' mein ${newQuestions.length} question(s) add ho gaye! (${subjectBlock.questions.length}/${blueprintEntry.questionCount})`,
+      message: `${newQuestions.length} question(s) added to '${subjectBlock.subjectName}'! (${subjectBlock.questions.length}/${blueprintEntry.questionCount})`,
       data: {
         paperId: paper._id,
         subjectName: subjectBlock.subjectName,
@@ -154,7 +154,7 @@ export const fillPreviousYearPaperSubject = async (req, res) => {
     console.error("fillPreviousYearPaperSubject error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya subject fill karte waqt.",
+      message: "Server error while filling the subject.",
       error: error.message,
     });
   }

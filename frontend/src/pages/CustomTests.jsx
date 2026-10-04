@@ -64,7 +64,7 @@ const CustomTests = () => {
           navigate("/Login");
           return;
         }
-        setErrorMsg(err.response?.data?.message || "Batch tests load nahi ho paaye.");
+        setErrorMsg(err.response?.data?.message || "Could not load batch tests.");
         setPhase("error");
       }
     };
@@ -86,7 +86,7 @@ const CustomTests = () => {
             onClick={() => navigate("/HomePage")}
             className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium"
           >
-            Home Jaayein
+            Go Home
           </button>
         </div>
         <BottomNav />
@@ -107,28 +107,27 @@ const CustomTests = () => {
         <h1 className="text-2xl font-bold mb-1">Batch Tests</h1>
         <p className="text-gray-400 text-sm mb-8">
           {tests.length === 0
-            ? `${examName} — aapki batch ke liye abhi koi test nahi bana.`
-            : `Aapke teacher ke banaye ${tests.length} test${tests.length > 1 ? "s" : ""}`}
+            ? `${examName} — no tests have been created for your batch yet.`
+            : `${tests.length} test${tests.length > 1 ? "s" : ""} created by your teacher`}
         </p>
 
         {tests.length === 0 ? (
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 text-center">
             <div className="text-3xl mb-3">📋</div>
             <p className="text-sm text-gray-400 mb-5">
-              Ye tests sirf batch (coupon) ke students ke liye hote hain. Agar aapne
-              abhi tak koi coupon code redeem nahi kiya hai, to pehle apni batch join karein.
+              These tests are only for batch (coupon) students. If you have not redeemed a coupon code yet, join your batch first.
             </p>
             <button
               onClick={() => navigate("/MyBatch")}
               className="w-full py-3 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] font-semibold mb-3"
             >
-              Meri Batch / Coupon Redeem
+              My Batch / Redeem Coupon
             </button>
             <button
               onClick={() => navigate("/HomePage")}
               className="w-full py-3 rounded-lg border border-gray-700 text-gray-300"
             >
-              Home Jaayein
+              Go Home
             </button>
           </div>
         ) : (
@@ -146,14 +145,14 @@ const CustomTests = () => {
                   </span>
                 </div>
                 <p className="text-xs text-gray-500">
-                  {t.totalQuestions} sawaal &middot; {t.durationMinutes} min &middot;{" "}
+                  {t.totalQuestions} questions &middot; {t.durationMinutes} min &middot;{" "}
                   {t.negativeMarking > 0
                     ? `-${t.negativeMarking} negative`
                     : "no negative marking"}
                 </p>
                 {t.attemptsCount > 0 && (
                   <p className="text-xs text-[#A78BFA] mt-2">
-                    {t.attemptsCount} baar diya &middot; Best Score: {t.bestScore}
+                    {t.attemptsCount} attempt(s) &middot; Best Score: {t.bestScore}
                   </p>
                 )}
               </button>

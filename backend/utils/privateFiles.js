@@ -15,7 +15,7 @@ const ensureCloudinary = () => {
   if (configured) return;
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error("Cloudinary env variables set nahi hain.");
+    throw new Error("Cloudinary env variables are not set.");
   }
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
@@ -67,12 +67,12 @@ export const fetchPdfBuffer = async ({ publicId, url }) => {
       expires_at: Math.floor(Date.now() / 1000) + 120,
     });
   }
-  if (!downloadUrl) throw new Error("File ka source nahi mila.");
+  if (!downloadUrl) throw new Error("File source not found.");
 
   const response = await fetch(downloadUrl);
   if (!response.ok) throw new Error(`File download failed (${response.status})`);
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  if (!isPdfBuffer(buffer)) throw new Error("File PDF nahi hai.");
+  if (!isPdfBuffer(buffer)) throw new Error("The file is not a PDF.");
   return buffer;
 };

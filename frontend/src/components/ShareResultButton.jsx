@@ -54,7 +54,7 @@ const drawCard = ({ title, score, maxScore, correct, wrong, unattempted, extraLi
 
   ctx.fillStyle = "#94A3B8";
   ctx.font = "500 34px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
-  ctx.fillText("Mera test result", 90, 250);
+  ctx.fillText("My test result", 90, 250);
 
   ctx.fillStyle = "#FFFFFF";
   fitText(ctx, title || "Mock Test", W - 180, 60);
@@ -81,9 +81,9 @@ const drawCard = ({ title, score, maxScore, correct, wrong, unattempted, extraLi
   const attempted = (correct || 0) + (wrong || 0);
   const accuracy = attempted ? Math.round(((correct || 0) / attempted) * 100) : 0;
   const tiles = [
-    { label: "Sahi", value: correct ?? 0, color: "#4ADE80" },
-    { label: "Galat", value: wrong ?? 0, color: "#F87171" },
-    { label: "Chhode", value: unattempted ?? 0, color: "#CBD5E1" },
+    { label: "Correct", value: correct ?? 0, color: "#4ADE80" },
+    { label: "Wrong", value: wrong ?? 0, color: "#F87171" },
+    { label: "Skipped", value: unattempted ?? 0, color: "#CBD5E1" },
     { label: "Accuracy", value: `${accuracy}%`, color: "#FBBF24" },
   ];
   const gap = 24;
@@ -113,10 +113,10 @@ const drawCard = ({ title, score, maxScore, correct, wrong, unattempted, extraLi
   ctx.fill();
   ctx.fillStyle = "#FFFFFF";
   ctx.font = "700 40px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
-  ctx.fillText("Tum bhi try karo — free mock tests!", W / 2, 1180);
+  ctx.fillText("You try it too — free mock tests!", W / 2, 1180);
   ctx.font = "600 34px system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
   ctx.fillStyle = "#EDE9FE";
-  ctx.fillText(refCode ? `Signup par code daalo: ${refCode}` : "AntimPrayash.in", W / 2, 1235);
+  ctx.fillText(refCode ? `Use code ${refCode} when you sign up` : "AntimPrayash.in", W / 2, 1235);
 
   return canvas;
 };
@@ -129,8 +129,8 @@ const ShareResultButton = ({ title, score, maxScore, correct, wrong, unattempted
   const [preview, setPreview] = useState(null); // { url, file }
 
   const shareText = () => {
-    const base = `Maine "${title || "Mock Test"}" mein ${score}${maxScore ? `/${maxScore}` : ""} score kiya! 📚`;
-    return ref ? `${base}\nTum bhi try karo — mera code: ${ref.code}\n${ref.link}` : `${base}\nAntimPrayash.in`;
+    const base = `I scored ${score}${maxScore ? `/${maxScore}` : ""} in "${title || "Mock Test"}"! 📚`;
+    return ref ? `${base}\nTry it too — my code: ${ref.code}\n${ref.link}` : `${base}\nAntimPrayash.in`;
   };
 
   const handleShare = async () => {
@@ -143,7 +143,7 @@ const ShareResultButton = ({ title, score, maxScore, correct, wrong, unattempted
 
       if (navigator.canShare?.({ files: [file] })) {
         try {
-          await navigator.share({ files: [file], text, title: "Mera result" });
+          await navigator.share({ files: [file], text, title: "My result" });
           return;
         } catch (err) {
           if (err?.name === "AbortError") return; // user ne khud cancel kiya
@@ -168,7 +168,7 @@ const ShareResultButton = ({ title, score, maxScore, correct, wrong, unattempted
         disabled={busy}
         className={`w-full py-3 rounded-xl bg-[#25D366] hover:bg-[#1FBD5A] text-black font-bold text-sm transition-colors disabled:opacity-60 ${className}`}
       >
-        {busy ? "Card ban raha hai..." : "📤 Result share karein"}
+        {busy ? "Creating card..." : "📤 Share result"}
       </button>
 
       {preview && (
@@ -192,9 +192,9 @@ const ShareResultButton = ({ title, score, maxScore, correct, wrong, unattempted
                 WhatsApp
               </a>
             </div>
-            <p className="text-[11px] text-gray-500 text-center">Image download karke WhatsApp status / Instagram par lagayein.</p>
+            <p className="text-[11px] text-gray-500 text-center">Download the image and post it on your WhatsApp status / Instagram.</p>
             <button onClick={closePreview} className="w-full py-2 text-xs text-gray-400">
-              Band karein
+              Close
             </button>
           </div>
         </div>

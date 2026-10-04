@@ -15,7 +15,7 @@ export const getExamStructure = async (req, res) => {
   try {
     const { examName } = req.params;
     if (!examName) {
-      return res.status(400).json({ success: false, message: "examName zaroori hai." });
+      return res.status(400).json({ success: false, message: "examName is required." });
     }
 
     const blueprints = await Blueprint.find({ examName }).select("blueprintName subjects");
@@ -50,6 +50,6 @@ export const getExamStructure = async (req, res) => {
     });
   } catch (error) {
     console.error("getExamStructure error:", error);
-    return res.status(500).json({ success: false, message: "Structure fetch karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while fetching the structure." });
   }
 };

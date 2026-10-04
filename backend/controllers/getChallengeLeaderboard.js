@@ -12,7 +12,7 @@ export const getChallengeLeaderboard = async (req, res) => {
     if (!challengeCode) {
       return res.status(400).json({
         success: false,
-        message: "Challenge code zaroori hai!",
+        message: "Challenge code is required!",
       });
     }
 
@@ -26,7 +26,7 @@ export const getChallengeLeaderboard = async (req, res) => {
     if (!challenge) {
       return res.status(404).json({
         success: false,
-        message: "Ye challenge nahi mila. Shayad expire ho gaya ho ya code galat ho.",
+        message: "Challenge not found. It may have expired or the code may be wrong.",
       });
     }
 
@@ -85,7 +85,7 @@ export const getChallengeLeaderboard = async (req, res) => {
     console.error("getChallengeLeaderboard error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya leaderboard fetch karte waqt.",
+      message: "Server error while fetching the leaderboard.",
       error: error.message,
     });
   }

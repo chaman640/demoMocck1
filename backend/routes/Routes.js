@@ -305,7 +305,7 @@ router.get("/blueprints/:examName", userInfo, async (req, res) => {
     console.error("blueprints error:", error);
     res.status(500).json({
       success: false,
-      message: "Blueprints fetch karne mein error aaya",
+      message: "Error while fetching blueprints",
       // 🔒 Round 1: production me asli error message bahar nahi jata —
       // usme model/field ke naam hote hain jo attacker ke kaam aate hain.
       ...(process.env.NODE_ENV === "production" ? {} : { error: error.message }),

@@ -20,7 +20,7 @@ export const adminCreatePromoter = async (req, res) => {
     if (!name || !email || !phone || !password) {
       return res.status(400).json({
         success: false,
-        message: "Naam, email, phone aur password sabhi zaroori hain!",
+        message: "Name, email, phone and password are all required!",
       });
     }
 
@@ -28,13 +28,13 @@ export const adminCreatePromoter = async (req, res) => {
     const normalizedPhone = String(phone).trim();
 
     if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-      return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+      return res.status(400).json({ success: false, message: "Please enter a valid email!" });
     }
     if (!/^\d{10}$/.test(normalizedPhone)) {
-      return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
     }
     if (String(password).length < 6) {
-      return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
+      return res.status(400).json({ success: false, message: "Password must be at least 6 characters!" });
     }
 
     const existing = await Promoter.findOne({
@@ -43,7 +43,7 @@ export const adminCreatePromoter = async (req, res) => {
     if (existing) {
       return res.status(400).json({
         success: false,
-        message: "Is email ya phone se promoter account pehle hi maujood hai!",
+        message: "A promoter account with this email or phone already exists!",
       });
     }
 
@@ -60,7 +60,7 @@ export const adminCreatePromoter = async (req, res) => {
     if (!code) {
       return res.status(500).json({
         success: false,
-        message: "Promoter code generate karne mein dikkat aa rahi hai, dobara try karein.",
+        message: "Problem generating the promoter code, please try again.",
       });
     }
 
@@ -97,8 +97,8 @@ export const adminCreatePromoter = async (req, res) => {
     return res.status(201).json({
       success: true,
       message: emailSent
-        ? "Promoter ban gaya aur credentials email bhej diye gaye hain!"
-        : "Promoter ban gaya, lekin email bhejne mein dikkat aayi — code/password khud bata dein.",
+        ? "Promoter created and credentials sent by email!"
+        : "Promoter created, but the email could not be sent — share the code/password yourself.",
       data: {
         promoterId: newPromoter._id,
         code,
@@ -110,11 +110,11 @@ export const adminCreatePromoter = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Is email, phone ya code se account pehle hi maujood hai.",
+        message: "An account with this email, phone or code already exists.",
       });
     }
     console.error("adminCreatePromoter error:", error);
-    return res.status(500).json({ success: false, message: "Promoter banate waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while creating the promoter." });
   }
 };
 
@@ -141,7 +141,7 @@ export const adminListPromoters = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("adminListPromoters error:", error);
-    return res.status(500).json({ success: false, message: "Promoters list karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while listing promoters." });
   }
 };
 
@@ -152,17 +152,17 @@ export const adminUpdatePromoter = async (req, res) => {
 
     const promoter = await Promoter.findById(promoterId);
     if (!promoter) {
-      return res.status(404).json({ success: false, message: "Promoter nahi mila!" });
+      return res.status(404).json({ success: false, message: "Promoter not found!" });
     }
 
     if (email) {
       const normalizedEmail = String(email).toLowerCase().trim();
       if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
-        return res.status(400).json({ success: false, message: "Sahi email daalein!" });
+        return res.status(400).json({ success: false, message: "Please enter a valid email!" });
       }
       const emailTaken = await Promoter.findOne({ email: normalizedEmail, _id: { $ne: promoterId } });
       if (emailTaken) {
-        return res.status(400).json({ success: false, message: "Ye email pehle se kisi aur promoter ke pass hai!" });
+        return res.status(400).json({ success: false, message: "This email already belongs to another promoter!" });
       }
       promoter.email = normalizedEmail;
     }
@@ -170,11 +170,11 @@ export const adminUpdatePromoter = async (req, res) => {
     if (phone) {
       const normalizedPhone = String(phone).trim();
       if (!/^\d{10}$/.test(normalizedPhone)) {
-        return res.status(400).json({ success: false, message: "Phone number bilkul 10 anko ka hona chahiye!" });
+        return res.status(400).json({ success: false, message: "Phone number must be exactly 10 digits!" });
       }
       const phoneTaken = await Promoter.findOne({ phone: normalizedPhone, _id: { $ne: promoterId } });
       if (phoneTaken) {
-        return res.status(400).json({ success: false, message: "Ye phone number pehle se kisi aur promoter ke pass hai!" });
+        return res.status(400).json({ success: false, message: "This phone number already belongs to another promoter!" });
       }
       promoter.phone = normalizedPhone;
     }
@@ -183,7 +183,7 @@ export const adminUpdatePromoter = async (req, res) => {
 
     if (newPassword) {
       if (String(newPassword).length < 6) {
-        return res.status(400).json({ success: false, message: "Password kam se kam 6 characters ka hona chahiye!" });
+        return res.status(400).json({ success: false, message: "Password must be at least 6 characters!" });
       }
       const salt = await bcrypt.genSalt(10);
       promoter.password = await bcrypt.hash(String(newPassword), salt);
@@ -195,7 +195,7 @@ export const adminUpdatePromoter = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Promoter update ho gaya!",
+      message: "Promoter updated!",
       data: {
         _id: promoter._id,
         name: promoter.name,
@@ -208,10 +208,10 @@ export const adminUpdatePromoter = async (req, res) => {
     });
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(409).json({ success: false, message: "Is email ya phone se account pehle hi maujood hai." });
+      return res.status(409).json({ success: false, message: "An account with this email or phone already exists." });
     }
     console.error("adminUpdatePromoter error:", error);
-    return res.status(500).json({ success: false, message: "Promoter update karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while updating the promoter." });
   }
 };
 
@@ -221,21 +221,21 @@ export const adminSetPromoterStatus = async (req, res) => {
     const { status } = req.body;
 
     if (!["active", "removed"].includes(status)) {
-      return res.status(400).json({ success: false, message: "status 'active' ya 'removed' hona chahiye!" });
+      return res.status(400).json({ success: false, message: "status must be 'active' or 'removed'!" });
     }
 
     const promoter = await Promoter.findByIdAndUpdate(promoterId, { status }, { new: true }).select("-password");
     if (!promoter) {
-      return res.status(404).json({ success: false, message: "Promoter nahi mila!" });
+      return res.status(404).json({ success: false, message: "Promoter not found!" });
     }
 
     return res.status(200).json({
       success: true,
-      message: status === "removed" ? "Promoter remove kar diya gaya." : "Promoter active kar diya gaya.",
+      message: status === "removed" ? "Promoter removed." : "Promoter activated.",
       data: promoter,
     });
   } catch (error) {
     console.error("adminSetPromoterStatus error:", error);
-    return res.status(500).json({ success: false, message: "Status badalte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while changing status." });
   }
 };

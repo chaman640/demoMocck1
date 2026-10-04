@@ -33,6 +33,6 @@ export const getBooksForStudent = async (req, res) => {
     return res.status(200).json({ success: true, data });
   } catch (error) {
     console.error("getBooksForStudent error:", error);
-    return res.status(500).json({ success: false, message: "Books list nahi ho payi." });
+    return res.status(500).json({ success: false, message: "Could not load the books list." });
   }
 };

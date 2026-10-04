@@ -20,11 +20,11 @@ export const checkCustomTestAnswer = async (req, res) => {
     }
 
     const test = await CustomTest.findOne({ _id: testId, isActive: true });
-    if (!test) return res.status(404).json({ success: false, message: "Ye test nahi mila." });
+    if (!test) return res.status(404).json({ success: false, message: "Test not found." });
 
     const studentCouponId = req.user.activeCoupon ? req.user.activeCoupon.toString() : null;
     if (studentCouponId !== test.couponId.toString()) {
-      return res.status(403).json({ success: false, message: "Ye test aapki batch ke liye available nahi hai." });
+      return res.status(403).json({ success: false, message: "This test is not available for your batch." });
     }
 
     let question = null;
@@ -32,7 +32,7 @@ export const checkCustomTestAnswer = async (req, res) => {
       question = subj.questions.find((q) => q._id.toString() === questionId);
       if (question) break;
     }
-    if (!question) return res.status(404).json({ success: false, message: "Ye sawaal is test ka nahi hai." });
+    if (!question) return res.status(404).json({ success: false, message: "This question is not part of this test." });
 
     // Pehli baar check karte waqt ka answer lock — dobara check par wahi rahega
     const reveal = await CustomTestReveal.findOneAndUpdate(
@@ -53,6 +53,6 @@ export const checkCustomTestAnswer = async (req, res) => {
     });
   } catch (error) {
     console.error("checkCustomTestAnswer error:", error);
-    return res.status(500).json({ success: false, message: "Answer check nahi ho paya." });
+    return res.status(500).json({ success: false, message: "Could not check the answer." });
   }
 };

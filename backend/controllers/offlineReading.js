@@ -112,15 +112,15 @@ export const downloadOfflineItem = async (req, res) => {
     const label = String(req.body?.deviceLabel || "").slice(0, 80);
 
     if (!ITEM_TYPES.includes(itemType)) {
-      return res.status(400).json({ success: false, message: "Galat item type." });
+      return res.status(400).json({ success: false, message: "Invalid item type." });
     }
     if (!isValidDeviceId(deviceId)) {
-      return res.status(400).json({ success: false, message: "Device ID galat hai. App reload karke try karein." });
+      return res.status(400).json({ success: false, message: "Invalid device ID. Reload the app and try again." });
     }
 
     const access = await resolveItemAccess(req.user, itemType, itemId);
     if (!access) {
-      return res.status(403).json({ success: false, message: "Aapke paas ise padhne ki permission nahi hai." });
+      return res.status(403).json({ success: false, message: "You do not have permission to read this." });
     }
 
     const device = await registerDevice(req.user, deviceId, label);
@@ -129,7 +129,7 @@ export const downloadOfflineItem = async (req, res) => {
       return res.status(409).json({
         success: false,
         code: "DEVICE_LIMIT",
-        message: `Aapka account pehle se ${MAX_OFFLINE_DEVICES} phones par chal raha hai. Naye phone par padhne ke liye ek purana phone hatayein.`,
+        message: `Your account is already in use on ${MAX_OFFLINE_DEVICES} phones. Remove an old phone to read on a new one.`,
         devices: devices.map((d) => deviceView(d, deviceId)),
       });
     }
@@ -139,7 +139,7 @@ export const downloadOfflineItem = async (req, res) => {
       pdfBuffer = await fetchPdfBuffer(access.source);
     } catch (error) {
       console.error("offline fetchPdfBuffer error:", error.message);
-      return res.status(502).json({ success: false, message: "File abhi load nahi ho payi. Thodi der baad try karein." });
+      return res.status(502).json({ success: false, message: "The file could not be loaded right now. Try again in a little while." });
     }
 
     const pkg = await buildOfflinePackage(pdfBuffer, req.user);
@@ -165,7 +165,7 @@ export const downloadOfflineItem = async (req, res) => {
     return res.status(200).send(pkg.cipher);
   } catch (error) {
     console.error("downloadOfflineItem error:", error);
-    return res.status(500).json({ success: false, message: "File taiyaar karte waqt error aaya." });
+    return res.status(500).json({ success: false, message: "Error while preparing the file." });
   }
 };
 
@@ -174,7 +174,7 @@ export const syncOfflineLicenses = async (req, res) => {
     const deviceId = String(req.body?.deviceId || "");
     const licenseIds = Array.isArray(req.body?.licenseIds) ? req.body.licenseIds.slice(0, 500) : [];
     if (!isValidDeviceId(deviceId)) {
-      return res.status(400).json({ success: false, message: "Device ID galat hai." });
+      return res.status(400).json({ success: false, message: "Invalid device ID." });
     }
 
     const validIds = licenseIds.filter((id) => mongoose.Types.ObjectId.isValid(id));
@@ -211,7 +211,7 @@ export const syncOfflineLicenses = async (req, res) => {
     return res.status(200).json({ success: true, data: results });
   } catch (error) {
     console.error("syncOfflineLicenses error:", error);
-    return res.status(500).json({ success: false, message: "Sync nahi ho paya." });
+    return res.status(500).json({ success: false, message: "Could not sync." });
   }
 };
 
@@ -225,7 +225,7 @@ export const listOfflineDevices = async (req, res) => {
     });
   } catch (error) {
     console.error("listOfflineDevices error:", error);
-    return res.status(500).json({ success: false, message: "Devices load nahi ho paye." });
+    return res.status(500).json({ success: false, message: "Could not load devices." });
   }
 };
 
@@ -233,7 +233,7 @@ export const removeOfflineDevice = async (req, res) => {
   try {
     const { deviceId } = req.params;
     const device = await OfflineDevice.findOne({ user: req.user._id, deviceId, active: true });
-    if (!device) return res.status(404).json({ success: false, message: "Device nahi mila." });
+    if (!device) return res.status(404).json({ success: false, message: "Device not found." });
 
     const recentRemovals = await OfflineDeviceRemoval.countDocuments({
       user: req.user._id,
@@ -242,7 +242,7 @@ export const removeOfflineDevice = async (req, res) => {
     if (recentRemovals >= MAX_REMOVALS_PER_30_DAYS) {
       return res.status(429).json({
         success: false,
-        message: `30 din mein sirf ${MAX_REMOVALS_PER_30_DAYS} baar phone hata sakte hain. Kuch din baad try karein.`,
+        message: `You can remove a phone only ${MAX_REMOVALS_PER_30_DAYS} times in 30 days. Try again in a few days.`,
       });
     }
 
@@ -255,10 +255,10 @@ export const removeOfflineDevice = async (req, res) => {
       { $set: { revokedAt: new Date() } }
     );
 
-    return res.status(200).json({ success: true, message: "Phone hata diya gaya." });
+    return res.status(200).json({ success: true, message: "Phone removed." });
   } catch (error) {
     console.error("removeOfflineDevice error:", error);
-    return res.status(500).json({ success: false, message: "Phone hata nahi paye." });
+    return res.status(500).json({ success: false, message: "Could not remove the phone." });
   }
 };
 
@@ -289,6 +289,6 @@ export const listNotesForStudent = async (req, res) => {
     });
   } catch (error) {
     console.error("listNotesForStudent error:", error);
-    return res.status(500).json({ success: false, message: "Notes load nahi ho paye." });
+    return res.status(500).json({ success: false, message: "Could not load notes." });
   }
 };

@@ -156,7 +156,7 @@ export const getTeacherDashboard = async (req, res) => {
     console.error("getTeacherDashboard error:", error);
     return res.status(500).json({
       success: false,
-      message: "Dashboard fetch karte waqt error aaya.",
+      message: "Error while fetching the dashboard.",
       error: error.message,
     });
   }

@@ -7,7 +7,7 @@ export const getMySubTeachers = async (req, res) => {
     if (req.teacher.role !== "main") {
       return res.status(403).json({
         success: false,
-        message: "Sirf Main Teacher hi apne sub-teachers dekh sakta hai!",
+        message: "Only a Main Teacher can view their sub-teachers!",
       });
     }
 
@@ -60,7 +60,7 @@ export const getMySubTeachers = async (req, res) => {
     console.error("getMySubTeachers error:", error);
     return res.status(500).json({
       success: false,
-      message: "Sub-teachers fetch karte waqt error aaya.",
+      message: "Error while fetching sub-teachers.",
       error: error.message,
     });
   }

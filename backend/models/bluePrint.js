@@ -36,7 +36,7 @@ const subjectSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Har subject mein kam se kam ek topic hona chahiye",
+        message: "Every subject must have at least one topic",
       },
     },
   },
@@ -47,25 +47,25 @@ const blueprintSchema = new mongoose.Schema(
   {
     blueprintName: {
       type: String,
-      required: [true, "Blueprint ka naam zaroori hai"],
+      required: [true, "Blueprint name is required"],
       trim: true,
     },
     examName: {
       type: String,
-      required: [true, "Kis exam ka blueprint hai, ye batana zaroori hai"],
+      required: [true, "The exam this blueprint is for is required"],
       trim: true,
     },
     totalQuestions: {
       type: Number,
-      required: [true, "Total questions batana zaroori hai"],
+      required: [true, "Total questions is required"],
     },
     marksPerQuestion: {
       type: Number,
-      required: [true, "Marks per question dena zaroori hai"],
+      required: [true, "Marks per question is required"],
     },
     negativeMarking: {
       type: Number,
-      required: [true, "Negative marking batana zaroori hai. (0 likhein agar nahi hai)"],
+      required: [true, "Negative marking is required. (Enter 0 if there is none)"],
       default: 0,
     },
     durationMinutes: {
@@ -77,7 +77,7 @@ const blueprintSchema = new mongoose.Schema(
       required: true,
       validate: {
         validator: (arr) => Array.isArray(arr) && arr.length > 0,
-        message: "Kam se kam ek subject hona chahiye",
+        message: "There must be at least one subject",
       },
     },
     mockType: {
@@ -100,13 +100,13 @@ blueprintSchema.pre("validate", function (next) {
     if (topicsSum !== subject.questionCount) {
       return next(
         new Error(
-          `Subject '${subject.subjectName}' ka questionCount (${subject.questionCount}) uske topics ke total (${topicsSum}) se match nahi karta.`
+          `Subject '${subject.subjectName}' questionCount (${subject.questionCount}) does not match the total of its topics (${topicsSum}).`
         )
       );
     }
     for (const topic of subject.topics || []) {
       if (topic.isUnseenPassage && !topic.passageLanguage) {
-        return next(new Error(`Topic '${topic.topicName}' Unseen Passage hai lekin uski language (Hindi/English) nahi batayi gayi.`));
+        return next(new Error(`Topic '${topic.topicName}' is an Unseen Passage but its language (Hindi/English) is not set.`));
       }
     }
   }
@@ -114,7 +114,7 @@ blueprintSchema.pre("validate", function (next) {
   const subjectsSum = (this.subjects || []).reduce((sum, s) => sum + s.questionCount, 0);
   if (subjectsSum !== this.totalQuestions) {
     return next(
-      new Error(`totalQuestions (${this.totalQuestions}) subjects ke total (${subjectsSum}) se match nahi karta.`)
+      new Error(`totalQuestions (${this.totalQuestions}) does not match the subjects total (${subjectsSum}).`)
     );
   }
 

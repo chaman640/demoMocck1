@@ -12,7 +12,7 @@ export const getClassQuestionAnalysis = async (req, res) => {
     const { filter = "all", minPercentile, maxPercentile } = req.query;
 
     if (!subjectName || !topicName) {
-      return res.status(400).json({ success: false, message: "subjectName aur topicName zaroori hain." });
+      return res.status(400).json({ success: false, message: "subjectName and topicName are required." });
     }
 
     // Sub-teacher apne authorized subject ke alawa kisi aur subject ka
@@ -24,7 +24,7 @@ export const getClassQuestionAnalysis = async (req, res) => {
     if (Array.isArray(allowedSubjects) && !allowedSubjects.some((a) => sameSubject(a, subjectName))) {
       return res.status(403).json({
         success: false,
-        message: `Aap '${normalizeSubject(subjectName)}' subject ke liye authorized nahi hain.`,
+        message: `You are not authorized for subject '${normalizeSubject(subjectName)}'.`,
       });
     }
 
@@ -34,7 +34,7 @@ export const getClassQuestionAnalysis = async (req, res) => {
     if (studentIds.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "Is batch mein abhi koi student nahi hai.",
+        message: "There are no students in this batch yet.",
         data: { questions: [], totalBatchStudents, selectedCount: 0 },
       });
     }
@@ -58,7 +58,7 @@ export const getClassQuestionAnalysis = async (req, res) => {
     console.error("getClassQuestionAnalysis error:", error);
     return res.status(error.statusCode || 500).json({
       success: false,
-      message: error.statusCode ? error.message : "Class question analysis fetch karte waqt error aaya.",
+      message: error.statusCode ? error.message : "Error while fetching class question analysis.",
       error: error.statusCode ? undefined : error.message,
     });
   }

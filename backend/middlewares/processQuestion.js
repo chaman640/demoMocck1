@@ -27,7 +27,7 @@ const ensureCloudinary = () => {
     // 🐛 FIX: pehle env missing hone par bhi upload try hota tha aur
     // ek confusing error aata tha. Ab saaf message milta hai.
     throw new Error(
-      "Cloudinary env variables set nahi hain (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
+      "Cloudinary env variables are not set (CLOUDINARY_CLOUD_NAME / CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET)."
     );
   }
 
@@ -109,18 +109,18 @@ export const processQuestionMiddleware = (req, res, next) => {
       if (!question || !option1 || !option2 || !option3 || !option4 || !subjectName || !topicName) {
         return res
           .status(400)
-          .json({ success: false, message: "❌ Sabhi fields aur options zaroori hain!" });
+          .json({ success: false, message: "❌ All fields and options are required!" });
       }
       // 🐛 FIX #4: answerExplain schema mein `required: true` hai, lekin yahan
       // check nahi hota tha → save() pe mongoose ValidationError aur 500 error.
       if (!answerExplain) {
-        return res.status(400).json({ success: false, message: "❌ answerExplain zaroori hai!" });
+        return res.status(400).json({ success: false, message: "❌ answerExplain is required!" });
       }
       const correctOpt = Number(correctOption);
       if (!correctOpt || correctOpt < 1 || correctOpt > 4) {
         return res
           .status(400)
-          .json({ success: false, message: "❌ correctOption 1 se 4 ke beech hona chahiye!" });
+          .json({ success: false, message: "❌ correctOption must be between 1 and 4!" });
       }
       req.body.correctOption = correctOpt;
 
@@ -136,7 +136,7 @@ export const processQuestionMiddleware = (req, res, next) => {
       if (!parsedExamName || !Array.isArray(parsedExamName) || parsedExamName.length === 0) {
         return res
           .status(400)
-          .json({ success: false, message: "❌ examName array hona zaroori hai!" });
+          .json({ success: false, message: "❌ examName must be an array!" });
       }
       req.body.examName = parsedExamName;
 
@@ -159,7 +159,7 @@ export const processQuestionMiddleware = (req, res, next) => {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "❌ Middleware mein processing error aaya",
+        message: "❌ Processing error in middleware",
         error: error.message,
       });
     }

@@ -11,7 +11,7 @@ export const redeemCoupon = async (req, res) => {
     if (typeof code !== "string" || !code.trim()) {
       return res.status(400).json({
         success: false,
-        message: "Coupon code zaroori hai!",
+        message: "Coupon code is required!",
       });
     }
 
@@ -22,7 +22,7 @@ export const redeemCoupon = async (req, res) => {
     if (!coupon) {
       return res.status(404).json({
         success: false,
-        message: "Ye coupon code nahi mila. Sahi code check karein.",
+        message: "Coupon code not found. Check the code.",
       });
     }
 
@@ -33,7 +33,7 @@ export const redeemCoupon = async (req, res) => {
     if (coupon.exam !== req.user.exam) {
       return res.status(400).json({
         success: false,
-        message: `Ye coupon '${coupon.exam}' exam ke liye hai, lekin aapka current exam '${req.user.exam}' hai.`,
+        message: `This coupon is for the '${coupon.exam}' exam, but your current exam is '${req.user.exam}'.`,
       });
     }
 
@@ -50,7 +50,7 @@ export const redeemCoupon = async (req, res) => {
     if (!accessCheck.allowed) {
       return res.status(403).json({
         success: false,
-        message: "Aap is batch mein nahi hain. Apne teacher se sampark karein.",
+        message: "You are not in this batch. Contact your teacher.",
       });
     }
 
@@ -60,7 +60,7 @@ export const redeemCoupon = async (req, res) => {
     if (req.user.activeCoupon && req.user.activeCoupon.toString() === coupon._id.toString()) {
       return res.status(400).json({
         success: false,
-        message: "Aap pehle se is batch mein enrolled hain!",
+        message: "You are already enrolled in this batch!",
       });
     }
 
@@ -96,7 +96,7 @@ export const redeemCoupon = async (req, res) => {
     // ─────────────────────────────────────────────
     return res.status(200).json({
       success: true,
-      message: `'${coupon.name}' batch mein successfully enroll ho gaye!`,
+      message: `Successfully enrolled in batch '${coupon.name}'!`,
       data: {
         activeCoupon: {
           _id: coupon._id,
@@ -110,7 +110,7 @@ export const redeemCoupon = async (req, res) => {
     console.error("redeemCoupon error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server mein error aa gaya coupon redeem karte waqt.",
+      message: "Server error while redeeming the coupon.",
       error: error.message,
     });
   }

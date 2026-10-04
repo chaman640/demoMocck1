@@ -69,7 +69,7 @@ const key = (s) => norm(s).toLowerCase();
 // Chip par click karne se naam clipboard me copy ho jata hai,
 // ya onPick diya ho to wo call hota hai.
 // ─────────────────────────────────────────────
-export const SubjectHints = ({ onPick, label = "Is batch ke subjects" }) => {
+export const SubjectHints = ({ onPick, label = "Subjects of this batch" }) => {
   const { subjects, exam } = useTeacherSubjects();
   const [copied, setCopied] = useState(null);
 
@@ -89,8 +89,8 @@ export const SubjectHints = ({ onPick, label = "Is batch ke subjects" }) => {
   return (
     <div className="mb-2">
       <p className="text-[10px] text-gray-500 mb-1.5">
-        {label} {exam ? `(${exam})` : ""} — ★ wale Mock Test blueprint ke hain.
-        Click karke naam copy karein, spelling bilkul yahi rakhein:
+        {label} {exam ? `(${exam})` : ""} — names with ★ are from the Mock Test blueprint.
+        Click a name to copy it, and keep the spelling exactly the same:
       </p>
       <div className="flex flex-wrap gap-1.5">
         {subjects.map((s) => (
@@ -100,8 +100,8 @@ export const SubjectHints = ({ onPick, label = "Is batch ke subjects" }) => {
             onClick={() => handle(s.name)}
             title={
               s.inBlueprint
-                ? "Mock Test blueprint ka subject — iske sawaal Mock Test mein aayenge"
-                : "Sirf is batch mein use ho raha hai — Mock Test mein nahi aayega"
+                ? "Mock Test blueprint subject — its questions will appear in Mock Tests"
+                : "Used only in this batch — will not appear in Mock Tests"
             }
             className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
               s.inBlueprint
@@ -127,7 +127,7 @@ export const SubjectHints = ({ onPick, label = "Is batch ke subjects" }) => {
 const SubjectPicker = ({
   value = "",
   onChange,
-  placeholder = "Subject naam",
+  placeholder = "Subject name",
   className = "",
   compact = false,
   wrapperClassName = "",
@@ -169,8 +169,8 @@ const SubjectPicker = ({
               onClick={() => onChange(s.name)}
               title={
                 s.inBlueprint
-                  ? "Mock Test blueprint ka subject — iske sawaal Mock Test mein aayenge"
-                  : "Sirf is batch mein use ho raha hai — Mock Test mein nahi aayega"
+                  ? "Mock Test blueprint subject — its questions will appear in Mock Tests"
+                  : "Used only in this batch — will not appear in Mock Tests"
               }
               className={`text-[11px] px-2 py-1 rounded-full border transition-colors ${
                 key(s.name) === key(current)
@@ -189,16 +189,15 @@ const SubjectPicker = ({
 
       {isBrandNew && (
         <p className="text-[11px] text-yellow-500 mt-1.5 leading-relaxed">
-          🆕 <b>{current}</b> — ye naya subject ban jayega. Spelling check kar lein
-          (upar diye gaye naamon me se chunna zyada safe hai).
+          🆕 <b>{current}</b> — this will create a new subject. Please check the spelling (choosing one of the names above is safer).
         </p>
       )}
 
       {notInBlueprint && hasBlueprintSubjects && (
         <p className="text-[11px] text-orange-400 mt-1 leading-relaxed">
-          ⚠️ <b>{current}</b> {exam ? `'${exam}' ke ` : ""}Mock Test blueprint me nahi hai —
-          iske sawaal Custom Test / PYQ me chalenge, lekin auto-generate hone wale
-          Mock Test me nahi aayenge.
+          ⚠️ <b>{current}</b> is not in the {exam ? `'${exam}' ` : ""}Mock Test blueprint —
+          its questions will work in Custom Tests / PYQs, but they will not appear
+          in auto-generated Mock Tests.
         </p>
       )}
     </div>

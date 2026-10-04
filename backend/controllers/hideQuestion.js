@@ -7,7 +7,7 @@ export const hideQuestion = async (req, res) => {
     const { questionId } = req.body;
 
     if (!questionId) {
-      return res.status(400).json({ success: false, message: "questionId zaroori hai!" });
+      return res.status(400).json({ success: false, message: "questionId is required!" });
     }
 
     // upsert — agar pehle se hidden hai to bhi error na aaye
@@ -19,12 +19,12 @@ export const hideQuestion = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Ye sawaal analysis se hata diya gaya.",
+      message: "This question has been removed from the analysis.",
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Sawaal hide karte waqt error aaya.",
+      message: "Error while hiding the question.",
       error: error.message,
     });
   }

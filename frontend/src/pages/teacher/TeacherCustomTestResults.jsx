@@ -72,7 +72,7 @@ const TeacherCustomTestResults = () => {
       <div className="min-h-screen bg-[#0A0D14] text-white flex items-center justify-center px-6 pb-24">
         <div className="max-w-md text-center space-y-4">
           <p className="text-gray-300">{leaderboardQuery.error?.response?.data?.message || "Could not load data."}</p>
-          <button onClick={() => navigate("/TeacherCustomTests")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Wapas Jaayein</button>
+          <button onClick={() => navigate("/TeacherCustomTests")} className="px-5 py-2 rounded-lg bg-[#7C3AED] hover:bg-[#6D28D9] text-sm font-medium">Go Back</button>
         </div>
         <TeacherBottomNav />
       </div>
@@ -82,11 +82,11 @@ const TeacherCustomTestResults = () => {
   return (
     <div className="min-h-screen bg-[#0A0D14] text-white px-4 sm:px-6 py-8 pb-24">
       <div className="max-w-2xl mx-auto space-y-6">
-        <button onClick={() => navigate("/TeacherCustomTests")} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">&larr; Custom Tests Par Wapas</button>
+        <button onClick={() => navigate("/TeacherCustomTests")} className="text-sm text-gray-400 hover:text-white flex items-center gap-1">&larr; Back to Custom Tests</button>
 
         <div>
           <h1 className="text-2xl font-bold mb-1">{board.testName}</h1>
-          <p className="text-gray-400 text-sm">{board.totalAttempted} / {board.totalBatchStudents} students ne diya &middot; {board.totalQuestions} sawaal &middot; max score {board.maxScore}</p>
+          <p className="text-gray-400 text-sm">{board.totalAttempted} / {board.totalBatchStudents} students attempted &middot; {board.totalQuestions} questions &middot; max score {board.maxScore}</p>
         </div>
 
         <div className="flex gap-2">
@@ -110,7 +110,7 @@ const TeacherCustomTestResults = () => {
 
             <div className="bg-[#111827] border border-gray-800 rounded-2xl overflow-hidden">
               {filteredLeaderboard.length === 0 ? (
-                <p className="p-6 text-sm text-gray-400 text-center">Koi student nahi mila.</p>
+                <p className="p-6 text-sm text-gray-400 text-center">No students found.</p>
               ) : (
                 <div className="divide-y divide-gray-800">
                   {filteredLeaderboard.map((r) => (
@@ -122,7 +122,7 @@ const TeacherCustomTestResults = () => {
                         <div className="min-w-0">
                           <p className="text-sm font-medium truncate">{r.name}</p>
                           <p className="text-[11px] text-gray-500">
-                            {r.attempted ? `${r.correctCount} sahi · ${r.wrongCount} galat · ${r.unattemptedCount} chhoda` : "Not attempted yet"}
+                            {r.attempted ? `${r.correctCount} correct · ${r.wrongCount} wrong · ${r.unattemptedCount} skipped` : "Not attempted yet"}
                           </p>
                         </div>
                       </div>
@@ -155,7 +155,7 @@ const TeacherCustomTestResults = () => {
                   <div key={q.questionId} className="bg-[#111827] border border-gray-800 rounded-2xl p-5">
                     <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
                       <span className="text-xs text-gray-500">Q{q.questionNumber} &middot; {q.subjectName} &middot; {q.topicName}</span>
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${wrongColor(q.wrongPercentage)}`}>{q.wrongPercentage}% galat</span>
+                      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${wrongColor(q.wrongPercentage)}`}>{q.wrongPercentage}% wrong</span>
                     </div>
                     <p className="text-sm text-gray-200 mb-1 leading-relaxed">{q.question}</p>
                     {/* 🆕 Question photo (agar thi) */}
