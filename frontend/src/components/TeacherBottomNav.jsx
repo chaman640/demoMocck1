@@ -26,7 +26,7 @@ const isActivePath = (pathname, key) => {
     case "dashboard": return lower.startsWith("/teacherdashboard");
     case "coupons": return lower.startsWith("/teachercoupons") || lower.startsWith("/teacherbatchstudents") || lower.startsWith("/teachersubteachers");
     case "analysis": return lower.startsWith("/teacherclassanalysis") || lower.startsWith("/teacherstudentanalysis") || lower.startsWith("/teacherstudenttopicanalysis") || lower.startsWith("/teacherstudentsubjectanalysis") || lower.startsWith("/teacherstudentsearch");
-    case "content": return lower.startsWith("/teachercontent") || lower.startsWith("/teacherpyq") || lower.startsWith("/teachercustomtest") || lower.startsWith("/teachercurrentaffair");
+    case "content": return lower.startsWith("/teachercontent") || lower.startsWith("/teacherclasses") || lower.startsWith("/teacherclassdetail") || lower.startsWith("/teacherpyq") || lower.startsWith("/teachercustomtest") || lower.startsWith("/teachercurrentaffair");
     case "profile": return lower.startsWith("/teacherprofile");
     default: return false;
   }

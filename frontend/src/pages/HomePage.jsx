@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import { formatClassTime } from "../utils/classFormat";
 // 👆 top imports mein add karo
 import BottomNav from "../components/BottomNav";
 
@@ -136,6 +137,16 @@ const HomePage = () => {
   const averageScoreOutOf = overview?.averageScoreOutOf ?? null; // 👈 NAYA
   const totalTests = overview?.totalTestsGiven ?? 0;
 
+  // 🎥 Live class banner — classes of the student's batch that are live right now
+  const { data: liveClasses } = useQuery({
+    queryKey: ["classes-live-now"],
+    queryFn: async () => (await api.get("/classes/live-now")).data.data,
+    enabled: Boolean(user),
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+    retry: false,
+  });
+
   // 🆕 Coins + streak badge (header)
   const { data: rewardsSummary } = useQuery({
     queryKey: ["rewards-summary"],
@@ -177,6 +188,12 @@ const HomePage = () => {
 
   // Quick actions — swipe row mein dikhne wale
   const quickActions = [
+    {
+      icon: "🎥",
+      label: "Video Classes",
+      sub: "Live & recorded",
+      onClick: () => navigate("/Classes"),
+    },
     {
       icon: "📝",
       label: "Study Notes",
@@ -332,6 +349,36 @@ const HomePage = () => {
             Take mock tests, raise your score, and secure your selection
           </p>
         </section>
+
+        {/* 🎥 Live class / next class banner */}
+        {liveClasses?.live?.length > 0 ? (
+          <section className="mb-4 space-y-2">
+            {liveClasses.live.map((c) => (
+              <button
+                key={c._id}
+                onClick={() => navigate(`/Class/${c._id}`)}
+                className="w-full text-left rounded-2xl p-4 bg-gradient-to-r from-red-600/30 to-red-900/20 border border-red-500/40 active:scale-[0.98] transition-transform"
+              >
+                <p className="text-[11px] font-bold text-red-300 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> LIVE CLASS NOW · {c.subjectName}
+                </p>
+                <p className="text-sm font-bold mt-1 text-white">{c.title}</p>
+                <p className="text-xs text-red-200/80 mt-0.5">Tap to join →</p>
+              </button>
+            ))}
+          </section>
+        ) : liveClasses?.next ? (
+          <button
+            onClick={() => navigate(`/Class/${liveClasses.next._id}`)}
+            className="mb-4 w-full text-left rounded-2xl px-4 py-3 bg-[#111827] border border-amber-500/30 flex items-center gap-3"
+          >
+            <span className="text-xl">🗓</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] text-amber-300">Next live class · {formatClassTime(liveClasses.next.scheduledAt)}</p>
+              <p className="text-sm font-semibold text-white truncate">{liveClasses.next.title}</p>
+            </div>
+          </button>
+        ) : null}
 
         {/* Score Card */}
         <section 

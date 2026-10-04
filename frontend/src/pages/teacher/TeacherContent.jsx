@@ -6,6 +6,7 @@ const options = [
   // 🆕 HATA DIYA — "Add Question" (Mock Test wala Question Bank).
   // Ab sirf Admin Question Bank mein sawaal add kar sakta hai. Teacher
   // apne students ke liye "Custom Tests" se hi sawaal daal sakta hai.
+  { title: "Video Classes", desc: "Live classes, recordings and class notes — subject & topic folders", path: "/TeacherClasses", icon: "🎥" },
   { title: "Previous Year Papers", desc: "Create a paper shell or fill in your subject", path: "/TeacherPYQPapers", icon: "📚" },
   { title: "Custom Tests", desc: "Create weekly or chapter-wise tests", path: "/TeacherCustomTests", icon: "📝" },
   // 🆕 NAYA — apne batch ke liye current affairs

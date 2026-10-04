@@ -70,6 +70,10 @@ import CoinRewardListener from './components/CoinRewardListener';
 import Notes from './pages/Notes';
 import MyDownloads from './pages/MyDownloads';
 import ManageNotes from './pages/ManageNotes';
+import Classes from './pages/Classes';
+import ClassPlayer from './pages/ClassPlayer';
+import TeacherClasses from './pages/teacher/TeacherClasses';
+import TeacherClassDetail from './pages/teacher/TeacherClassDetail';
 import OfflineSync from './components/OfflineSync';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -184,6 +188,8 @@ const App = () => {
             <Route path="/Notes" element={<Notes />} />
             <Route path="/MyDownloads" element={<MyDownloads />} />
             <Route path="/ManageNotes" element={<ManageNotes />} />
+            <Route path="/Classes" element={<Classes />} />
+            <Route path="/Class/:classId" element={<ClassPlayer />} />
             <Route
               path="/Reader/:type/:id"
               element={
@@ -216,6 +222,8 @@ const App = () => {
             <Route path="/AcceptInvite/:token" element={<AcceptInvite />} />
             <Route path="/TeacherDashboard" element={<TeacherDashboard />} />
             <Route path="/TeacherContent" element={<TeacherContent />} />
+            <Route path="/TeacherClasses" element={<TeacherClasses />} />
+            <Route path="/TeacherClassDetail/:classId" element={<TeacherClassDetail />} />
             <Route path="/TeacherProfile" element={<TeacherProfile />} /> {/* 🆕 */}
             <Route path="/TeacherCurrentAffairs" element={<TeacherCurrentAffairs />} /> {/* 🆕 */}
             <Route path="/TeacherSubTeachers" element={<TeacherSubTeachers />} />

@@ -159,6 +159,28 @@ import { getMockLeaderboardBlueprints, getMockLeaderboard } from "../controllers
 import { downloadOfflineItem, syncOfflineLicenses, listOfflineDevices, removeOfflineDevice, listNotesForStudent } from "../controllers/offlineReading.js";
 import { uploadNotePdfMiddleware, getNoteUploadOptions, createNote, listManagedNotes, setNoteStatus, deleteNote } from "../controllers/manageNotes.js";
 import { anyStaff } from "../middlewares/anyStaff.js";
+import {
+  getTeacherClasses,
+  createClassFolder,
+  renameClassFolder,
+  deleteClassFolder,
+  createVideoClass,
+  updateVideoClass,
+  setVideoClassStatus,
+  deleteVideoClass,
+  getVideoClassAttendance,
+  getVideoClassDoubtsForTeacher,
+  answerVideoClassDoubt,
+  deleteVideoClassDoubt,
+} from "../controllers/teacherClasses.js";
+import {
+  getStudentClasses,
+  getLiveClassesNow,
+  getStudentClass,
+  saveClassProgress,
+  getClassDoubts,
+  askClassDoubt,
+} from "../controllers/studentClasses.js";
 import { getMyReferral } from "../controllers/referral.js";
 import { checkCodeAvailability, changePromoterCode } from "../controllers/codeAvailability.js";
 import { bulkImportStudents, getBatchRoster, getMyManagedCoupons, bulkMoveStudents, bulkRemoveStudents, uploadStudentFileMiddleware, parseStudentFile } from "../controllers/bulkManageStudents.js";
@@ -286,6 +308,27 @@ router.get("/manage/notes", adminOrTeacher, listManagedNotes);
 router.post("/manage/notes", adminLimiter, adminOrTeacher, uploadNotePdfMiddleware, sanitizeBody, createNote);
 router.post("/manage/notes/:noteId/status", adminLimiter, adminOrTeacher, setNoteStatus);
 router.delete("/manage/notes/:noteId", adminLimiter, adminOrTeacher, deleteNote);
+
+// 🎥 Video classes — Batch → Subject folder → Topic folder → Class (YouTube live / recorded + notes)
+router.get("/classes", userInfo, getStudentClasses);
+router.get("/classes/live-now", userInfo, getLiveClassesNow);
+router.get("/classes/:classId", userInfo, getStudentClass);
+router.post("/classes/:classId/progress", userInfo, writeLimiter, saveClassProgress);
+router.get("/classes/:classId/doubts", userInfo, getClassDoubts);
+router.post("/classes/:classId/doubts", userInfo, writeLimiter, askClassDoubt);
+
+router.get("/teacher/classes", teacherInfo, getTeacherClasses);
+router.post("/teacher/classes/folders", teacherInfo, writeLimiter, createClassFolder);
+router.patch("/teacher/classes/folders/:folderId", teacherInfo, writeLimiter, renameClassFolder);
+router.delete("/teacher/classes/folders/:folderId", teacherInfo, writeLimiter, deleteClassFolder);
+router.post("/teacher/classes", teacherInfo, writeLimiter, uploadNotePdfMiddleware, sanitizeBody, createVideoClass);
+router.post("/teacher/classes/:classId/update", teacherInfo, writeLimiter, uploadNotePdfMiddleware, sanitizeBody, updateVideoClass);
+router.post("/teacher/classes/:classId/status", teacherInfo, writeLimiter, setVideoClassStatus);
+router.delete("/teacher/classes/:classId", teacherInfo, writeLimiter, deleteVideoClass);
+router.get("/teacher/classes/:classId/attendance", teacherInfo, getVideoClassAttendance);
+router.get("/teacher/classes/:classId/doubts", teacherInfo, getVideoClassDoubtsForTeacher);
+router.post("/teacher/class-doubts/:doubtId/answer", teacherInfo, writeLimiter, answerVideoClassDoubt);
+router.delete("/teacher/class-doubts/:doubtId", teacherInfo, writeLimiter, deleteVideoClassDoubt);
 
 router.get("/me", userInfo, (req, res) => {
   res.status(200).json({ success: true, data: req.user });
