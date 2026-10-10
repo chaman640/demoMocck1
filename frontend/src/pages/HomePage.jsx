@@ -69,7 +69,7 @@ const HomePageSkeleton = () => (
     </main>
 
     {/* Bottom Nav */}
-    <nav className="fixed bottom-0 left-0 right-0 h-14 bg-[#0A0D14]/95 backdrop-blur-lg border-t border-gray-800 flex justify-around items-center z-50">
+    <nav data-bottom-nav className="fixed bottom-0 left-0 right-0 h-14 bg-[#0A0D14]/95 backdrop-blur-lg border-t border-gray-800 flex justify-around items-center z-50">
       {[1, 2, 3, 4].map((i) => (
         <SkeletonBlock key={i} className="w-6 h-6 rounded" />
       ))}

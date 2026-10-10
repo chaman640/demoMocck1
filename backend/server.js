@@ -53,13 +53,35 @@ app.disable("x-powered-by");
 // ─────────────────────────────────────────────
 const disableCsp = String(process.env.DISABLE_CSP || "").toLowerCase() === "true";
 
+// Hosts that Google AdSense and the Google IMA (video ads) SDK load from
+const AD_SCRIPT_HOSTS = [
+  "https://pagead2.googlesyndication.com",
+  "https://*.googlesyndication.com",
+  "https://*.adtrafficquality.google",
+  "https://adservice.google.com",
+  "https://www.googletagservices.com",
+  "https://partner.googleadservices.com",
+  "https://fundingchoicesmessages.google.com",
+  "https://imasdk.googleapis.com",
+  "https://*.doubleclick.net",
+];
+const AD_FRAME_HOSTS = [
+  "https://*.googlesyndication.com",
+  "https://*.doubleclick.net",
+  "https://*.adtrafficquality.google",
+  "https://www.google.com",
+  "https://imasdk.googleapis.com",
+  "https://fundingchoicesmessages.google.com",
+];
+
 const cspDirectives = {
   defaultSrc: ["'self'"],
   baseUri: ["'self'"],
   objectSrc: ["'none'"],
   frameAncestors: ["'none'"], // koi doosri site aapko iframe mein nahi daal sakti
   formAction: ["'self'"],
-  scriptSrc: ["'self'"], // Vite build ki saari JS alag file mein hoti hai — safe
+  // Own JS + Google AdSense (banner ads) + Google IMA SDK (video ads on test submit)
+  scriptSrc: ["'self'", ...AD_SCRIPT_HOSTS],
   // recharts / react inline `style=""` lagate hain, isliye style ke liye
   // 'unsafe-inline' zaroori hai. Ye XSS ke liye khatarnak nahi hai.
   // Google Fonts pehle se allow — kabhi index.html me font link jode to
@@ -69,11 +91,11 @@ const cspDirectives = {
   imgSrc: ["'self'", "data:", "blob:", "https:"],
   fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
   connectSrc: ["'self'", "https:"],
-  mediaSrc: ["'self'", "https:", "data:"],
+  mediaSrc: ["'self'", "https:", "data:", "blob:"], // blob: — video ads
   workerSrc: ["'self'", "blob:"], // aage PWA service worker ke liye
   manifestSrc: ["'self'"], // aage PWA manifest.json ke liye
   // YouTube solution-video embed karna ho to ye pehle se laga hai
-  frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
+  frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com", ...AD_FRAME_HOSTS],
 };
 if (isProduction) cspDirectives.upgradeInsecureRequests = [];
 

@@ -3,6 +3,7 @@ import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import { showAdBreak } from "../ads/adBreak";
 import AdBanner from "../components/AdBanner";
 import { emitCoinEarned } from "../utils/rewardEvents";
 import { vibrateShort } from "../utils/vibrate";
@@ -358,6 +359,7 @@ const CustomTest = () => {
     submittingRef.current = true;
     if (currentQuestion && !isCurrentRevealed) freezeTime(currentQuestion._id);
     setPhase("submitting");
+    showAdBreak(); // video ad plays while the result loads behind it
     try {
       const attemptedQuestions = testData.subjects.flatMap((subj) =>
         subj.questions.map((q) => ({
@@ -587,7 +589,7 @@ const CustomTest = () => {
           </div>
 
           <div className="w-full lg:w-72 bg-[#111827] border border-gray-800 rounded-2xl p-5 h-fit">
-            <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} className="mb-4" />
+            <AdBanner slot="inline" refreshTrigger={adRefreshCount} className="mb-4" />
             <div className="grid grid-cols-1 gap-2 text-[11px] mb-5">
               <div className="flex items-center gap-1.5 text-gray-400">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500" /> Correct ({summary.correct})

@@ -75,6 +75,8 @@ import ClassPlayer from './pages/ClassPlayer';
 import TeacherClasses from './pages/teacher/TeacherClasses';
 import TeacherClassDetail from './pages/teacher/TeacherClassDetail';
 import OfflineSync from './components/OfflineSync';
+import PageBottomAd from './components/PageBottomAd';
+import AdBreakHost from './components/AdBreakHost';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // PDF reader (PDF.js) bhari hai — sirf reader khulne par load hota hai
@@ -151,6 +153,8 @@ const App = () => {
         <HashRouter>
           <CoinRewardListener />
           <OfflineSync />
+          <PageBottomAd />
+          <AdBreakHost />
           <RouteErrorBoundary>
             <Routes>
               {/* ── Student ── */}

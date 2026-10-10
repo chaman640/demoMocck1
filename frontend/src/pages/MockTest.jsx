@@ -3,6 +3,7 @@ import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import api from "../api/api";
+import { showAdBreak } from "../ads/adBreak";
 import BottomNav from "../components/BottomNav";
 import AdBanner from "../components/AdBanner";
 import { emitCoinEarned } from "../utils/rewardEvents";
@@ -425,6 +426,7 @@ const MockTest = () => {
     submittingRef.current = true;
     flushTime();
     setPhase("submitting");
+    showAdBreak(); // video ad plays while the result loads behind it
     try {
       // 👇 BUG FIX: isCorrect ab yahan calculate NAHI hota — backend
       // (addPerformence.js) ab khud DB ke correctOption se compare karke
@@ -886,7 +888,7 @@ const TestScreen = ({
 
         {/* Palette sidebar */}
         <div className="w-full lg:w-72 bg-[#111827] border border-gray-800 rounded-2xl p-5 h-fit">
-          <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshTrigger} className="mb-4" />
+          <AdBanner slot="inline" refreshTrigger={adRefreshTrigger} className="mb-4" />
           <div className="grid grid-cols-2 gap-2 text-[11px] mb-5">
             <LegendItem colorClass="bg-green-500" label="Answered" count={summary.answered} />
             <LegendItem colorClass="bg-red-500" label="Not Answered" count={summary.notAnswered} />

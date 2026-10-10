@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
+import { showAdBreak } from "../ads/adBreak";
 import AdBanner from "../components/AdBanner";
 import { emitCoinEarned } from "../utils/rewardEvents";
 import { vibrateShort } from "../utils/vibrate";
@@ -137,6 +138,7 @@ const CurrentAffairs = () => {
     if (!quiz || submittingRef.current) return;
     submittingRef.current = true;
     setPhase("submitting");
+    showAdBreak(); // video ad plays while the result loads behind it
     try {
       const attemptedQuestions = quiz.questions.map((q) => ({
         questionId: q._id,
@@ -321,7 +323,7 @@ const CurrentAffairs = () => {
             </div>
           </div>
 
-          <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} className="mb-4" />
+          <AdBanner slot="inline" refreshTrigger={adRefreshCount} className="mb-4" />
 
           <div className="flex gap-3">
             <button onClick={goPrev} disabled={activeQIdx === 0} className="px-4 py-2 rounded-lg border border-gray-700 text-sm text-gray-300 disabled:opacity-40">

@@ -1,58 +1,62 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useAdsConfig } from "../ads/adsConfig";
 
-const AD_CLIENT = "ca-pub-2902001191700540";
 const MIN_REFRESH_GAP_MS = 5000;
 
-const AdBanner = ({ adSlot, refreshTrigger, className = "" }) => {
+/**
+ * Google AdSense banner.
+ * slot: "inline" | "bottom" (ad unit IDs come from the server's ad settings)
+ * refreshTrigger: change it to load a new ad (at most once every 5 seconds)
+ * Renders nothing when ads are off or the ad unit ID is not set.
+ */
+const AdBanner = ({ slot = "inline", refreshTrigger, className = "", compact = false }) => {
+  const ads = useAdsConfig();
+  const slotId = ads.enabled ? ads.slots?.[slot] : "";
   const [instanceKey, setInstanceKey] = useState(0);
   const lastPushRef = useRef(0);
   const isFirstRender = useRef(true);
   const pendingRefreshRef = useRef(false);
 
-  const pushAd = () => {
+  useEffect(() => {
+    if (!slotId) return;
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
       lastPushRef.current = Date.now();
-    } catch (e) {}
-  };
-
-  useEffect(() => {
-    pushAd();
-  }, [instanceKey]);
+    } catch {
+      /* ad blocker or script not loaded — nothing to do */
+    }
+  }, [instanceKey, slotId]);
 
   useEffect(() => {
     if (isFirstRender.current) {
       isFirstRender.current = false;
       return;
     }
-
     const elapsed = Date.now() - lastPushRef.current;
     if (elapsed >= MIN_REFRESH_GAP_MS) {
       setInstanceKey((k) => k + 1);
       return;
     }
-
     if (pendingRefreshRef.current) return;
     pendingRefreshRef.current = true;
-    const wait = MIN_REFRESH_GAP_MS - elapsed;
     const t = setTimeout(() => {
       pendingRefreshRef.current = false;
       setInstanceKey((k) => k + 1);
-    }, wait);
+    }, MIN_REFRESH_GAP_MS - elapsed);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
+
+  if (!slotId) return null;
 
   return (
     <div className={className}>
       <ins
         key={instanceKey}
         className="adsbygoogle"
-        style={{ display: "block" }}
-        data-ad-client={AD_CLIENT}
-        data-ad-slot={adSlot}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
+        style={compact ? { display: "block", width: "100%", height: 50 } : { display: "block" }}
+        data-ad-client={ads.client}
+        data-ad-slot={slotId}
+        {...(compact ? { "data-ad-format": "horizontal", "data-full-width-responsive": "false" } : { "data-ad-format": "auto", "data-full-width-responsive": "true" })}
       />
     </div>
   );

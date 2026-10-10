@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import ShareResultButton from "../components/ShareResultButton";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "../api/api";
+import { showAdBreak } from "../ads/adBreak";
 import AdBanner from "../components/AdBanner";
 import { vibrateShort } from "../utils/vibrate";
 
@@ -409,6 +410,7 @@ const Challenge = () => {
     submittingRef.current = true;
     flushTime();
     setPhase("submitting");
+    showAdBreak(); // video ad plays while the result loads behind it
     try {
       const attemptedQuestions = challengeMeta.subjects.flatMap((subj) =>
         subj.questions.map((q) => ({
@@ -754,7 +756,7 @@ const Challenge = () => {
             </div>
           </div>
           <div className="max-w-2xl mx-auto mt-4">
-            <AdBanner adSlot="YOUR_AD_SLOT_ID" refreshTrigger={adRefreshCount} />
+            <AdBanner slot="inline" refreshTrigger={adRefreshCount} />
           </div>
         </div>
       </div>

@@ -34,6 +34,8 @@ const OPTIONAL = [
   ["BREVO_SENDER_EMAIL", "🚨 OTP / admin login link / teacher invite — NO EMAILS WILL BE SENT"],
   ["ADMIN_SECRET", "admin seeding/scripts (x-admin-secret header) will stay disabled"],
   ["ADMIN_EMAIL", "admin panel access from the browser will stay disabled"],
+  ["ADSENSE_SLOT_BOTTOM", "the small ad at the bottom of every page will not show"],
+  ["VIDEO_AD_TAG_URL", "no video ad after a test is submitted"],
   ["FRONTEND_URL", "CORS will only allow hardcoded origins, email links may point to the wrong domain"],
 ];
 
@@ -56,7 +58,7 @@ export const checkEnv = () => {
   } else {
     // 🆕 Positive confirmation bhi print karo — taaki "sab sahi hai" bhi
     // saaf dikhe, sirf missing hone par hi warning na aaye
-    console.log("✅ All optional env variables (Cloudinary, Brevo, Admin, Frontend URL) are set.\n");
+    console.log("✅ All optional env variables (Cloudinary, Brevo, Admin, Ads, Frontend URL) are set.\n");
   }
 
   if (missingRequired.length) {

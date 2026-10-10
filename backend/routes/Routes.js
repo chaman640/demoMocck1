@@ -159,6 +159,7 @@ import { getMockLeaderboardBlueprints, getMockLeaderboard } from "../controllers
 import { downloadOfflineItem, syncOfflineLicenses, listOfflineDevices, removeOfflineDevice, listNotesForStudent } from "../controllers/offlineReading.js";
 import { uploadNotePdfMiddleware, getNoteUploadOptions, createNote, listManagedNotes, setNoteStatus, deleteNote } from "../controllers/manageNotes.js";
 import { anyStaff } from "../middlewares/anyStaff.js";
+import { getAdsConfig } from "../controllers/adsConfig.js";
 import {
   getTeacherClasses,
   createClassFolder,
@@ -310,6 +311,9 @@ router.post("/manage/notes/:noteId/status", adminLimiter, adminOrTeacher, setNot
 router.delete("/manage/notes/:noteId", adminLimiter, adminOrTeacher, deleteNote);
 
 // 🎥 Video classes — Batch → Subject folder → Topic folder → Class (YouTube live / recorded + notes)
+// 📢 Ad settings (public — no login needed)
+router.get("/ads/config", getAdsConfig);
+
 router.get("/classes", userInfo, getStudentClasses);
 router.get("/classes/live-now", userInfo, getLiveClassesNow);
 router.get("/classes/:classId", userInfo, getStudentClass);

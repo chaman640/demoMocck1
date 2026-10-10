@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import api from "../api/api";
+import { showAdBreak } from "../ads/adBreak";
 import { vibrateShort } from "../utils/vibrate";
 import { emitBoostActivated } from "../utils/rewardEvents";
 
@@ -228,6 +229,7 @@ const RewardsStore = () => {
     setBoosting(true);
     setDownload(null);
     try {
+      await showAdBreak({ force: true, message: "Your 2x boost starts right after this ad" });
       const res = await api.post("/rewards/watch-ad-boost");
       setMessage(res.data.message);
       emitBoostActivated(Math.round((res.data.data?.boostRemainingSeconds || 2700) / 60));
